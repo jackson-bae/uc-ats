@@ -92,13 +92,11 @@ model Task {
   createdAt      DateTime   @default(now())
   completed      Boolean    @default(false)
 
-  assignedToId   String?
-  assignedTo     User?      @relation("AssignedTasks", fields: [assignedToId], references: [id])
-
   applicationId  String?
   application    Application? @relation("ApplicationTasks", fields: [applicationId], references: [id])
 
   @@map("tasks")
+
 }
 
 model Grade {
@@ -112,4 +110,5 @@ model Grade {
   user        String?
 
   @@map("grades")
+
 }
