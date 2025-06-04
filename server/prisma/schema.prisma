@@ -15,7 +15,6 @@ model User {
   graduationClass String?
   role            UserRole   @default(USER)
   createdAt       DateTime   @default(now())
-  tasks           Task[]     @relation("AssignedTasks")
 
   @@map("users")
 }
