@@ -211,18 +211,38 @@ export default function ApplicationList() {
                 </div>
 
                 <div className="candidate-scores">
-                  <div className="score-item">
-                    <p className="score-label">Resume</p>
-                    <p className="score-value">8.5</p>
-                  </div>
-                  <div className="score-item">
-                    <p className="score-label">Cover Letter</p>
-                    <p className="score-value">7.8</p>
-                  </div>
-                  <div className="score-item">
-                    <p className="score-label">Video</p>
-                    <p className="score-value">9.2</p>
-                  </div>
+                  {applicant.averageGrades?.resume || applicant.averageGrades?.cover_letter || applicant.averageGrades?.video ? (
+                    <>
+                      <div className="score-item">
+                        <p className="score-label">Resume</p>
+                        <p className="score-value">
+                          {applicant.averageGrades?.resume || 'N/A'}
+                        </p>
+                      </div>
+                      <div className="score-item">
+                        <p className="score-label">Cover Letter</p>
+                        <p className="score-value">
+                          {applicant.averageGrades?.cover_letter || 'N/A'}
+                        </p>
+                      </div>
+                      <div className="score-item">
+                        <p className="score-label">Video</p>
+                        <p className="score-value">
+                          {applicant.averageGrades?.video || 'N/A'}
+                        </p>
+                      </div>
+                      <div className="score-item">
+                        <p className="score-label">Overall</p>
+                        <p className="score-value" style={{ color: '#3b82f6' }}>
+                          {applicant.averageGrades?.overall || 'N/A'}
+                        </p>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="no-grades-message" style={{ fontStyle: 'italic', color: '#6b7280' }}>
+                      Be the first to grade this application
+                    </div>
+                  )}
                 </div>
 
                 <div className="candidate-status">
