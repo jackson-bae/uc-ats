@@ -1,6 +1,5 @@
 generator client {
   provider = "prisma-client-js"
-  // output = "../generated/prisma"
 }
 
 datasource db {
@@ -9,14 +8,15 @@ datasource db {
 }
 
 model User {
-  id              String   @id @default(uuid())
-  email           String   @unique
-  password        String   // Will be hashed
+  id              String     @id @default(uuid())
+  email           String     @unique
+  password        String     // Will be hashed
   fullName        String
   graduationClass String?
-  role            UserRole @default(USER)
-  createdAt       DateTime @default(now())
-  
+  role            UserRole   @default(USER)
+  createdAt       DateTime   @default(now())
+  tasks           Task[]     @relation("AssignedTasks")
+
   @@map("users")
 }
 
@@ -26,22 +26,18 @@ enum UserRole {
 }
 
 model Application {
-  // app data
   id                    String              @id @default(uuid())
   status                ApplicationStatus   @default(SUBMITTED)
 
-  // form metadata
   responseID            String              @unique
   submittedAt           DateTime            @default(now())
-  
-  // Basic Information
+
   email                 String              
   firstName             String
   lastName              String
   studentId             String              
   phoneNumber           String
-  
-  // Academic Information
+
   graduationYear        String
   isTransferStudent     Boolean
   priorCollegeYears     String?
@@ -49,22 +45,26 @@ model Application {
   majorGpa              Decimal            @db.Decimal(3,2)
   major1                String
   major2                String?
-  
-  // Demographic Information
+
   gender                String?
   isFirstGeneration     Boolean
-  
-  // File Upload URLs (direct access for displaying in UI)
-  resumeUrl             String             // PDF download link
-  blindResumeUrl        String?             // PDF download link  
-  headshotUrl           String             // Image URL for profile display
-  coverLetterUrl        String?             // PDF download link
-  videoUrl              String?             // Video stream/download link
-  
-  // Raw form responses (backup/additional fields)
+
+  resumeUrl             String             
+  blindResumeUrl        String?             
+  headshotUrl           String             
+  coverLetterUrl        String?             
+  videoUrl              String?             
+
   rawResponses          Json?
-  
+
+  cycleId    String?
+  applicationCycle      ApplicationCycle?  @relation(fields: [cycleId], references: [id])
+  tasks                 Task[]             @relation("ApplicationTasks")
+
   @@map("applications")
+
+  approved              Boolean?
+  currentRound          String?
 }
 
 enum ApplicationStatus {
@@ -76,24 +76,27 @@ enum ApplicationStatus {
 }
 
 model ApplicationCycle {
-  id        String   @id @default(uuid())
-  name      String
-  isActive  Boolean  @default(false)
-  createdAt DateTime @default(now())
-
+  id            String         @id @default(uuid())
+  name          String
+  isActive      Boolean        @default(false)
+  createdAt     DateTime       @default(now())
+  applications  Application[]
+  
   @@map("application_cycles")
 }
 
 model Task {
-  id          String   @id @default(uuid())
-  title       String
-  description String?
-  createdAt   DateTime @default(now())
-  completed   Boolean  @default(false)
+  id             String     @id @default(uuid())
+  title          String
+  description    String?
+  createdAt      DateTime   @default(now())
+  completed      Boolean    @default(false)
 
-  assignedTo  String?
-  applicationId String?
-  cycleId     String?
+  assignedToId   String?
+  assignedTo     User?      @relation("AssignedTasks", fields: [assignedToId], references: [id])
+
+  applicationId  String?
+  application    Application? @relation("ApplicationTasks", fields: [applicationId], references: [id])
 
   @@map("tasks")
 }
