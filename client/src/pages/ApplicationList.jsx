@@ -87,7 +87,7 @@ export default function ApplicationList() {
     <div className="application-list">
       {/* Simple header */}
       <div className="application-list-header">
-        <h1 className="header-title">Candidates</h1>
+        <h1 className="header-title">Grade Applications</h1>
         
         <div className="search-section">
           <div className="header-search">

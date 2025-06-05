@@ -27,9 +27,9 @@ const Layout = ({ children }) => {
   };
 
   const navigation = [
-    { name: 'Applications', href: '/application-list', icon: DocumentTextIcon },
+    { name: 'Grade Applications', href: '/application-list', icon: DocumentTextIcon },
     // make these admin only later
-    { name: 'Candidate Management', href: '/candidate-management', icon: ChartBarIcon },  
+    { name: 'Round Management', href: '/candidate-management', icon: ChartBarIcon },  
   ];
 
   const isCurrentPath = (path) => location.pathname === path;

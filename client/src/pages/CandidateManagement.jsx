@@ -737,7 +737,7 @@ export default function CandidateManagement() {
     return (
         <Box>
             <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
-                <Typography variant="h4" gutterBottom sx={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontWeight: 700 }}>Candidate Management</Typography>
+                <Typography variant="h4" gutterBottom sx={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontWeight: 700 }}>Round Management</Typography>
                 <Stack direction="row" spacing={1}>
                     <Button
                         variant="outlined"
