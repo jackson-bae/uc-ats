@@ -105,12 +105,13 @@ Core Functionality:
 
   The Candidate Management feature supports the following candidate statuses:
 
-  Rounds
-    1. Submitted: Initial application has been received
-    2. Under Review: Application is being evaluated, has made it past the submission stage
-    3. Accepted: Candidate has been selected to join the club
-    4. Rejected: Application has been declined
-    5. Waitlisted: Candidate’s status has been placed on hold for now, and can either be Accepted or Rejected from there
+### Rounds
+
+1. **Submitted**: Initial application has been received.
+2. **Under Review**: Application is being evaluated; it has made it past the submission stage.
+3. **Accepted**: Candidate has been selected to join the club.
+4. **Rejected**: Application has been declined.
+5. **Waitlisted**: Candidate’s status is on hold. They may later be **Accepted** or **Rejected** from this state.
 
 ### Notes
 
