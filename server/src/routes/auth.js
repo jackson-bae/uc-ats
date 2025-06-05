@@ -3,8 +3,10 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import prisma from '../prismaClient.js';
 import config from '../config.js';
+import nodemailer from 'nodemailer';
+import crypto from 'crypto';
 
-const router = express.Router();
+const router = express.Router(); 
 
 // Register new user
 router.post('/register', async (req, res) => {
@@ -127,6 +129,101 @@ router.get('/verify', async (req, res) => {
   } catch (error) {
     console.error('Token verification error:', error);
     res.status(401).json({ error: 'Invalid token' });
+  }
+});
+
+router.post('/forgot-password', async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    const user = await prisma.user.findUnique({ where: { email } });
+
+    if (!user) {
+      // Don't reveal if email exists
+      return res.json({ message: 'If that email exists, a reset link has been sent.' });
+    }
+
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetTokenExpiry = new Date(Date.now() + 1000 * 60 * 30); // 30 mins
+
+    await prisma.user.update({
+      where: { email },
+      data: {
+        resetToken,
+        resetTokenExpiry
+      }
+    });
+
+    const transporter = nodemailer.createTransport({
+      service: 'Gmail',
+      auth: {
+        user: process.env.EMAIL_USER,  // Add to your .env
+        pass: process.env.EMAIL_PASS   // Add to your .env
+      }
+    });
+
+    const resetLink = `http://localhost:5173/reset-password?token=${resetToken}`;
+    console.log('Sending email to:', email);
+    console.log('Using user:', process.env.EMAIL_USER);
+    console.log('Reset link:', resetLink);
+    await transporter.sendMail({
+      from: `"Club ATS" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: 'Reset Your Password',
+      html: `<p>You requested a password reset.</p>
+             <p><a href="${resetLink}">Click here to reset your password</a></p>`
+    }, (err, info) => {
+      if (err) {
+        console.error('❌ Email send error:', err);
+      } else {
+        console.log('✅ Email sent successfully:', info.response);
+      }
+    });
+
+    res.json({ message: 'Reset link sent if email exists' });
+
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({ error: 'Something went wrong' });
+  }
+});
+
+router.post('/reset-password', async (req, res) => {
+  const { token, newPassword } = req.body;
+
+  try {
+    if (!token || !newPassword) {
+      return res.status(400).json({ error: 'Missing token or new password' });
+    }
+
+    const user = await prisma.user.findFirst({
+      where: {
+        resetToken: token,
+        resetTokenExpiry: {
+          gte: new Date(), // ensure not expired
+        },
+      },
+    });
+
+    if (!user) {
+      return res.status(400).json({ error: 'Invalid or expired token' });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        password: hashedPassword,
+        resetToken: null,
+        resetTokenExpiry: null,
+      },
+    });
+
+    res.json({ message: 'Password reset successful' });
+  } catch (error) {
+    console.error('❌ Reset password error:', error); // this is what you check in terminal
+    res.status(500).json({ error: 'Something went wrong' });
   }
 });
 

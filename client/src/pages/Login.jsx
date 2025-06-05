@@ -190,6 +190,11 @@ const Login = () => {
                 <Button type="submit" fullWidth variant="contained" size="large" sx={{ mb: 3 }}>
                   Sign In
                 </Button>
+                <Typography variant="body2" align="center" sx={{ mt: 1 }}>
+                <a href="/forgot-password" style={{ color: '#1976d2', textDecoration: 'none' }}>
+                  Forgot password?
+                </a>
+                </Typography>
 
                 <Box sx={{ textAlign: 'center' }}>
                   <Typography variant="body2" sx={{ color: 'text.secondary' }}>

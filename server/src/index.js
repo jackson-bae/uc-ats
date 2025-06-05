@@ -1,13 +1,13 @@
 import express from 'express';
 import cors from 'cors';
 import cron from 'node-cron';
-
+import config from './config.js';
 import syncFormResponses from './services/syncResponses.js';
 import applicationsRoutes from './routes/applications.js';
 import filesRoutes from './routes/files.js';
 import authRoutes from './routes/auth.js';
 
-import config from './config.js';
+
 import adminRoutes from './routes/admin.js';
 const app = express();
 
