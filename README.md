@@ -88,7 +88,7 @@ Clicking on any applicant, you will see a variety of information about them, inc
 
 If you return back to the Application List page, you should see that your grade for that applicant should appear on its horizontal display card or should have influenced the average grades for that applicant. 
 
-## Candidate Management System
+### 3. Candidate Management System
 
 The following feature allows club administrators to manage recruitment candidates through various stages of the club application process.
 
