@@ -88,7 +88,7 @@ Clicking on any applicant, you will see a variety of information about them, inc
 
 If you return back to the Application List page, you should see that your grade for that applicant should appear on its horizontal display card or should have influenced the average grades for that applicant. 
 
-### Candidate Management System
+## Candidate Management System
 
 The following feature allows club administrators to manage recruitment candidates through various stages of the club application process.
 
@@ -101,7 +101,7 @@ Core Functionality:
   6. Data Management: Edit candidate information through the edit icon in each cell. Rounds are the only editable information for the candidates.
   7. Reset Functionality: The administrator can reset all decisions and start over
 
-  ## User Workflow
+  ### User Workflow
 
   The Candidate Management feature supports the following candidate statuses:
 
