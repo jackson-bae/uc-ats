@@ -306,20 +306,40 @@ router.get('/:id/grades/average', requireAuth, async (req, res) => {
       });
     }
 
+    // Filter out null grades and convert string grades to numbers
+    const resumeGrades = grades
+      .filter(g => g.resume !== null && g.resume !== undefined)
+      .map(g => parseFloat(g.resume));
+      
+    const videoGrades = grades
+      .filter(g => g.video !== null && g.video !== undefined)
+      .map(g => parseFloat(g.video));
+      
+    const coverLetterGrades = grades
+      .filter(g => g.cover_letter !== null && g.cover_letter !== undefined)
+      .map(g => parseFloat(g.cover_letter));
+    
     // Calculate averages
-    const totals = grades.reduce((acc, grade) => ({
-      resume: acc.resume + parseFloat(grade.resume || 0),
-      video: acc.video + parseFloat(grade.video || 0),
-      cover_letter: acc.cover_letter + parseFloat(grade.cover_letter || 0),
-      count: acc.count + 1
-    }), { resume: 0, video: 0, cover_letter: 0, count: 0 });
+    const avgResume = resumeGrades.length > 0 ? 
+      (resumeGrades.reduce((a, b) => a + b, 0) / resumeGrades.length) : 0;
+      
+    const avgVideo = videoGrades.length > 0 ? 
+      (videoGrades.reduce((a, b) => a + b, 0) / videoGrades.length) : 0;
+      
+    const avgCoverLetter = coverLetterGrades.length > 0 ? 
+      (coverLetterGrades.reduce((a, b) => a + b, 0) / coverLetterGrades.length) : 0;
+    
+    // Calculate overall average if at least one grade exists
+    const allGradeValues = [...resumeGrades, ...videoGrades, ...coverLetterGrades];
+    const overallAverage = allGradeValues.length > 0 ? 
+      (allGradeValues.reduce((a, b) => a + b, 0) / allGradeValues.length) : 0;
 
     const averages = {
-      resume: parseFloat((totals.resume / totals.count).toFixed(2)),
-      video: parseFloat((totals.video / totals.count).toFixed(2)),
-      cover_letter: parseFloat((totals.cover_letter / totals.count).toFixed(2)),
-      total: parseFloat(((totals.resume + totals.video + totals.cover_letter) / (totals.count * 3)).toFixed(2)),
-      count: totals.count
+      resume: parseFloat(avgResume.toFixed(2)),
+      video: parseFloat(avgVideo.toFixed(2)),
+      cover_letter: parseFloat(avgCoverLetter.toFixed(2)),
+      total: parseFloat(overallAverage.toFixed(2)),
+      count: grades.length
     };
 
     res.json(averages);

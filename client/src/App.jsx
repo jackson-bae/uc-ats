@@ -3,9 +3,7 @@ import { Route, Routes, Navigate, useNavigate } from 'react-router-dom';
 import ApplicationList from './pages/ApplicationList';
 import ApplicationDetail from './pages/ApplicationDetail';
 import Login from './pages/Login';
-import LandingPage from './pages/LandingPage';
 import SignUp from './pages/SignUp';
-import NotFound from './pages/NotFound';
 import Layout from './components/Layout';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import CandidateManagement from './pages/CandidateManagement';
@@ -68,12 +66,11 @@ const AppRoutes = () => {
       
     
       
-      <Route path="*" element={<NotFound />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
 
-<Route path="/reset-password" element={<ResetPassword />} />
-    </Routes>
-  );
+      <Route path="/reset-password" element={<ResetPassword />} />
+        </Routes>
+      );
 };
 
 export default function App() {
