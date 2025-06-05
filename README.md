@@ -32,17 +32,7 @@ cd ../server
 npm install
 ```
 
-### 3. Set up database access
-
-All team members have been added to the Supabase organization — check your email for an invitation to join. Once you've accepted, you'll be able to access the database.
-
-To connect to the databse with Prisma, create a `.env` file in the `server/` directory and add a `DATABASE_URL` entry. You can find this in the Supabase dashboard. It should look something like: 
-
-```env
-DATABASE_URL="postgresql://postgres:<your-password>@<your-db-host>.supabase.co:5432/postgres"
-```
-
-### 4. Generate Prisma client
+### 3. Generate Prisma client
 
 This step generates the Prisma client which allows you to query your database in a type-safe way. It reads your `schema.prisma` file and creates a client tailored to your data models in the `node_modules/@prisma/client` folder.
 
@@ -53,14 +43,10 @@ cd server
 npx prisma generate
 ```
 
-To push your local schema to Supabase (if you make changes to schema.prisma):
-
-```bash
-npx prisma db push
-```
-
 ## Testing  
 ### 1. Start the backend server
+
+The backend is run locally on local port 3001.
 
 ```bash
 cd server
@@ -69,7 +55,36 @@ npm run dev
 
 ### 2. Start the frontend
 
+The frontend is run locally on local port 5173.
+
 ```bash
 cd client
 npm run dev
 ```
+
+## User Flow
+### 0. Google Form Applications
+
+All of the applications in our applicant tracking system are fueled by responses from a Google Form: https://docs.google.com/forms/d/e/1FAIpQLSdpXneX-5RIdqclQGnk8DWOSHsQVcLxyCW2_EBMaI3eB8UdpA/viewform?pli=1. You can test this out after reading the below instructions by filling out the Google Form. Once you put in a new application, you will need to restart the backend once again for the applicant to be updated onto the website. 
+
+```bash
+cd server
+npm run dev
+```
+
+### 1. Sign up
+
+You should now log on to http://localhost:5173/...
+
+As a new user, you are a part of the board of one of UCLA's renowned clubs and because it is the Fall, you have a new application cycle and a lot of new applicants to review in collaboration with your fellow board members. 
+
+Because you are new to the platform, click on the Sign Up button and enter your new credentials. 
+
+### 2. Application List
+
+Upon landing to the application tracking system, you will see a list of applicants. You can use a series of dropdown menus to sort and filter out applicants as you need. You are also given the opportunity to grade applicants. Some of them already have grades, which should be visible, while others do not.
+
+Clicking on any applicant, you will see a variety of information about them, including its existing applicant grades, photo, and basic information such as major, academic information, and demographic information. As a board member, you are to grade applications using the grading panel on the right, based on their resume, cover letter, and optional video. If an applicant did not submit any of these items, select N/A for that category. Once you are ready to submit your grades for an applicant, click Save Grades!
+
+If you return back to the Application List page, you should see that your grade for that applicant should appear on its horizontal display card or should have influenced the average grades for that applicant. 
+
