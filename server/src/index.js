@@ -8,7 +8,7 @@ import filesRoutes from './routes/files.js';
 import authRoutes from './routes/auth.js';
 
 import config from './config.js';
-
+import adminRoutes from './routes/admin.js';
 const app = express();
 
 app.use(cors());
@@ -18,6 +18,7 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/applications', applicationsRoutes);
 app.use('/api/files', filesRoutes);
+app.use('/api/admin', adminRoutes);
 
 await syncFormResponses();
 cron.schedule('*/5 * * * *', () => {
