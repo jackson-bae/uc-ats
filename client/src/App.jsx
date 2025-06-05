@@ -11,7 +11,8 @@ import ApplicationCycleManager from './pages/ApplicationCycleManager';
 import NotFound from './pages/NotFound';
 import Layout from './components/Layout';
 import { AuthProvider, useAuth } from './context/AuthContext';
-
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 // Protected Route wrapper
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -87,6 +88,9 @@ const AppRoutes = () => {
       />
       
       <Route path="*" element={<NotFound />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+
+<Route path="/reset-password" element={<ResetPassword />} />
     </Routes>
   );
 };
