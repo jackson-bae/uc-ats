@@ -9,19 +9,27 @@ router.get('/stats', async (req, res) => {
   try {
     const totalApplicants = await prisma.application.count();
     const totalTasks = await prisma.task.count();
+
     const candidates = await prisma.application.findMany({
-      where: { status: 'UNDER_REVIEW' }
+      where: {
+        status: { in: ['SUBMITTED', 'UNDER_REVIEW', 'WAITLISTED'] }
+      }
     });
 
-    const activeCycle = await prisma.applicationCycle.findFirst({
-      where: { isActive: true }
-    });
+    const statusCounts = candidates.reduce((acc, candidate) => {
+      acc[candidate.status] = (acc[candidate.status] || 0) + 1;
+      return acc;
+    }, {});
+
+    const currentRound = Object.keys(statusCounts).reduce((a, b) =>
+      statusCounts[a] > statusCounts[b] ? a : b, 'SUBMITTED'
+    );
 
     res.json({
       totalApplicants,
       tasks: totalTasks,
       candidates: candidates.length,
-      currentRound: activeCycle?.name || null
+      currentRound: currentRound
     });
   } catch (error) {
     console.error('[GET /api/admin/stats]', error);
@@ -42,66 +50,210 @@ router.get('/candidates', async (req, res) => {
   }
 });
 
+router.post('/advance-candidate/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log(`🚀 Advancing candidate ${id}...`);
+
+    const candidate = await prisma.application.findUnique({
+      where: { id }
+    });
+
+    if (!candidate) {
+      return res.status(404).json({ error: 'Candidate not found' });
+    }
+
+    let nextStatus;
+    if (candidate.status === 'SUBMITTED') {
+      nextStatus = 'UNDER_REVIEW';
+    } else if (candidate.status === 'UNDER_REVIEW') {
+      nextStatus = 'ACCEPTED';
+    } else if (candidate.status === 'WAITLISTED') {
+      nextStatus = 'UNDER_REVIEW';
+    } else {
+      return res.status(400).json({ error: 'Candidate cannot be advanced further' });
+    }
+
+    await prisma.application.update({
+      where: { id },
+      data: {
+        status: nextStatus,
+        approved: null
+      }
+    });
+
+    res.json({ message: `Candidate advanced to ${nextStatus}` });
+
+  } catch (error) {
+    console.error(`[POST /api/admin/advance-candidate/:id]`, error);
+    res.status(500).json({ error: 'Failed to advance candidate' });
+  }
+});
+
+router.put('/candidates/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+
+    console.log(`Updating candidate ${id}...`, updateData);
+
+    Object.keys(updateData).forEach(key => {
+      if (updateData[key] === undefined || key === 'rejectedAtRound') {
+        delete updateData[key];
+      }
+    });
+
+    if (updateData.cumulativeGpa !== undefined) {
+      const gpa = parseFloat(updateData.cumulativeGpa);
+      if (isNaN(gpa) || gpa < 0 || gpa > 4) {
+        return res.status(400).json({ error: 'Invalid cumulative GPA' });
+      }
+      updateData.cumulativeGpa = gpa;
+    }
+
+    if (updateData.majorGpa !== undefined) {
+      const gpa = parseFloat(updateData.majorGpa);
+      if (isNaN(gpa) || gpa < 0 || gpa > 4) {
+        return res.status(400).json({ error: 'Invalid major GPA' });
+      }
+      updateData.majorGpa = gpa;
+    }
+
+    const validStatuses = ['SUBMITTED', 'UNDER_REVIEW', 'ACCEPTED', 'REJECTED', 'WAITLISTED'];
+    if (updateData.status && !validStatuses.includes(updateData.status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+
+    if (updateData.currentRound && !updateData.status) {
+      const statusMap = {
+        'SUBMITTED': 'SUBMITTED',
+        'UNDER_REVIEW': 'UNDER_REVIEW',
+        'ACCEPTED': 'ACCEPTED',
+        'REJECTED': 'REJECTED',
+        'WAITLISTED': 'WAITLISTED'
+      };
+      updateData.status = statusMap[updateData.currentRound] || updateData.currentRound;
+      delete updateData.currentRound;
+    }
+
+    const updatedCandidate = await prisma.application.update({
+      where: { id },
+      data: updateData
+    });
+
+    res.json({
+      message: 'Candidate updated successfully',
+      candidate: updatedCandidate
+    });
+  } catch (error) {
+    console.error(`[PUT /api/admin/candidates/:id]`, error);
+    res.status(500).json({ error: 'Failed to update candidate' });
+  }
+});
+
+router.post('/reject-candidate/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log(`Rejecting candidate ${id}...`);
+
+    await prisma.application.update({
+      where: { id },
+      data: {
+        status: 'REJECTED',
+        approved: false
+      }
+    });
+
+    res.json({ message: 'Candidate rejected' });
+  } catch (error) {
+    console.error(`[POST /api/admin/reject-candidate/:id]`, error);
+    res.status(500).json({ error: 'Failed to reject candidate' });
+  }
+});
+
 // Update approval status
 router.patch('/candidates/:id/approval', async (req, res) => {
   const { id } = req.params;
   const { approved } = req.body;
 
   try {
+    // Validate approved value
+    if (approved !== null && typeof approved !== 'boolean') {
+      return res.status(400).json({ error: 'Invalid approval status' });
+    }
+
     const updated = await prisma.application.update({
       where: { id },
       data: { approved }
     });
-    res.json(updated);
+
+    res.json({
+      message: `Candidate ${approved === null ? 'approval reset' : approved ? 'approved' : 'rejected'} successfully`,
+      candidate: updated
+    });
   } catch (error) {
     console.error('[PATCH /api/admin/candidates/:id/approval]', error);
+    if (error.code === 'P2025') {
+      return res.status(404).json({ error: 'Candidate not found' });
+    }
     res.status(500).json({ error: 'Failed to update approval status' });
   }
 });
 
 // Advance round
-router.post('/candidates/advance-round', async (req, res) => {
-  const { currentRound, nextRound } = req.body;
-
+router.post('/advance-round', async (req, res) => {
   try {
+    console.log('Starting bulk advance...');
+
     const approvedCandidates = await prisma.application.findMany({
-      where: { currentRound, approved: true }
+      where: {
+        approved: true,
+        status: { in: ['SUBMITTED', 'UNDER_REVIEW', 'WAITLISTED'] }
+      }
     });
 
-    const rejectedCandidates = await prisma.application.findMany({
-      where: { currentRound, approved: false }
+    console.log('Approved candidates to advance:', approvedCandidates.length);
+
+    if (approvedCandidates.length === 0) {
+      return res.status(400).json({ error: 'No approved candidates found to advance.' });
+    }
+
+    const updates = approvedCandidates.map(candidate => {
+      let nextStatus;
+
+      if (candidate.status === 'SUBMITTED') {
+        nextStatus = 'UNDER_REVIEW';
+      } else if (candidate.status === 'UNDER_REVIEW') {
+        nextStatus = 'ACCEPTED';
+      } else if (candidate.status === 'WAITLISTED') {
+        nextStatus = 'UNDER_REVIEW';
+      } else {
+        return null;
+      }
+
+      return prisma.application.update({
+        where: { id: candidate.id },
+        data: {
+          status: nextStatus,
+          approved: null
+        }
+      });
+    }).filter(Boolean);
+
+    await Promise.all(updates);
+
+    res.json({
+      message: `Successfully advanced ${updates.length} candidates`,
+      advancedCount: updates.length
     });
 
-    await Promise.all([
-      ...approvedCandidates.map(c =>
-        prisma.application.update({
-          where: { id: c.id },
-          data: {
-            currentRound: nextRound,
-            status: 'UNDER_REVIEW',
-            approved: null
-          }
-        })
-      ),
-      ...rejectedCandidates.map(c =>
-        prisma.application.update({
-          where: { id: c.id },
-          data: {
-            status: 'REJECTED',
-            currentRound: 'rejected'
-          }
-        })
-      )
-    ]);
-
-    res.json({ message: 'Candidates updated successfully' });
   } catch (error) {
-    console.error('[POST /api/admin/candidates/advance-round]', error);
-    res.status(500).json({ error: 'Failed to advance round' });
+    console.error('[POST /api/admin/advance-round]', error);
+    res.status(500).json({ error: 'Failed to advance round', details: error.message });
   }
 });
 
-// PATCH approval status of a specific candidate
+// Approval status of a specific candidate
 router.post('/candidates/:id/approve', async (req, res) => {
   const { id } = req.params;
   const { approved } = req.body;
@@ -116,90 +268,6 @@ router.post('/candidates/:id/approve', async (req, res) => {
   } catch (error) {
     console.error('[POST /api/admin/candidates/:id/approve]', error);
     res.status(500).json({ error: 'Failed to update approval status' });
-  }
-});
-
-router.post('/advance-round', async (req, res) => {
-  try {
-    // 1. Get the current active round
-    const currentCycle = await prisma.applicationCycle.findFirst({
-      where: { isActive: true }
-    });
-
-    if (!currentCycle) {
-      return res.status(404).json({ error: 'No active application cycle found.' });
-    }
-
-    // 2. Get all applications in this cycle with a decision
-    const applications = await prisma.application.findMany({
-      where: {
-        cycleId: currentCycle.id,
-        approved: { not: null }
-      }
-    });
-
-    // 3. Get all cycles and figure out the next one (by creation order)
-    const allCycles = await prisma.applicationCycle.findMany({
-      orderBy: { createdAt: 'asc' }
-    });
-
-    const currentIndex = allCycles.findIndex(c => c.id === currentCycle.id);
-    const nextCycle = allCycles[currentIndex + 1];
-
-    // 4. If no next round, reject all unapproved
-    if (!nextCycle) {
-      await Promise.all(applications.map(app => {
-        return prisma.application.update({
-          where: { id: app.id },
-          data: {
-            status: app.approved ? 'ACCEPTED' : 'REJECTED',
-            approved: null
-          }
-        });
-      }));
-
-      await prisma.applicationCycle.update({
-        where: { id: currentCycle.id },
-        data: { isActive: false }
-      });
-
-      return res.json({ message: 'Final round complete. Applications updated accordingly.' });
-    }
-
-    // 5. Advance approved applications to the next round
-    const updates = applications.map(app => {
-      return prisma.application.update({
-        where: { id: app.id },
-        data: app.approved
-          ? {
-              cycleId: nextCycle.id,
-              approved: null,
-              status: 'UNDER_REVIEW'
-            }
-          : {
-              status: 'REJECTED',
-              approved: null
-            }
-      });
-    });
-
-    // 6. Update current cycle status
-    await Promise.all([
-      ...updates,
-      prisma.applicationCycle.update({
-        where: { id: currentCycle.id },
-        data: { isActive: false }
-      }),
-      prisma.applicationCycle.update({
-        where: { id: nextCycle.id },
-        data: { isActive: true }
-      })
-    ]);
-
-    res.json({ message: `Advanced to next round: ${nextCycle.name}` });
-  } catch (error) {
-    console.error('[POST /api/admin/advance-round]', error);
-    res.status(500).json({ error: 'Failed to advance round' });
   }
 });
 
@@ -238,6 +306,68 @@ router.post('/cycles/:id/activate', async (req, res) => {
     console.error('[POST /api/admin/cycles/:id/activate]', error);
     res.status(500).json({ error: 'Failed to activate cycle' });
   }
+});
+
+router.post('/reset-all', async (req, res) => {
+  try {
+    console.log('Resetting all candidates...');
+
+    await prisma.application.updateMany({
+      data: {
+        status: 'SUBMITTED',
+        approved: null
+      }
+    });
+
+    res.json({ message: 'All candidates reset to initial state' });
+  } catch (error) {
+    console.error('[POST /api/admin/reset-all]', error);
+    res.status(500).json({ error: 'Failed to reset candidates' });
+  }
+});
+
+router.put('/profile', async (req, res) => {
+  const { email, fullName, graduationClass, originalEmail } = req.body;
+
+  try {
+    // Prevent duplicate email
+    if (email !== originalEmail) {
+      const existingUser = await prisma.User.findUnique({
+        where: { email }
+      });
+
+      if (existingUser) {
+        return res.status(409).json({ error: 'Email already in use by another account' });
+      }
+    }
+
+    const result = await prisma.User.update({
+      where: { email: originalEmail },
+      data: { email, fullName, graduationClass }
+    });
+
+    res.json({ message: 'Profile updated successfully', user: result });
+  } catch (error) {
+    console.error('[PUT /api/admin/profile]', error);
+    res.status(500).json({ error: 'Failed to update user profile' });
+  }
+});
+
+router.get('/profile', async (req, res) => {
+  const { email } = req.query;
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { email }
+    });
+
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    res.json(user);
+  } catch (error) {
+    console.error('[GET /api/admin/profile]', error);
+    res.status(500).json({ error: 'Failed to fetch user profile' });
+     }
 });
 
 router.put('/profile', async (req, res) => {

@@ -11,6 +11,7 @@ import ApplicationCycleManager from './pages/ApplicationCycleManager';
 import NotFound from './pages/NotFound';
 import Layout from './components/Layout';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import CandidateManagement from './pages/CandidateManagement';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 // Protected Route wrapper
@@ -45,7 +46,7 @@ const AppRoutes = () => {
         path="/admin"
         element={
           <ProtectedRoute>
-            <AdminDashboard />
+            <CandidateManagement />
           </ProtectedRoute>
         }
       />

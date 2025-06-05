@@ -6,6 +6,7 @@ import syncFormResponses from './services/syncResponses.js';
 import applicationsRoutes from './routes/applications.js';
 import filesRoutes from './routes/files.js';
 import authRoutes from './routes/auth.js';
+import adminRoutes from './routes/admin.js';
 
 
 import adminRoutes from './routes/admin.js';
