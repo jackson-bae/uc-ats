@@ -101,7 +101,7 @@ Core Functionality:
   6. Data Management: Edit candidate information through the edit icon in each cell. Rounds are the only editable information for the candidates.
   7. Reset Functionality: The administrator can reset all decisions and start over
 
-  ### User Workflow
+  #### User Workflow
 
   The Candidate Management feature supports the following candidate statuses:
 
