@@ -1,13 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Route, Routes, Navigate, useNavigate } from 'react-router-dom';
-import AdminDashboard from './pages/AdminDashboard';
-import UserDashboard from './pages/UserDashboard';
 import ApplicationList from './pages/ApplicationList';
 import ApplicationDetail from './pages/ApplicationDetail';
 import Login from './pages/Login';
 import LandingPage from './pages/LandingPage';
 import SignUp from './pages/SignUp';
-import ApplicationCycleManager from './pages/ApplicationCycleManager';
 import NotFound from './pages/NotFound';
 import Layout from './components/Layout';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -38,12 +35,12 @@ const AppRoutes = () => {
       {/* Protected Routes */}
       <Route path="/" element={
         <ProtectedRoute>
-          <UserDashboard />
+          <ApplicationList />
         </ProtectedRoute>
       }/>
 
       <Route
-        path="/admin"
+        path="/candidate-management"
         element={
           <ProtectedRoute>
             <CandidateManagement />
@@ -69,24 +66,7 @@ const AppRoutes = () => {
         }
       />
       
-      <Route
-        path="/dashboard"
-        element={
-          <ProtectedRoute>
-            <UserDashboard />
-          </ProtectedRoute>
-        }
-      />
-      
-      
-      <Route
-        path="/application-cycles"
-        element={
-          <ProtectedRoute>
-            <ApplicationCycleManager />
-          </ProtectedRoute>
-        }
-      />
+    
       
       <Route path="*" element={<NotFound />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />

@@ -27,12 +27,9 @@ const Layout = ({ children }) => {
   };
 
   const navigation = [
-    { name: 'Dashboard', href: '/', icon: HomeIcon },
     { name: 'Applications', href: '/application-list', icon: DocumentTextIcon },
     // make these admin only later
-    { name: 'Admin Dashboard', href: '/admin', icon: ChartBarIcon },
-    { name: 'Application Cycles', href: '/application-cycles', icon: ClipboardDocumentListIcon },
-  
+    { name: 'Candidate Management', href: '/candidate-management', icon: ChartBarIcon },  
   ];
 
   const isCurrentPath = (path) => location.pathname === path;
@@ -60,7 +57,7 @@ const Layout = ({ children }) => {
               {/* Logo and title */}
               <div className="logo-section">
                 <div>
-                  <h1 className="logo-title">Club ATS</h1>
+                  <h1 className="logo-title">UConsulting</h1>
                 </div>
                 <div className="logo-subtitle">
                   <p>Application Tracking System</p>
