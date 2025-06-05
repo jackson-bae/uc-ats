@@ -91,6 +91,18 @@ const createAppTheme = (isDarkMode) => createTheme({
     text: {
       primary: isDarkMode ? '#fff' : '#2c3e50',
       secondary: isDarkMode ? '#b0b0b0' : '#7f8c8d'
+    },
+    sidebar: {
+      main: isDarkMode ? '#1a1a1a' : '#1e293b',
+      text: isDarkMode ? '#fff' : '#fff',
+      textSecondary: isDarkMode ? 'rgba(255, 255, 255, 0.8)' : 'rgba(255, 255, 255, 0.8)',
+      active: isDarkMode ? 'rgba(59, 130, 246, 0.3)' : 'rgba(59, 130, 246, 0.2)',
+      activeText: isDarkMode ? '#60a5fa' : '#60a5fa',
+      hover: isDarkMode ? 'rgba(255, 255, 255, 0.15)' : 'rgba(255, 255, 255, 0.1)'
+    },
+    appbar: {
+      main: isDarkMode ? '#1a1a1a' : '#fff',
+      text: isDarkMode ? '#fff' : '#2c3e50'
     }
   },
   typography: {
@@ -111,7 +123,7 @@ const createAppTheme = (isDarkMode) => createTheme({
     MuiButton: {
       styleOverrides: {
         root: {
-          borderRadius: '8px',
+          borderRadius: '40px',
           textTransform: 'none',
           fontWeight: 600,
           transition: 'all 0.2s ease-in-out',
@@ -185,7 +197,30 @@ const StatusIndicator = ({ status }) => {
     }
   };
 
-  return <Chip label={status} color={getStatusColor(status)} size="small" />;
+  return (
+    <Chip
+      label={status}
+      color={getStatusColor(status)}
+      size="small"
+      sx={{
+        fontWeight: 500,
+        borderRadius: '40px',
+        border: '2px solid',
+        borderColor: `${getStatusColor(status)}.main`,
+        px: 1.5,
+        py: 0.5,
+        height: '32px',
+        minWidth: '90px',
+        '& .MuiChip-label': {
+          paddingLeft: '4px',
+          paddingRight: '4px',
+          fontSize: '0.875rem',
+          letterSpacing: '0.02em',
+          color: 'white'
+        }
+      }}
+    />
+  );
 };
 
 const ApprovalIndicator = ({ approved, onApprovalChange }) => {
@@ -197,6 +232,27 @@ const ApprovalIndicator = ({ approved, onApprovalChange }) => {
         color="success"
         size="small"
         onDelete={() => onApprovalChange(null)}
+        sx={{
+          fontWeight: 500,
+          borderRadius: '40px',
+          border: '1px solid',
+          color: 'white',
+          borderColor: 'success.main',
+          height: '32px',
+          minWidth: '90px',
+          px: 1,
+          '& .MuiChip-icon': {
+            marginLeft: '8px',
+            color: 'white'
+          },
+          '& .MuiChip-label': {
+            paddingLeft: '8px',
+            paddingRight: '8px'
+          },
+          '& .MuiChip-deleteIcon': {
+            color: 'white'
+          },
+        }}
       />
     );
   } else if (approved === false) {
@@ -207,6 +263,27 @@ const ApprovalIndicator = ({ approved, onApprovalChange }) => {
         color="error"
         size="small"
         onDelete={() => onApprovalChange(null)}
+        sx={{
+          fontWeight: 500,
+          borderRadius: '40px',
+          border: '1px solid',
+          borderColor: 'error.main',
+          height: '32px',
+          minWidth: '90px',
+          color: 'white',
+          px: 1,
+          '& .MuiChip-icon': {
+            marginLeft: '8px',
+            color: 'white'
+          },
+          '& .MuiChip-deleteIcon': {
+            color: 'white'
+          },
+          '& .MuiChip-label': {
+            paddingLeft: '8px',
+            paddingRight: '8px'
+          }
+        }}
       />
     );
   } else {
@@ -216,7 +293,7 @@ const ApprovalIndicator = ({ approved, onApprovalChange }) => {
           size="small"
           color="success"
           onClick={() => onApprovalChange(true)}
-          sx={{ bgcolor: 'success.light', '&:hover': { bgcolor: 'success.main' } }}
+          sx={{ border: '2px solid', borderColor: 'success.main', color: 'success.main', bgcolor: 'transparent', '&:hover': { bgcolor: 'success.light', borderColor: 'success.main' } }}
         >
           <ThumbUpIcon fontSize="small" />
         </IconButton>
@@ -224,7 +301,7 @@ const ApprovalIndicator = ({ approved, onApprovalChange }) => {
           size="small"
           color="error"
           onClick={() => onApprovalChange(false)}
-          sx={{ bgcolor: 'error.light', '&:hover': { bgcolor: 'error.main' } }}
+          sx={{ border: '2px solid', borderColor: 'error.main', color: 'error.main', bgcolor: 'transparent', '&:hover': { bgcolor: 'error.light', borderColor: 'error.main' } }}
         >
           <ThumbDownIcon fontSize="small" />
         </IconButton>
@@ -419,9 +496,9 @@ export default function AdminDashboard() {
   ];
 
   const drawer = (
-    <Box sx={{ height: '100%', bgcolor: '#1e293b', color: 'white' }}>
-      <Box sx={{ p: 3, borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
-        <Typography variant="h6" sx={{ color: 'white', fontWeight: 700 }}>
+    <Box sx={{ height: '100%', bgcolor: 'sidebar.main', color: 'sidebar.text' }}>
+      <Box sx={{ p: 3, borderBottom: 'none' }}>
+        <Typography variant="h6" sx={{ color: 'sidebar.text', fontWeight: 700 }}>
           Club Admin
         </Typography>
       </Box>
@@ -435,10 +512,10 @@ export default function AdminDashboard() {
               mx: 2,
               mb: 1,
               borderRadius: '8px',
-              bgcolor: selectedTab === item.key ? 'rgba(59, 130, 246, 0.2)' : 'transparent',
-              color: selectedTab === item.key ? '#60a5fa' : 'rgba(255, 255, 255, 0.8)',
+              bgcolor: selectedTab === item.key ? 'sidebar.active' : 'transparent',
+              color: selectedTab === item.key ? 'sidebar.activeText' : 'sidebar.textSecondary',
               '&:hover': {
-                bgcolor: 'rgba(255, 255, 255, 0.1)'
+                bgcolor: 'sidebar.hover'
               }
             }}
           >
@@ -451,17 +528,17 @@ export default function AdminDashboard() {
       </List>
 
       <Box sx={{ position: 'absolute', bottom: 20, left: 20, right: 20 }}>
-        <Card sx={{ bgcolor: 'rgba(255, 255, 255, 0.1)', color: 'white' }}>
+        <Card sx={{ bgcolor: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.1)', color: 'sidebar.text' }}>
           <CardContent sx={{ p: 2 }}>
             <Stack direction="row" spacing={2} alignItems="center">
               <Avatar sx={{ bgcolor: 'primary.main' }}>
                 <AccountCircleIcon />
               </Avatar>
               <Box>
-                <Typography variant="body2" sx={{ color: 'white', fontWeight: 600 }}>
+                <Typography variant="body2" sx={{ color: 'sidebar.text', fontWeight: 600 }}>
                   Ronit Anilkumar
                 </Typography>
-                <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+                <Typography variant="caption" sx={{ color: isDarkMode ? 'rgba(255, 255, 255, 0.6)' : 'rgba(255, 255, 255, 0.7)' }}>
                   Recruitment Lead
                 </Typography>
               </Box>
@@ -627,34 +704,34 @@ export default function AdminDashboard() {
                     <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
                       <Typography variant="h6">User Profile</Typography>
                       <Button
-                      variant="contained"
-                      startIcon={<SaveIcon />}
-                      onClick={handleProfileUpdate}
-                      size="small"
+                        variant="contained"
+                        startIcon={<SaveIcon />}
+                        onClick={handleProfileUpdate}
+                        size="small"
                       >
                         Save Profile
                       </Button>
                     </Stack>
                     <Stack spacing={3}>
                       <TextField
-                      label="Full Name"
-                      value={userProfile.fullName}
-                      onChange={(e) => setUserProfile(prev => ({ ...prev, fullName: e.target.value }))}
-                      fullWidth
+                        label="Full Name"
+                        value={userProfile.fullName}
+                        onChange={(e) => setUserProfile(prev => ({ ...prev, fullName: e.target.value }))}
+                        fullWidth
                       />
                       <TextField
-                      label="Email Address"
-                      type="email"
-                      value={userProfile.email}
-                      onChange={(e) => setUserProfile(prev => ({ ...prev, email: e.target.value }))}
-                      fullWidth
+                        label="Email Address"
+                        type="email"
+                        value={userProfile.email}
+                        onChange={(e) => setUserProfile(prev => ({ ...prev, email: e.target.value }))}
+                        fullWidth
                       />
                       <TextField
-                      label="Graduation Class"
-                      value={userProfile.graduationClass}
-                      onChange={(e) => setUserProfile(prev => ({ ...prev, graduationClass: e.target.value }))}
-                      placeholder="e.g. 2026"
-                      fullWidth
+                        label="Graduation Class"
+                        value={userProfile.graduationClass}
+                        onChange={(e) => setUserProfile(prev => ({ ...prev, graduationClass: e.target.value }))}
+                        placeholder="e.g. 2026"
+                        fullWidth
                       />
                       <Typography variant="body2" color="text.secondary">
                         Changes will be saved to your profile and reflected across the system.
@@ -672,10 +749,10 @@ export default function AdminDashboard() {
                       <FormControlLabel
                         control={
                           <Switch
-                          checked={isDarkMode}
-                          onChange={handleThemeToggle}
-                          icon={<LightModeIcon />}
-                          checkedIcon={<DarkModeIcon />}
+                            checked={isDarkMode}
+                            onChange={handleThemeToggle}
+                            icon={<LightModeIcon />}
+                            checkedIcon={<DarkModeIcon />}
                           />
                         }
                         label={
@@ -789,9 +866,10 @@ export default function AdminDashboard() {
           sx={{
             width: { md: `calc(100% - ${DRAWER_WIDTH}px)` },
             ml: { md: `${DRAWER_WIDTH}px` },
-            bgcolor: 'white',
+            bgcolor: 'background.default',
             color: 'text.primary',
-            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+            boxShadow: 'none',
+            borderBottom: isDarkMode ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(0, 0, 0, 0.05)',
             zIndex: 2222
           }}
         >
@@ -799,12 +877,12 @@ export default function AdminDashboard() {
             <IconButton
               edge="start"
               onClick={() => setMobileOpen(!mobileOpen)}
-              sx={{ mr: 2, display: { md: 'none' } }}
+              sx={{ mr: 2, display: { md: 'none' }, color: 'appbar.text' }}
             >
               <MenuIcon />
             </IconButton>
             <Box sx={{ flexGrow: 1 }} />
-            <IconButton>
+            <IconButton sx={{ color: 'appbar.text' }}>
               <Badge badgeContent={3} color="error">
                 <NotificationsIcon />
               </Badge>
