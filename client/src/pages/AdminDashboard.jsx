@@ -72,6 +72,7 @@ import {
   Brightness4 as DarkModeIcon,
   Brightness7 as LightModeIcon
 } from '@mui/icons-material';
+import { useAuth } from '../context/AuthContext';
 
 const createAppTheme = (isDarkMode) => createTheme({
   palette: {
@@ -244,6 +245,7 @@ const PriorityIndicator = ({ priority }) => {
 };
 
 export default function AdminDashboard() {
+  const { user } = useAuth();
   const [selectedTab, setSelectedTab] = useState('dashboard');
   const [mobileOpen, setMobileOpen] = useState(false);
   const [cycleDialogOpen, setCycleDialogOpen] = useState(false);
@@ -259,26 +261,39 @@ export default function AdminDashboard() {
 
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [userProfile, setUserProfile] = useState({
-    fullName: 'Ronit Anilkumar',
-    email: 'ronit@email.com',
-    graduationClass: '2026'
+    fullName: '',
+    email: '',
+    graduationClass: ''
   });
+  const [originalEmail, setOriginalEmail] = useState('');
+  
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
 
   useEffect(() => {
-    // Replace with actual logic for Supabase
-    const fetchDashboardData = async () => {
+    const fetchProfile = async () => {
       try {
-        console.log('TODO: Fetch actual data from Supabase backend');
-      } catch (error) {
-        console.error('Error fetching data from Supabase backend: ', error);
+        const loggedInEmail = user?.email || '';  // from AuthContext
+        if (!loggedInEmail) return;
+  
+        const res = await fetch(`/api/admin/profile?email=${encodeURIComponent(loggedInEmail)}`);
+        if (!res.ok) throw new Error('Failed to fetch profile');
+        
+        const data = await res.json();
+        setUserProfile({
+          fullName: data.fullName,
+          email: data.email,
+          graduationClass: data.graduationClass
+        });
+        setOriginalEmail(data.email);
+      } catch (err) {
+        console.error('Error loading profile:', err);
       }
     };
-
-    fetchDashboardData();
+  
+    fetchProfile();
   }, []);
-
+  
   const handleCycleCreation = async (cycleData) => {
     // Replace with actual logic for Supabase
     try {
@@ -383,17 +398,40 @@ export default function AdminDashboard() {
   };
 
   const handleProfileUpdate = async () => {
+    console.log('Submitting profile update:', userProfile);
+  
     try {
-      console.log('TODO: Update user profiles in Supabase backend');
-
+      const response = await fetch('/api/admin/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...userProfile, originalEmail })
+      });
+      
+  
+      if (response.status === 409) {
+        setSnackbarMessage('Email is already taken by another user.');
+        setSnackbarOpen(true);
+        return;
+      }
+      
+      if (!response.ok) throw new Error('Failed to update');
+      
+      const result = await response.json();
+      console.log('Profile update response:', result);
+      
+      setOriginalEmail(userProfile.email);  // <-- update original email after success
       setSnackbarMessage('Profile updated successfully.');
       setSnackbarOpen(true);
+      
     } catch (error) {
-      console.error('Error updating profile: ', error);
+      console.error('Error updating profile:', error);
       setSnackbarMessage('Error updating profile. Please try again.');
       setSnackbarOpen(true);
     }
   };
+  
+  
+  
 
   const handleThemeToggle = () => {
     setIsDarkMode(!isDarkMode);
@@ -458,12 +496,12 @@ export default function AdminDashboard() {
                 <AccountCircleIcon />
               </Avatar>
               <Box>
-                <Typography variant="body2" sx={{ color: 'white', fontWeight: 600 }}>
-                  Ronit Anilkumar
-                </Typography>
-                <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
-                  Recruitment Lead
-                </Typography>
+              <Typography variant="body2" sx={{ color: 'white', fontWeight: 600 }}>
+                {userProfile.fullName || 'Admin User'}
+              </Typography>
+              <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+                Class of {userProfile.graduationClass}
+              </Typography>
               </Box>
             </Stack>
           </CardContent>
@@ -853,6 +891,25 @@ export default function AdminDashboard() {
           {renderContent()}
         </Box>
       </Box>
+      <Snackbar
+      open={snackbarOpen}
+      autoHideDuration={4000}
+      onClose={() => setSnackbarOpen(false)}
+      anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+    >
+      <Alert
+        onClose={() => setSnackbarOpen(false)}
+        severity={
+          snackbarMessage.toLowerCase().includes('success') ? 'success'
+          : snackbarMessage.toLowerCase().includes('error') ? 'error'
+          : snackbarMessage.toLowerCase().includes('taken') ? 'warning'
+          : 'info'
+        }
+        sx={{ width: '100%' }}
+      >
+        {snackbarMessage}
+      </Alert>
+    </Snackbar>
     </ThemeProvider>
   );
 }
