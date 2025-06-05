@@ -326,4 +326,48 @@ router.post('/reset-all', async (req, res) => {
   }
 });
 
+router.put('/profile', async (req, res) => {
+  const { email, fullName, graduationClass, originalEmail } = req.body;
+
+  try {
+    // Prevent duplicate email
+    if (email !== originalEmail) {
+      const existingUser = await prisma.User.findUnique({
+        where: { email }
+      });
+
+      if (existingUser) {
+        return res.status(409).json({ error: 'Email already in use by another account' });
+      }
+    }
+
+    const result = await prisma.User.update({
+      where: { email: originalEmail },
+      data: { email, fullName, graduationClass }
+    });
+
+    res.json({ message: 'Profile updated successfully', user: result });
+  } catch (error) {
+    console.error('[PUT /api/admin/profile]', error);
+    res.status(500).json({ error: 'Failed to update user profile' });
+  }
+});
+
+router.get('/profile', async (req, res) => {
+  const { email } = req.query;
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { email }
+    });
+
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    res.json(user);
+  } catch (error) {
+    console.error('[GET /api/admin/profile]', error);
+    res.status(500).json({ error: 'Failed to fetch user profile' });
+     }
+});
+
 export default router;
