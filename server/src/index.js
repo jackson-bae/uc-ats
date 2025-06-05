@@ -8,8 +8,6 @@ import filesRoutes from './routes/files.js';
 import authRoutes from './routes/auth.js';
 import adminRoutes from './routes/admin.js';
 
-
-import adminRoutes from './routes/admin.js';
 const app = express();
 
 app.use(cors());

@@ -58,8 +58,6 @@ model Application {
 
   rawResponses          Json?
 
-  cycleId    String?
-  applicationCycle      ApplicationCycle?  @relation(fields: [cycleId], references: [id])
   tasks                 Task[]             @relation("ApplicationTasks")
 
   @@map("applications")
@@ -74,16 +72,6 @@ enum ApplicationStatus {
   ACCEPTED
   REJECTED
   WAITLISTED
-}
-
-model ApplicationCycle {
-  id            String         @id @default(uuid())
-  name          String
-  isActive      Boolean        @default(false)
-  createdAt     DateTime       @default(now())
-  applications  Application[]
-  
-  @@map("application_cycles")
 }
 
 model Task {
