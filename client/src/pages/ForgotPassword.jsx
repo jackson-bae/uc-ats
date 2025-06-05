@@ -89,25 +89,24 @@ export default function ForgotPassword() {
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const navigate = useNavigate();
-const handleSubmit = async (e) => {
-  e.preventDefault();
 
-  try {
-    
-    const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/auth/forgot-password`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email }),
-      
-    });
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
-    const data = await res.json();
-    console.log(data); // optional: to verify response
-    setSubmitted(true);
-  } catch (err) {
-    console.error('Error sending reset request:', err);
-  }
-};
+    try {
+      const res = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await res.json();
+      console.log(data); // optional: to verify response
+      setSubmitted(true);
+    } catch (err) {
+      console.error('Error sending reset request:', err);
+    }
+  };
 
   return (
     <ThemeProvider theme={theme}>

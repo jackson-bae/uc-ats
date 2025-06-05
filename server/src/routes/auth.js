@@ -174,9 +174,9 @@ router.post('/forgot-password', async (req, res) => {
              <p><a href="${resetLink}">Click here to reset your password</a></p>`
     }, (err, info) => {
       if (err) {
-        console.error('❌ Email send error:', err);
+        console.error('Email send error:', err);
       } else {
-        console.log('✅ Email sent successfully:', info.response);
+        console.log('Email sent successfully:', info.response);
       }
     });
 
@@ -222,7 +222,7 @@ router.post('/reset-password', async (req, res) => {
 
     res.json({ message: 'Password reset successful' });
   } catch (error) {
-    console.error('❌ Reset password error:', error); // this is what you check in terminal
+    console.error('Reset password error:', error); // this is what you check in terminal
     res.status(500).json({ error: 'Something went wrong' });
   }
 });
