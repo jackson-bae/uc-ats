@@ -115,7 +115,7 @@ export default function ForgotPassword() {
         <Box sx={{ width: '50%' }}>
           <LeftSection>
             <Typography variant="h1" sx={{ mb: 2, textAlign: 'center' }}>
-              Club Application Tracker
+              UConsulting Application Tracker
             </Typography>
             <Typography
               variant="h5"
