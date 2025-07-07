@@ -13,6 +13,7 @@ import {
   UserIcon,
   Cog6ToothIcon
 } from '@heroicons/react/24/outline';
+import UConsultingLogo from './UConsultingLogo';
 import '../styles/Layout.css';
 
 const Layout = ({ children }) => {
@@ -56,9 +57,7 @@ const Layout = ({ children }) => {
               
               {/* Logo and title */}
               <div className="logo-section">
-                <div>
-                  <h1 className="logo-title">UConsulting</h1>
-                </div>
+                <UConsultingLogo size="medium" />
                 <div className="logo-subtitle">
                   <p>Application Tracking System</p>
                 </div>
@@ -87,9 +86,7 @@ const Layout = ({ children }) => {
         {/* Sidebar */}
         <div className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
           <div className="sidebar-content">
-            <div className="sidebar-header">
-              <h2 className="sidebar-title">Navigation</h2>
-            </div>
+            
             
             <nav className="sidebar-nav">
               {navigation.map((item) => {

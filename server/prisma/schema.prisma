@@ -50,15 +50,13 @@ model Application {
   gender                String?
   isFirstGeneration     Boolean
 
-  resumeUrl             String?             
+  resumeUrl             String             
   blindResumeUrl        String?             
-  headshotUrl           String?             
+  headshotUrl           String             
   coverLetterUrl        String?             
   videoUrl              String?             
 
-  rawResponses          Json?
-
-  tasks                 Task[]             @relation("ApplicationTasks")
+  rawResponses          Json
 
   @@map("applications")
 
@@ -74,19 +72,6 @@ enum ApplicationStatus {
   WAITLISTED
 }
 
-model Task {
-  id             String     @id @default(uuid())
-  title          String
-  description    String?
-  createdAt      DateTime   @default(now())
-  completed      Boolean    @default(false)
-
-  applicationId  String?
-  application    Application? @relation("ApplicationTasks", fields: [applicationId], references: [id])
-
-  @@map("tasks")
-
-}
 
 model Grade {
   id            String   @id @default(uuid())

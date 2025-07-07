@@ -24,7 +24,9 @@ import {
     Alert,
     Snackbar,
     TextField,
-    CircularProgress
+    CircularProgress,
+    ThemeProvider,
+    CssBaseline
 } from '@mui/material';
 import {
     Edit as EditIcon,
@@ -34,6 +36,8 @@ import {
     Refresh as RefreshIcon,
     Refresh
 } from '@mui/icons-material';
+import globalTheme from '../styles/globalTheme';
+import '../styles/CandidateManagement.css';
 
 const adminAPI = {
     async fetchStats() {
@@ -735,8 +739,10 @@ export default function CandidateManagement() {
     }
 
     return (
-        <Box>
-            <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
+        <ThemeProvider theme={globalTheme}>
+            <CssBaseline />
+            <Box className="candidate-management">
+                <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
                 <Typography variant="h4" gutterBottom sx={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', fontWeight: 700 }}>Round Management</Typography>
                 <Stack direction="row" spacing={1}>
                     <Button
@@ -1424,6 +1430,7 @@ export default function CandidateManagement() {
                 message={snackbarMessage}
                 anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
             />
-        </Box>
+            </Box>
+        </ThemeProvider>
     );
 }

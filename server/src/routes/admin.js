@@ -8,7 +8,7 @@ const router = express.Router();
 router.get('/stats', async (req, res) => {
   try {
     const totalApplicants = await prisma.application.count();
-    const totalTasks = await prisma.task.count();
+    const totalGrades = await prisma.grade.count();
 
     const candidates = await prisma.application.findMany({
       where: {
@@ -21,13 +21,15 @@ router.get('/stats', async (req, res) => {
       return acc;
     }, {});
 
-    const currentRound = Object.keys(statusCounts).reduce((a, b) =>
-      statusCounts[a] > statusCounts[b] ? a : b, 'SUBMITTED'
-    );
+    const currentRound = Object.keys(statusCounts).length > 0 
+      ? Object.keys(statusCounts).reduce((a, b) =>
+          statusCounts[a] > statusCounts[b] ? a : b
+        )
+      : 'SUBMITTED';
 
     res.json({
       totalApplicants,
-      tasks: totalTasks,
+      tasks: totalGrades, // Using grades count as "tasks" for compatibility
       candidates: candidates.length,
       currentRound: currentRound
     });
