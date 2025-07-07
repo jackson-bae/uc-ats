@@ -86,29 +86,6 @@ function generateFileUrl(fileData, fileType) {
   return `${baseUrl}/api/files/${fileId}/pdf`;
 }
 
-//Validate a transformed record against the field mappings
-export function validateRecord(record) {
-  const errors = [];
-  
-  for (const [questionId, mapping] of Object.entries(config.form.database_mappings)) {
-    const value = record[mapping.field];
-    
-    // Check required fields
-    if (mapping.required && (value === null || value === undefined || value === '')) {
-      errors.push(`${mapping.field} is required`);
-      continue;
-    }
-    
-    // Skip validation if field is optional and empty
-    if (!value) continue;
-  }
-  
-  return {
-    isValid: errors.length === 0,
-    errors
-  };
-}
-
 //Get all file upload question IDs
 export function getFileUploadQuestions() {
   const mappings = getDatabaseMappings();

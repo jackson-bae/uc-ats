@@ -1,14 +1,19 @@
+@import './variables.css';
+
 /* ApplicationDetail Styles */
 .application-detail {
   padding: 0;
   max-width: 1200px;
   margin: 0 auto;
+  font-family: var(--font-family);
+  font-weight: var(--font-weight-body);
+  background-color: var(--bg-primary);
 }
 
 .detail-header {
   margin-bottom: 2rem;
   padding: 1rem 0;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border-light);
 }
 
 .header-left {
@@ -20,9 +25,11 @@
 .back-link {
   display: flex;
   align-items: center;
-  color: #6b7280;
+  color: var(--text-tertiary);
   text-decoration: none;
   font-size: 0.875rem;
+  font-family: var(--font-family);
+  font-weight: var(--font-weight-body);
   padding: 0.25rem 0;
   transition: all 0.2s;
   gap: 0.375rem;
@@ -34,7 +41,7 @@
 }
 
 .back-link:hover {
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .name-and-status {
@@ -62,15 +69,15 @@
   flex-direction: column;
   align-items: center;
   padding: 0.5rem 1rem;
-  background-color: #f8f9fa;
-  border-radius: 0.5rem;
-  border: 1px solid #e9ecef;
+  background-color: var(--bg-gray-lighter);
+  border-radius: var(--border-radius);
+  border: 1px solid var(--border-light);
   min-width: 80px;
 }
 
 .average-grade-label {
   font-size: 0.75rem;
-  color: #6c757d;
+  color: var(--text-tertiary);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin-bottom: 0.25rem;
@@ -79,41 +86,42 @@
 .average-grade-value {
   font-size: 1.25rem;
   font-weight: 600;
-  color: #212529;
+  color: var(--text-primary);
 }
 
 .average-grade-total {
   margin-left: 0.5rem;
   font-size: 0.85rem;
-  color: #6c757d;
+  color: var(--text-tertiary);
 }
 
 .average-grade-count {
   font-size: 0.75rem;
-  color: #6c757d;
+  color: var(--text-tertiary);
   margin-top: 0.5rem;
   text-align: center;
 }
 
 .candidate-name {
   font-size: 1.875rem;
-  font-weight: 700;
-  color: #111827;
+  font-family: var(--font-family-heading);
+  font-weight: var(--font-weight-heading);
+  color: var(--text-primary);
   margin: 0;
 }
 
 .applicant-id {
   font-size: 0.875rem;
-  color: #6b7280;
-  background: #f3f4f6;
+  color: var(--text-tertiary);
+  background: var(--bg-gray-light);
   padding: 0.25rem 0.5rem;
-  border-radius: 0.375rem;
-  font-family: monospace;
+  border-radius: var(--border-radius-sm);
+  font-family: var(--font-mono);
 }
 
 .status-badge {
   padding: 0.375rem 0.75rem;
-  border-radius: 0.375rem;
+  border-radius: var(--border-radius-sm);
   font-size: 0.75rem;
   font-weight: 600;
   text-transform: uppercase;
@@ -121,28 +129,28 @@
 }
 
 .status-badge.accepted {
-  background-color: #dcfce7;
-  color: #166534;
+  background-color: var(--status-success-bg);
+  color: var(--status-success-text);
 }
 
 .status-badge.rejected {
-  background-color: #fee2e2;
-  color: #991b1b;
+  background-color: var(--status-error-bg);
+  color: var(--status-error-text);
 }
 
 .status-badge.waitlisted {
-  background-color: #fef3c7;
-  color: #92400e;
+  background-color: var(--status-warning-bg);
+  color: var(--status-warning-text);
 }
 
 .status-badge.submitted {
-  background-color: #EEF2FF;
-  color: #4F46E5;
+  background-color: var(--status-info-bg);
+  color: var(--status-info-text);
 }
 
 .status-badge.under_review {
-  background-color: #fef3c7;
-  color: #92400e;
+  background-color: var(--status-warning-bg);
+  color: var(--status-warning-text);
 }
 
 /* Main content layout */
@@ -155,14 +163,14 @@
 
 /* Left column */
 .detail-main {
-  background: white;
-  border-radius: 0.5rem;
-  border: 1px solid #e5e7eb;
+  background: var(--bg-white);
+  border-radius: var(--border-radius);
+  border: 1px solid var(--border-light);
 }
 
 .info-section {
   padding: 1.5rem;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border-light);
 }
 
 .info-section:last-child {
@@ -171,8 +179,9 @@
 
 .section-title {
   font-size: 1.25rem;
-  font-weight: 600;
-  color: #111827;
+  font-family: var(--font-family-heading);
+  font-weight: var(--font-weight-heading);
+  color: var(--text-primary);
   margin: 0 0 1rem 0;
 }
 
@@ -190,8 +199,9 @@
 
 .info-label {
   font-size: 0.75rem;
+  font-family: var(--font-family);
   font-weight: 500;
-  color: #6b7280;
+  color: var(--text-tertiary);
   text-transform: uppercase;
   letter-spacing: 0.025em;
 }
@@ -385,14 +395,14 @@
 
 .grade-slider::-webkit-slider-thumb:hover {
   transform: scale(1.1);
-  background: #2563eb;
+  background: var(--primary-blue-hover);
 }
 
 .grade-slider::-moz-range-thumb {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: #3b82f6;
+  background: var(--primary-blue);
 }
 
 /* Status Messages */
@@ -407,37 +417,37 @@
 
 .status-message {
   padding: 0.5rem 1rem;
-  border-radius: 0.375rem;
+  border-radius: var(--border-radius-sm);
   font-size: 0.875rem;
   font-weight: 500;
   margin-left: 0.5rem;
 }
 
 .status-message.success {
-  background-color: #dcfce7;
-  color: #166534;
-  border: 1px solid #bbf7d0;
+  background-color: var(--status-success-bg);
+  color: var(--status-success-text);
+  border: 1px solid var(--status-success-border);
 }
 
 .status-message.error {
-  background-color: #fee2e2;
-  color: #991b1b;
-  border: 1px solid #fecaca;
+  background-color: var(--status-error-bg);
+  color: var(--status-error-text);
+  border: 1px solid var(--status-error-border);
 }
 
 .status-message.info {
-  background-color: #e0f2fe;
-  color: #075985;
-  border: 1px solid #bae6fd;
+  background-color: var(--status-info-bg);
+  color: var(--status-info-text);
+  border: 1px solid var(--status-info-border);
 }
 
 /* Slider Thumb Hover */
 .grade-slider::-webkit-slider-thumb:hover {
   transform: scale(1.1);
-  background: #2563eb;
+  background: var(--primary-blue-hover);
   cursor: pointer;
-  border: 2px solid white;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border: 2px solid var(--bg-white);
+  box-shadow: var(--shadow-md);
 }
 
 /* Slider Track */
@@ -445,7 +455,7 @@
   width: 100%;
   height: 6px;
   cursor: pointer;
-  background: #e5e7eb;
+  background: var(--border-light);
   border-radius: 3px;
 }
 
@@ -453,7 +463,7 @@
   width: 100%;
   height: 6px;
   cursor: pointer;
-  background: #e5e7eb;
+  background: var(--border-light);
   border-radius: 3px;
 }
 
@@ -472,7 +482,7 @@
 .tick {
   width: 1px;
   height: 8px;
-  background-color: #d1d5db;
+  background-color: var(--border-medium);
   position: relative;
 }
 
@@ -483,7 +493,7 @@
   left: 50%;
   transform: translateX(-50%);
   font-size: 10px;
-  color: #6b7280;
+  color: var(--text-tertiary);
 }
 
 .grading-item:last-child {
@@ -494,25 +504,25 @@
   display: block;
   font-size: 0.75rem;
   font-weight: 500;
-  color: #4b5563;
+  color: var(--text-secondary);
   margin-bottom: 0.375rem;
 }
 
 .grading-select {
   width: 100%;
   padding: 0.5rem 0.75rem;
-  border: 1px solid #d1d5db;
-  border-radius: 0.375rem;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--border-radius-sm);
   font-size: 0.875rem;
-  color: #111827;
-  background-color: white;
+  color: var(--text-primary);
+  background-color: var(--bg-white);
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .grading-select:focus {
   outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 2px var(--hover-overlay);
 }
 
 .grading-actions {
@@ -520,13 +530,13 @@
   gap: 0.75rem;
   margin-top: 1.25rem;
   padding-top: 1rem;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--border-light);
 }
 
 .grading-button {
   flex: 1;
   padding: 0.5rem 1rem;
-  border-radius: 0.375rem;
+  border-radius: var(--border-radius-sm);
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
@@ -535,22 +545,22 @@
 }
 
 .grading-button.save-button {
-  background-color: #3b82f6;
-  color: white;
+  background-color: var(--primary-blue);
+  color: var(--text-white);
 }
 
 .grading-button.save-button:hover {
-  background-color: #2563eb;
+  background-color: var(--primary-blue-hover);
 }
 
 .grading-button.reset-button {
-  background-color: #f3f4f6;
-  color: #4b5563;
-  border: 1px solid #d1d5db;
+  background-color: var(--bg-gray-light);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-medium);
 }
 
 .grading-button.reset-button:hover {
-  background-color: #e5e7eb;
+  background-color: var(--border-light);
 }
 
 /* Responsive adjustments */

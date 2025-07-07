@@ -9,6 +9,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import CandidateManagement from './pages/CandidateManagement';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
+import './styles/variables.css';
 // Protected Route wrapper
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -74,6 +75,13 @@ const AppRoutes = () => {
 };
 
 export default function App() {
+  // Apply global Montserrat Light for body, Montserrat Bold for headings
+  useEffect(() => {
+    document.body.style.fontFamily = 'Montserrat, -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", sans-serif';
+    document.body.style.fontWeight = '300'; // Montserrat Light as default body weight
+    document.body.style.backgroundColor = '#ffffff'; // Clean white background
+  }, []);
+
   return (
     <AuthProvider>
       <AppRoutes />
