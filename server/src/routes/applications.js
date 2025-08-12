@@ -10,8 +10,17 @@ router.use(requireAuth);
 // Get all applications with average grades
 router.get('/', async (req, res) => {
   try {
-    // First, get all applications
+    // Optional: scope to active recruiting cycle if one exists
+    const activeCycle = await prisma.recruitingCycle.findFirst({ where: { isActive: true } });
+    if (!activeCycle) {
+      // When no active cycle, return empty list instead of all
+      return res.json([]);
+    }
+    const whereClause = { cycleId: activeCycle.id };
+
+    // First, get applications
     const applications = await prisma.application.findMany({
+      where: whereClause,
       orderBy: { submittedAt: 'desc' }
     });
 
@@ -70,12 +79,51 @@ router.get('/', async (req, res) => {
   }
 });
 
+// Comments: list for an application
+router.get('/:id/comments', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const comments = await prisma.comment.findMany({
+      where: { applicationId: id },
+      orderBy: { createdAt: 'desc' },
+      include: { user: { select: { id: true, email: true, fullName: true } } }
+    });
+    res.json(comments);
+  } catch (error) {
+    console.error('Error fetching comments:', error);
+    res.status(500).json({ error: 'Failed to fetch comments' });
+  }
+});
+
+// Comments: add to an application
+router.post('/:id/comments', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { content } = req.body;
+    if (!content || !content.trim()) {
+      return res.status(400).json({ error: 'Content is required' });
+    }
+    const created = await prisma.comment.create({
+      data: {
+        applicationId: id,
+        userId: req.user.id,
+        content: content.trim(),
+      }
+    });
+    res.status(201).json(created);
+  } catch (error) {
+    console.error('Error creating comment:', error);
+    res.status(500).json({ error: 'Failed to create comment' });
+  }
+});
+
 // Get single application by ID
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const application = await prisma.application.findUnique({
-      where: { id }
+      where: { id },
+      include: { comments: { orderBy: { createdAt: 'desc' }, include: { user: { select: { id: true, email: true, fullName: true } } } } }
     });
     
     if (!application) {
@@ -353,3 +401,4 @@ router.get('/:id/grades/average', requireAuth, async (req, res) => {
 });
 
 export default router; 
+ 

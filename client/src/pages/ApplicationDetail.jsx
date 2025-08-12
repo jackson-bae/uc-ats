@@ -31,6 +31,11 @@ export default function ApplicationDetail() {
     count: 0
   }); // Store average grades
 
+  // Comments
+  const [comments, setComments] = useState([]);
+  const [newComment, setNewComment] = useState('');
+  const [commentError, setCommentError] = useState('');
+
   const resetGrades = async () => {
     try {
       // Fetch the most recent grades for this application and user
@@ -115,6 +120,15 @@ export default function ApplicationDetail() {
     }
   };
 
+  const fetchComments = async () => {
+    try {
+      const list = await apiClient.get(`/applications/${id}/comments`);
+      setComments(list);
+    } catch (e) {
+      console.error('Error fetching comments:', e);
+    }
+  };
+
   // Toggle N/A for a grade type
   const toggleNa = (type) => {
     const newState = !isNa[type];
@@ -182,6 +196,9 @@ export default function ApplicationDetail() {
         
         // Log average grades
         await logAverageGrades();
+
+        // Load comments
+        await fetchComments();
         
       } catch (err) {
         console.error('Error loading data:', err);
@@ -655,6 +672,59 @@ export default function ApplicationDetail() {
                 )}
               </div>
             </div>
+          </div>
+
+          {/* Comments */}
+          <div className="info-section">
+            <h2 className="section-title">Comments</h2>
+            <div style={{ marginBottom: '1rem' }}>
+              <textarea
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+                placeholder="Leave a comment for the team..."
+                style={{ width: '100%', minHeight: '80px', padding: '8px' }}
+              />
+              {commentError && (
+                <div style={{ color: 'red', marginTop: '4px' }}>{commentError}</div>
+              )}
+              <button
+                className="grading-button save-button"
+                onClick={async () => {
+                  setCommentError('');
+                  const content = newComment.trim();
+                  if (!content) {
+                    setCommentError('Please enter a comment');
+                    return;
+                  }
+                  try {
+                    await apiClient.post(`/applications/${id}/comments`, { content });
+                    setNewComment('');
+                    await fetchComments();
+                  } catch (e) {
+                    console.error('Failed to post comment', e);
+                    setCommentError('Failed to post comment');
+                  }
+                }}
+                style={{ marginTop: '8px' }}
+              >
+                Add Comment
+              </button>
+            </div>
+
+            {comments.length === 0 ? (
+              <div className="empty-state">No comments yet.</div>
+            ) : (
+              <div className="comments-list">
+                {comments.map((c) => (
+                  <div key={c.id} className="comment-item" style={{ padding: '10px 0', borderBottom: '1px solid #eee' }}>
+                    <div style={{ fontSize: '0.85rem', color: '#6b7280' }}>
+                      {c.user?.fullName || c.user?.email || 'Unknown'} • {new Date(c.createdAt).toLocaleString()}
+                    </div>
+                    <div style={{ whiteSpace: 'pre-wrap' }}>{c.content}</div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>

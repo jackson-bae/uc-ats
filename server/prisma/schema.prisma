@@ -19,6 +19,8 @@ model User {
   resetTokenExpiry DateTime?
 
   @@map("users")
+
+  comments         Comment[]
 }
 
 enum UserRole {
@@ -62,6 +64,12 @@ model Application {
 
   approved              Boolean?
   currentRound          String?
+
+  // Recruiting cycle relation
+  cycleId               String?
+  cycle                 RecruitingCycle?    @relation(fields: [cycleId], references: [id])
+
+  comments              Comment[]
 }
 
 enum ApplicationStatus {
@@ -70,6 +78,32 @@ enum ApplicationStatus {
   ACCEPTED
   REJECTED
   WAITLISTED
+}
+
+model RecruitingCycle {
+  id         String   @id @default(uuid())
+  name       String
+  formUrl    String?
+  isActive   Boolean  @default(false)
+  startDate  DateTime?
+  endDate    DateTime?
+  createdAt  DateTime @default(now())
+
+  applications Application[]
+
+  @@map("recruiting_cycles")
+}
+
+model Comment {
+  id            String       @id @default(uuid())
+  applicationId String
+  application   Application  @relation(fields: [applicationId], references: [id])
+  userId        String
+  user          User         @relation(fields: [userId], references: [id])
+  content       String
+  createdAt     DateTime     @default(now())
+
+  @@map("comments")
 }
 
 

@@ -2,11 +2,25 @@ import prisma from '../prismaClient.js';
 import config from '../config.js';
 import { getResponses } from './google/forms.js'
 import { transformFormResponse } from '../utils/dataMapper.js'
+import { extractFormIdFromUrl } from '../utils/formUtils.js'
 
 export default async function syncFormResponses() {
   try {
     console.log('Fetching new responses from Google Forms...');
-    const responses = await getResponses(config.form.id)
+
+    // Require an active cycle and use its form URL exclusively
+    const activeCycle = await prisma.recruitingCycle.findFirst({ where: { isActive: true } });
+    if (!activeCycle) {
+      console.warn('No active recruiting cycle. Skipping sync.');
+      return;
+    }
+    const formIdToUse = extractFormIdFromUrl(activeCycle.formUrl || '');
+    if (!formIdToUse) {
+      console.warn('Active cycle has no valid Google Form URL. Skipping sync.');
+      return;
+    }
+
+    const responses = await getResponses(formIdToUse)
     
     // Get existing response IDs
     const existingResponseIds = new Set(
@@ -26,8 +40,12 @@ export default async function syncFormResponses() {
     for (const response of newResponses) {
       try {
         const dbRecord = transformFormResponse(response);
-        
-        await prisma.application.create({data: dbRecord});
+        // Associate with active cycle if exists
+        const dataToCreate = {
+          ...dbRecord,
+          ...(activeCycle ? { cycleId: activeCycle.id } : {})
+        };
+        await prisma.application.create({ data: dataToCreate });
         successCount++;
 
       } catch (error) {

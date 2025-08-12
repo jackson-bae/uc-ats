@@ -7,8 +7,10 @@ import SignUp from './pages/SignUp';
 import Layout from './components/Layout';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import CandidateManagement from './pages/CandidateManagement';
+import CycleManagement from './pages/CycleManagement';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
+import Dashboard from './pages/Dashboard';
 import './styles/variables.css';
 // Protected Route wrapper
 const ProtectedRoute = ({ children }) => {
@@ -32,17 +34,15 @@ const AppRoutes = () => {
       <Route path="/signup" element={<SignUp />} />
       
       {/* Protected Routes */}
-      <Route path="/" element={
-        <ProtectedRoute>
-          <ApplicationList />
-        </ProtectedRoute>
-      }/>
+      <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
 
+      {/* Redirect legacy Round Management to Applications */}
+      <Route path="/candidate-management" element={<Navigate to="/application-list" />} />
       <Route
-        path="/candidate-management"
+        path="/cycles"
         element={
           <ProtectedRoute>
-            <CandidateManagement />
+            <CycleManagement />
           </ProtectedRoute>
         }
       />

@@ -7,6 +7,7 @@ import applicationsRoutes from './routes/applications.js';
 import filesRoutes from './routes/files.js';
 import authRoutes from './routes/auth.js';
 import adminRoutes from './routes/admin.js';
+import { requireAuth, requireAdmin } from './middleware/auth.js';
 
 const app = express();
 
