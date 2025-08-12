@@ -38,134 +38,46 @@ import {
 } from '@mui/icons-material';
 import globalTheme from '../styles/globalTheme';
 import '../styles/CandidateManagement.css';
+import apiClient from '../utils/api';
 
 const adminAPI = {
     async fetchStats() {
-        try {
-            const response = await fetch('/api/admin/stats');
-            if (!response.ok) throw new Error('Failed to fetch stats');
-            return await response.json();
-        } catch (error) {
-            console.error('Error fetching stats:', error);
-            throw error;
-        }
+        return await apiClient.get('/admin/stats');
     },
 
     async fetchCandidates() {
-        try {
-            const response = await fetch('/api/admin/candidates');
-            return await response.json();
-        } catch (error) {
-            console.error('Error fetching candidates: ', error);
-            throw error;
-        }
+        return await apiClient.get('/admin/candidates');
     },
 
     async updateApproval(candidateId, approved) {
-        try {
-            const response = await fetch(`/api/admin/candidates/${candidateId}/approval`, {
-                method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ approved }),
-            });
-
-            if (!response.ok) throw new Error('Failed to update approval');
-            return await response.json();
-        } catch (error) {
-            console.error('Error updating approval: ', error);
-            throw error;
-        }
+        return await apiClient.request(`/admin/candidates/${candidateId}/approval`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ approved })
+        });
     },
 
     async advanceRound() {
-        try {
-            const response = await fetch('/api/admin/advance-round', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-            });
-
-            if (!response.ok) throw new Error('Failed to advance round');
-            return await response.json();
-        } catch (error) {
-            console.error('Error advancing round: ', error);
-            throw error;
-        }
+        return await apiClient.post('/admin/advance-round', {});
     },
 
     // Advance individual candidate
     async advanceCandidate(candidateId) {
-        try {
-            const response = await fetch(`/api/admin/advance-candidate/${candidateId}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-            });
-
-            if (!response.ok) throw new Error('Failed to advance candidate');
-            return await response.json();
-        } catch (error) {
-            console.error('Error advancing candidate:', error);
-            throw error;
-        }
+        return await apiClient.post(`/admin/advance-candidate/${candidateId}`, {});
     },
 
     // Reject individual candidate
     async rejectCandidate(candidateId) {
-        try {
-            const response = await fetch(`/api/admin/reject-candidate/${candidateId}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-            });
-
-            if (!response.ok) throw new Error('Failed to reject candidate');
-            return await response.json();
-        } catch (error) {
-            console.error('Error rejecting candidate:', error);
-            throw error;
-        }
+        return await apiClient.post(`/admin/reject-candidate/${candidateId}`, {});
     },
 
     // Update individual candidate
     async updateCandidate(candidateId, updateData) {
-        try {
-            const response = await fetch(`/api/admin/candidates/${candidateId}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(updateData),
-            });
-
-            if (!response.ok) throw new Error('Failed to update candidate');
-            return await response.json();
-        } catch (error) {
-            console.error('Error updating candidate:', error);
-            throw error;
-        }
+        return await apiClient.put(`/admin/candidates/${candidateId}`, updateData);
     },
 
     async resetAll() {
-        try {
-            const response = await fetch('/api/admin/reset-all', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-            });
-
-            if (!response.ok) throw new Error('Failed to reset candidates');
-            return await response.json();
-        } catch (error) {
-            console.error('Error resetting candidates: ', error);
-            throw error;
-        }
+        return await apiClient.post('/admin/reset-all', {});
     },
 };
 

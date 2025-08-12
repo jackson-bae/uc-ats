@@ -1,20 +1,30 @@
 import express from 'express';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../prismaClient.js';
+import { requireAuth, requireAdmin } from '../middleware/auth.js';
 
-const prisma = new PrismaClient();
 const router = express.Router();
+
+// Protect all admin routes
+router.use(requireAuth, requireAdmin);
 
 // Get dashboard stats
 router.get('/stats', async (req, res) => {
   try {
-    const totalApplicants = await prisma.application.count();
-    const totalGrades = await prisma.grade.count();
+    const active = await prisma.recruitingCycle.findFirst({ where: { isActive: true } });
+    if (!active) {
+      return res.json({ totalApplicants: 0, tasks: 0, candidates: 0, currentRound: 'SUBMITTED' });
+    }
 
-    const candidates = await prisma.application.findMany({
-      where: {
-        status: { in: ['SUBMITTED', 'UNDER_REVIEW', 'WAITLISTED'] }
-      }
-    });
+    const [totalApplicants, totalGrades, candidates] = await Promise.all([
+      prisma.application.count({ where: { cycleId: active.id } }),
+      prisma.grade.count(), // grades are not linked to cycles; consider linking in future
+      prisma.application.findMany({
+        where: {
+          cycleId: active.id,
+          status: { in: ['SUBMITTED', 'UNDER_REVIEW', 'WAITLISTED'] }
+        }
+      })
+    ]);
 
     const statusCounts = candidates.reduce((acc, candidate) => {
       acc[candidate.status] = (acc[candidate.status] || 0) + 1;
@@ -27,12 +37,7 @@ router.get('/stats', async (req, res) => {
         )
       : 'SUBMITTED';
 
-    res.json({
-      totalApplicants,
-      tasks: totalGrades, // Using grades count as "tasks" for compatibility
-      candidates: candidates.length,
-      currentRound: currentRound
-    });
+    res.json({ totalApplicants, tasks: totalGrades, candidates: candidates.length, currentRound });
   } catch (error) {
     console.error('[GET /api/admin/stats]', error);
     res.status(500).json({ error: 'Failed to fetch dashboard stats' });
@@ -42,7 +47,13 @@ router.get('/stats', async (req, res) => {
 // Get all candidates
 router.get('/candidates', async (req, res) => {
   try {
+    // Scope to active cycle if present
+    const active = await prisma.recruitingCycle.findFirst({ where: { isActive: true } });
+    if (!active) {
+      return res.json([]);
+    }
     const candidates = await prisma.application.findMany({
+      where: { cycleId: active.id },
       orderBy: { submittedAt: 'desc' }
     });
     res.json(candidates);
@@ -206,9 +217,14 @@ router.patch('/candidates/:id/approval', async (req, res) => {
 router.post('/advance-round', async (req, res) => {
   try {
     console.log('Starting bulk advance...');
+    const active = await prisma.recruitingCycle.findFirst({ where: { isActive: true } });
+    if (!active) {
+      return res.status(400).json({ error: 'No active recruiting cycle' });
+    }
 
     const approvedCandidates = await prisma.application.findMany({
       where: {
+        cycleId: active.id,
         approved: true,
         status: { in: ['SUBMITTED', 'UNDER_REVIEW', 'WAITLISTED'] }
       }
@@ -276,7 +292,7 @@ router.post('/candidates/:id/approve', async (req, res) => {
 // Fetch all application cycles
 router.get('/cycles', async (req, res) => {
   try {
-    const cycles = await prisma.applicationCycle.findMany({
+    const cycles = await prisma.recruitingCycle.findMany({
       orderBy: { createdAt: 'desc' }
     });
     res.json(cycles);
@@ -286,19 +302,57 @@ router.get('/cycles', async (req, res) => {
   }
 });
 
+// Get active cycle
+router.get('/cycles/active', async (req, res) => {
+  try {
+    const active = await prisma.recruitingCycle.findFirst({ where: { isActive: true } });
+    res.json(active || null);
+  } catch (error) {
+    console.error('[GET /api/admin/cycles/active]', error);
+    res.status(500).json({ error: 'Failed to fetch active cycle' });
+  }
+});
+
+// Create a new cycle
+router.post('/cycles', async (req, res) => {
+  try {
+    const { name, formUrl, startDate, endDate, isActive } = req.body;
+    const created = await prisma.recruitingCycle.create({
+      data: {
+        name,
+        formUrl: formUrl || null,
+        startDate: startDate ? new Date(startDate) : null,
+        endDate: endDate ? new Date(endDate) : null,
+        isActive: Boolean(isActive) || false,
+      }
+    });
+    // If created as active, deactivate others
+    if (created.isActive) {
+      await prisma.recruitingCycle.updateMany({
+        where: { id: { not: created.id }, isActive: true },
+        data: { isActive: false }
+      });
+    }
+    res.status(201).json(created);
+  } catch (error) {
+    console.error('[POST /api/admin/cycles]', error);
+    res.status(500).json({ error: 'Failed to create cycle' });
+  }
+});
+
 // Set a cycle as active
 router.post('/cycles/:id/activate', async (req, res) => {
   const { id } = req.params;
 
   try {
     // Deactivate all current cycles
-    await prisma.applicationCycle.updateMany({
+    await prisma.recruitingCycle.updateMany({
       where: { isActive: true },
       data: { isActive: false }
     });
 
     // Activate selected one
-    const updated = await prisma.applicationCycle.update({
+    const updated = await prisma.recruitingCycle.update({
       where: { id },
       data: { isActive: true }
     });
@@ -310,15 +364,54 @@ router.post('/cycles/:id/activate', async (req, res) => {
   }
 });
 
+// Update a cycle
+router.patch('/cycles/:id', async (req, res) => {
+  const { id } = req.params;
+  const { name, formUrl, startDate, endDate, isActive } = req.body;
+  try {
+    const updated = await prisma.recruitingCycle.update({
+      where: { id },
+      data: {
+        ...(name !== undefined ? { name } : {}),
+        ...(formUrl !== undefined ? { formUrl } : {}),
+        ...(startDate !== undefined ? { startDate: startDate ? new Date(startDate) : null } : {}),
+        ...(endDate !== undefined ? { endDate: endDate ? new Date(endDate) : null } : {}),
+        ...(isActive !== undefined ? { isActive: Boolean(isActive) } : {}),
+      }
+    });
+    if (isActive) {
+      await prisma.recruitingCycle.updateMany({ where: { id: { not: id }, isActive: true }, data: { isActive: false } });
+    }
+    res.json(updated);
+  } catch (error) {
+    console.error('[PATCH /api/admin/cycles/:id]', error);
+    res.status(500).json({ error: 'Failed to update cycle' });
+  }
+});
+
+// Delete a cycle
+router.delete('/cycles/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    await prisma.recruitingCycle.delete({ where: { id } });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('[DELETE /api/admin/cycles/:id]', error);
+    res.status(500).json({ error: 'Failed to delete cycle' });
+  }
+});
+
 router.post('/reset-all', async (req, res) => {
   try {
-    console.log('Resetting all candidates...');
+    console.log('Resetting candidates for active cycle...');
+    const active = await prisma.recruitingCycle.findFirst({ where: { isActive: true } });
+    if (!active) {
+      return res.status(400).json({ error: 'No active recruiting cycle' });
+    }
 
     await prisma.application.updateMany({
-      data: {
-        status: 'SUBMITTED',
-        approved: null
-      }
+      where: { cycleId: active.id },
+      data: { status: 'SUBMITTED', approved: null }
     });
 
     res.json({ message: 'All candidates reset to initial state' });
@@ -328,22 +421,19 @@ router.post('/reset-all', async (req, res) => {
   }
 });
 
+// Profile
 router.put('/profile', async (req, res) => {
   const { email, fullName, graduationClass, originalEmail } = req.body;
 
   try {
-    // Prevent duplicate email
     if (email !== originalEmail) {
-      const existingUser = await prisma.User.findUnique({
-        where: { email }
-      });
-
+      const existingUser = await prisma.user.findUnique({ where: { email } });
       if (existingUser) {
         return res.status(409).json({ error: 'Email already in use by another account' });
       }
     }
 
-    const result = await prisma.User.update({
+    const result = await prisma.user.update({
       where: { email: originalEmail },
       data: { email, fullName, graduationClass }
     });
@@ -359,57 +449,8 @@ router.get('/profile', async (req, res) => {
   const { email } = req.query;
 
   try {
-    const user = await prisma.user.findUnique({
-      where: { email }
-    });
-
+    const user = await prisma.user.findUnique({ where: { email } });
     if (!user) return res.status(404).json({ error: 'User not found' });
-
-    res.json(user);
-  } catch (error) {
-    console.error('[GET /api/admin/profile]', error);
-    res.status(500).json({ error: 'Failed to fetch user profile' });
-     }
-});
-
-router.put('/profile', async (req, res) => {
-  const { email, fullName, graduationClass, originalEmail } = req.body;
-
-  try {
-    // Prevent duplicate email
-    if (email !== originalEmail) {
-      const existingUser = await prisma.User.findUnique({
-        where: { email }
-      });
-
-      if (existingUser) {
-        return res.status(409).json({ error: 'Email already in use by another account' });
-      }
-    }
-
-    const result = await prisma.User.update({
-      where: { email: originalEmail },
-      data: { email, fullName, graduationClass }
-    });
-
-    res.json({ message: 'Profile updated successfully', user: result });
-  } catch (error) {
-    console.error('[PUT /api/admin/profile]', error);
-    res.status(500).json({ error: 'Failed to update user profile' });
-  }
-});
-
-
-router.get('/profile', async (req, res) => {
-  const { email } = req.query;
-
-  try {
-    const user = await prisma.user.findUnique({
-      where: { email }
-    });
-
-    if (!user) return res.status(404).json({ error: 'User not found' });
-
     res.json(user);
   } catch (error) {
     console.error('[GET /api/admin/profile]', error);
