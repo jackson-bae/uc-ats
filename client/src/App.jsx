@@ -11,6 +11,8 @@ import CycleManagement from './pages/CycleManagement';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
+import ReviewTeams from './pages/ReviewTeams';
+import UserManagement from './pages/UserManagement';
 import './styles/variables.css';
 // Protected Route wrapper
 const ProtectedRoute = ({ children }) => {
@@ -65,7 +67,23 @@ const AppRoutes = () => {
         }
       />
       
-    
+      <Route
+        path="/review-teams"
+        element={
+          <ProtectedRoute>
+            <ReviewTeams />
+          </ProtectedRoute>
+        }
+      />
+      
+      <Route
+        path="/user-management"
+        element={
+          <ProtectedRoute>
+            <UserManagement />
+          </ProtectedRoute>
+        }
+      />
       
       <Route path="/forgot-password" element={<ForgotPassword />} />
 
