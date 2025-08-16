@@ -108,9 +108,9 @@ model Application {
   cycleId               String?
   cycle                 RecruitingCycle?    @relation(fields: [cycleId], references: [id])
 
-  // Candidate relation
-  candidateId           String?
-  candidate             Candidate?          @relation(fields: [candidateId], references: [id])
+  // Enhanced Candidate relation - now required and automatically linked
+  candidateId           String
+  candidate             Candidate           @relation(fields: [candidateId], references: [id])
 
   comments              Comment[]
 }

@@ -5,7 +5,11 @@
   "main": "index.js",
   "scripts": {
     "start": "node src/index.js",
-    "dev": "nodemon src/index.js"
+    "dev": "nodemon src/index.js",
+    "backfill-candidates": "node scripts/backfill-candidates.js",
+    "verify-candidates": "node scripts/verify-candidates.js",
+    "update-schema-relations": "node scripts/update-schema-relations.js",
+    "setup-candidate-relations": "node scripts/setup-candidate-relations.js"
   },
   "keywords": [],
   "author": "",

@@ -17,7 +17,11 @@ app.use(cors());
 app.use(express.json());
 
 // Serve static files for profile images
-app.use('/uploads', express.static('uploads'));
+app.use('/api/uploads', express.static('uploads', {
+  setHeaders: (res, path) => {
+    res.set('Cross-Origin-Resource-Policy', 'cross-origin');
+  }
+}));
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -26,6 +30,28 @@ app.use('/api/files', filesRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/review-teams', reviewTeamsRoutes);
 app.use('/api/users', usersRoutes);
+
+// Test endpoint to check if uploads directory is accessible
+app.get('/api/test-uploads', (req, res) => {
+  const fs = require('fs');
+  const path = require('path');
+  const uploadsPath = path.join(process.cwd(), 'uploads', 'profile-images');
+  
+  try {
+    const files = fs.readdirSync(uploadsPath);
+    res.json({ 
+      message: 'Uploads directory accessible',
+      files: files,
+      uploadsPath: uploadsPath
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      error: 'Cannot access uploads directory',
+      details: error.message,
+      uploadsPath: uploadsPath
+    });
+  }
+});
 
 // Temporarily disable sync to test auth
 await syncFormResponses();

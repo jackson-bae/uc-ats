@@ -41,6 +41,7 @@ const UserManagement = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(null);
   const [selectedUser, setSelectedUser] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -66,6 +67,8 @@ const UserManagement = () => {
   const [imageFile, setImageFile] = useState(null);
 
   useEffect(() => {
+    console.log('UserManagement: user =', user);
+    console.log('UserManagement: user?.role =', user?.role);
     if (user?.role === 'ADMIN') {
       fetchUsers();
     }
@@ -74,7 +77,10 @@ const UserManagement = () => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
+      console.log('Fetching users...');
+      console.log('API client token:', apiClient.token);
       const response = await apiClient.get('/users');
+      console.log('Fetched users:', response);
       setUsers(response);
     } catch (err) {
       setError('Failed to fetch users');
@@ -134,15 +140,15 @@ const UserManagement = () => {
     formData.append('profileImage', imageFile);
 
     try {
-      await apiClient.post(`/users/${selectedUser.id}/profile-image`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      const response = await apiClient.post(`/users/${selectedUser.id}/profile-image`, formData);
+      console.log('Upload response:', response);
       setShowImageModal(false);
       setSelectedUser(null);
       setImageFile(null);
+      setSuccess('Profile image uploaded successfully!');
       fetchUsers();
+      // Clear success message after 3 seconds
+      setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
       setError('Failed to upload image');
       console.error('Error uploading image:', err);
@@ -196,7 +202,22 @@ const UserManagement = () => {
     }
   };
 
-  if (user?.role !== 'ADMIN') {
+  if (!user) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Paper sx={{ p: 4, textAlign: 'center' }}>
+          <Typography variant="h4" gutterBottom>
+            Not Logged In
+          </Typography>
+          <Typography variant="body1" color="text.secondary">
+            Please log in to access this page.
+          </Typography>
+        </Paper>
+      </Box>
+    );
+  }
+
+  if (user.role !== 'ADMIN') {
     return (
       <Box sx={{ p: 3 }}>
         <Paper sx={{ p: 4, textAlign: 'center' }}>
@@ -204,7 +225,7 @@ const UserManagement = () => {
             Access Denied
           </Typography>
           <Typography variant="body1" color="text.secondary">
-            You need admin privileges to access this page.
+            You need admin privileges to access this page. Current role: {user.role}
           </Typography>
         </Paper>
       </Box>
@@ -256,6 +277,25 @@ const UserManagement = () => {
           </Alert>
         )}
 
+        {/* Success Message */}
+        {success && (
+          <Alert 
+            severity="success" 
+            sx={{ mb: 3 }}
+            action={
+              <IconButton
+                color="inherit"
+                size="small"
+                onClick={() => setSuccess(null)}
+              >
+                <CloseIcon fontSize="inherit" />
+              </IconButton>
+            }
+          >
+            {success}
+          </Alert>
+        )}
+
                             {/* Search and Filters */}
           <Paper sx={{ p: 1, mb: 2, width: '100%', boxSizing: 'border-box' }}>
             <Grid container spacing={1} sx={{ width: '100%' }}>
@@ -304,13 +344,18 @@ const UserManagement = () => {
                                           {/* User Header */}
                       <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
                         <Avatar
-                          src={user.profileImage ? `${import.meta.env.VITE_API_URL}${user.profileImage}` : undefined}
+                          key={`${user.id}-${user.profileImage || 'no-image'}`}
+                          src={user.profileImage ? `${user.profileImage}?t=${Date.now()}` : undefined}
                           sx={{ 
                             width: 48, 
                             height: 48, 
                             mr: 1.5,
                             bgcolor: 'primary.main',
                             fontSize: '1.25rem'
+                          }}
+                          onError={(e) => {
+                            // Hide the image and show the fallback initials
+                            e.target.style.display = 'none';
                           }}
                         >
                           {user.fullName.charAt(0).toUpperCase()}

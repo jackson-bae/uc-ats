@@ -222,8 +222,12 @@ router.post('/:id/profile-image', requireAuth, upload.single('profileImage'), as
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
+    console.log('File uploaded:', req.file);
+    console.log('File path:', req.file.path);
+
     // Generate file URL
-    const fileUrl = `/uploads/profile-images/${req.file.filename}`;
+    const fileUrl = `/api/uploads/profile-images/${req.file.filename}`;
+    console.log('Generated file URL:', fileUrl);
 
     // Update user's profile image
     const updatedUser = await prisma.user.update({
@@ -237,6 +241,8 @@ router.post('/:id/profile-image', requireAuth, upload.single('profileImage'), as
         role: true
       }
     });
+
+    console.log('Updated user:', updatedUser);
 
     res.json({
       message: 'Profile image uploaded successfully',
