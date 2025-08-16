@@ -13,6 +13,7 @@ import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
 import ReviewTeams from './pages/ReviewTeams';
 import UserManagement from './pages/UserManagement';
+import EventManagement from './pages/EventManagement';
 import './styles/variables.css';
 // Protected Route wrapper
 const ProtectedRoute = ({ children }) => {
@@ -81,6 +82,15 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute>
             <UserManagement />
+          </ProtectedRoute>
+        }
+      />
+      
+      <Route
+        path="/events"
+        element={
+          <ProtectedRoute>
+            <EventManagement />
           </ProtectedRoute>
         }
       />

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Box, 
   Paper, 
@@ -28,11 +29,13 @@ import {
   TrashIcon,
   ChevronDownIcon,
   ChevronRightIcon,
-  ArrowPathIcon
+  ArrowPathIcon,
+  ArrowTopRightOnSquareIcon
 } from '@heroicons/react/24/outline';
 import apiClient from '../utils/api';
 
 export default function ReviewTeams() {
+  const navigate = useNavigate();
   const [teams, setTeams] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -49,6 +52,7 @@ export default function ReviewTeams() {
   const [expandedTeams, setExpandedTeams] = useState(new Set());
   const [users, setUsers] = useState([]);
   const [availableCandidates, setAvailableCandidates] = useState([]);
+  const [clickedCandidateId, setClickedCandidateId] = useState(null);
 
   // Calculate team progress for different review types
   const calculateTeamProgress = (team) => {
@@ -214,6 +218,23 @@ export default function ReviewTeams() {
   };
 
   const isTeamExpanded = (teamId) => expandedTeams.has(teamId);
+
+  const handleCandidateClick = async (candidateId) => {
+    try {
+      setClickedCandidateId(candidateId);
+      // Get the latest application ID for this candidate
+      const response = await apiClient.get(`/applications/candidate/${candidateId}/latest`);
+      const applicationId = response.applicationId;
+      
+      // Navigate to the application detail page
+      navigate(`/application/${applicationId}`);
+    } catch (error) {
+      console.error('Error getting application ID for candidate:', error);
+      setError('Failed to open candidate application. Please try again.');
+    } finally {
+      setClickedCandidateId(null);
+    }
+  };
 
   const refreshData = async () => {
     try {
@@ -510,7 +531,24 @@ export default function ReviewTeams() {
                           p: 2,
                           border: '1px solid',
                           borderColor: 'divider',
-                          backgroundColor: 'background.paper'
+                          backgroundColor: 'background.paper',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease-in-out',
+                          '&:hover': {
+                            borderColor: 'primary.main',
+                            backgroundColor: 'rgba(4, 39, 66, 0.04)',
+                            transform: 'translateY(-1px)',
+                            boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)'
+                          },
+                          ...(clickedCandidateId === candidate.id && {
+                            pointerEvents: 'none',
+                            opacity: 0.7
+                          })
+                        }}
+                        onClick={() => {
+                          if (clickedCandidateId !== candidate.id) {
+                            handleCandidateClick(candidate.id);
+                          }
                         }}
                       >
                         <Grid container spacing={2} alignItems="center">
@@ -519,11 +557,13 @@ export default function ReviewTeams() {
                               sx={{
                                 width: 48,
                                 height: 48,
-                                bgcolor: 'primary.main',
+                                bgcolor: clickedCandidateId === candidate.id ? 'grey.400' : 'primary.main',
                                 fontSize: '1rem'
                               }}
                             >
-                              {candidate.avatar ? (
+                              {clickedCandidateId === candidate.id ? (
+                                <ArrowPathIcon style={{ width: '1.25rem', height: '1.25rem' }} className="animate-spin" />
+                              ) : candidate.avatar ? (
                                 <img src={candidate.avatar} alt={candidate.name} />
                               ) : (
                                 candidate.name.split(' ').map(n => n[0]).join('')
@@ -550,19 +590,40 @@ export default function ReviewTeams() {
                           </Grid>
                           
                           <Grid item>
-                            <IconButton
-                              size="small"
-                              onClick={() => handleRemoveCandidateFromTeam(team.id, candidate.id)}
-                              sx={{
-                                color: 'error.main',
-                                '&:hover': {
-                                  backgroundColor: 'error.light',
-                                  color: 'error.contrastText'
-                                }
-                              }}
-                            >
-                              <TrashIcon style={{ width: '1rem', height: '1rem' }} />
-                            </IconButton>
+                            <Stack direction="row" spacing={1}>
+                              <IconButton
+                                size="small"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCandidateClick(candidate.id);
+                                }}
+                                sx={{
+                                  color: 'primary.main',
+                                  '&:hover': {
+                                    backgroundColor: 'primary.light',
+                                    color: 'primary.contrastText'
+                                  }
+                                }}
+                              >
+                                <ArrowTopRightOnSquareIcon style={{ width: '1rem', height: '1rem' }} />
+                              </IconButton>
+                              <IconButton
+                                size="small"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRemoveCandidateFromTeam(team.id, candidate.id);
+                                }}
+                                sx={{
+                                  color: 'error.main',
+                                  '&:hover': {
+                                    backgroundColor: 'error.light',
+                                    color: 'error.contrastText'
+                                  }
+                                }}
+                              >
+                                <TrashIcon style={{ width: '1rem', height: '1rem' }} />
+                              </IconButton>
+                            </Stack>
                           </Grid>
                         </Grid>
                       </Paper>
@@ -823,25 +884,46 @@ export default function ReviewTeams() {
                     cursor: 'pointer',
                     border: '1px solid',
                     borderColor: 'divider',
+                    transition: 'all 0.2s ease-in-out',
                     '&:hover': {
                       borderColor: 'primary.main',
-                      backgroundColor: 'rgba(4, 39, 66, 0.04)'
+                      backgroundColor: 'rgba(4, 39, 66, 0.04)',
+                      transform: 'translateY(-1px)',
+                      boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)'
                     }
                   }}
                   onClick={() => handleAddCandidateToTeam(candidate.id)}
                 >
-                  <Stack direction="row" spacing={2} alignItems="center">
-                    <Avatar sx={{ bgcolor: 'primary.main' }}>
-                      {candidate.name.split(' ').map(n => n[0]).join('')}
-                    </Avatar>
-                    <Box>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                        {candidate.name}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {candidate.major} - {candidate.year} - GPA: {candidate.gpa}
-                      </Typography>
-                    </Box>
+                  <Stack direction="row" spacing={2} alignItems="center" justifyContent="space-between">
+                    <Stack direction="row" spacing={2} alignItems="center">
+                      <Avatar sx={{ bgcolor: 'primary.main' }}>
+                        {candidate.name.split(' ').map(n => n[0]).join('')}
+                      </Avatar>
+                      <Box>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                          {candidate.name}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {candidate.major} - {candidate.year} - GPA: {candidate.gpa}
+                        </Typography>
+                      </Box>
+                    </Stack>
+                    <IconButton
+                      size="small"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleCandidateClick(candidate.id);
+                      }}
+                      sx={{
+                        color: 'primary.main',
+                        '&:hover': {
+                          backgroundColor: 'primary.light',
+                          color: 'primary.contrastText'
+                        }
+                      }}
+                    >
+                      <ArrowTopRightOnSquareIcon style={{ width: '1rem', height: '1rem' }} />
+                    </IconButton>
                   </Stack>
                 </Paper>
               ))}

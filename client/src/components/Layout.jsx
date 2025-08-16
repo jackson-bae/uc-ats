@@ -11,7 +11,8 @@ import {
   ClipboardDocumentListIcon,
   ChartBarIcon,
   UserIcon,
-  Cog6ToothIcon
+  Cog6ToothIcon,
+  CalendarDaysIcon
 } from '@heroicons/react/24/outline';
 import UConsultingLogo from './UConsultingLogo';
 import '../styles/Layout.css';
@@ -33,6 +34,7 @@ const Layout = ({ children }) => {
     { name: 'Review Teams', href: '/review-teams', icon: UserGroupIcon },
     ...(user?.role === 'ADMIN' ? [
       { name: 'Cycle Management', href: '/cycles', icon: ClipboardDocumentListIcon },
+      { name: 'Event Management', href: '/events', icon: CalendarDaysIcon },
       { name: 'User Management', href: '/user-management', icon: UserIcon },
     ] : [])
   ];
