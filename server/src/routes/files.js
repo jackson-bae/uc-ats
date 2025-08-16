@@ -1,5 +1,5 @@
 import express from 'express';
-import { getFileStream } from '../services/google/drive.js';
+import { getFileStream, getFileMetadata } from '../services/google/drive.js';
 import { requireAuth } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -11,17 +11,23 @@ router.use(requireAuth);
 router.get('/:fileId/image', async (req, res) => {
   try {
     const { fileId } = req.params;
+    console.log('Serving image file:', fileId);
     
+    const meta = await getFileMetadata(fileId);
     const fileStream = await getFileStream(fileId);
     
-    res.setHeader('Content-Type', 'image/jpeg'); // Default to JPEG
+    res.setHeader('Content-Type', meta?.mimeType || 'image/jpeg');
     res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
     
     fileStream.pipe(res);
     
   } catch (error) {
     console.error('Error serving image:', error);
-    res.status(500).json({ error: 'Failed to serve image' });
+    res.status(500).json({ 
+      error: 'Failed to serve image',
+      details: error.message,
+      fileId: req.params.fileId
+    });
   }
 });
 
@@ -29,10 +35,12 @@ router.get('/:fileId/image', async (req, res) => {
 router.get('/:fileId/pdf', async (req, res) => {
   try {
     const { fileId } = req.params;
+    console.log('Serving PDF file:', fileId);
     
+    const meta = await getFileMetadata(fileId);
     const fileStream = await getFileStream(fileId);
     
-    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Type', meta?.mimeType || 'application/pdf');
     res.setHeader('Content-Disposition', 'inline'); // View in browser
     res.setHeader('Cache-Control', 'public, max-age=3600');
     
@@ -40,7 +48,11 @@ router.get('/:fileId/pdf', async (req, res) => {
     
   } catch (error) {
     console.error('Error serving PDF:', error);
-    res.status(500).json({ error: 'Failed to serve PDF' });
+    res.status(500).json({ 
+      error: 'Failed to serve PDF',
+      details: error.message,
+      fileId: req.params.fileId
+    });
   }
 });
 

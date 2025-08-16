@@ -15,8 +15,8 @@ const AuthenticatedImage = ({ src, alt, style, onError, ...props }) => {
 
     const loadImage = async () => {
       try {
-        // Extract the path from the full URL to use with our API client
-        const urlPath = src.replace(/^https?:\/\/[^\/]+/, '');
+        console.log('AuthenticatedImage: Loading image from:', src);
+        console.log('AuthenticatedImage: Token available:', !!apiClient.token);
         
         // Use our API client to fetch with authentication
         const response = await fetch(src, {
@@ -25,16 +25,21 @@ const AuthenticatedImage = ({ src, alt, style, onError, ...props }) => {
           }
         });
 
+        console.log('AuthenticatedImage: Response status:', response.status);
+
         if (!response.ok) {
-          throw new Error('Failed to load image');
+          const errorText = await response.text();
+          console.error('AuthenticatedImage: Error response:', errorText);
+          throw new Error(`Failed to load image: ${response.status} ${response.statusText}`);
         }
 
         const blob = await response.blob();
         const blobUrl = URL.createObjectURL(blob);
         setImageUrl(blobUrl);
         setLoading(false);
+        console.log('AuthenticatedImage: Successfully loaded image');
       } catch (err) {
-        console.error('Error loading authenticated image:', err);
+        console.error('Error loading image:', err);
         setError(true);
         setLoading(false);
         if (onError) onError(err);

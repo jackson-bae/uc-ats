@@ -5,15 +5,23 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const formConfigPath = path.resolve(process.env.FORM_CONFIG_PATH);
-const formConfig = JSON.parse(fs.readFileSync(formConfigPath, 'utf8'));
+// Handle missing FORM_CONFIG_PATH gracefully
+let formConfig = {};
+if (process.env.FORM_CONFIG_PATH) {
+  try {
+    const formConfigPath = path.resolve(process.env.FORM_CONFIG_PATH);
+    formConfig = JSON.parse(fs.readFileSync(formConfigPath, 'utf8'));
+  } catch (error) {
+    console.warn('Warning: Could not load form config:', error.message);
+  }
+}
 
 const config = {
   port: process.env.PORT || 3001,
-  jwtSecret: process.env.JWT_SECRET, 
+  jwtSecret: process.env.JWT_SECRET || 'fallback-secret-key', 
 
   dbUrl: process.env.DATABASE_URL,
-  gCloudKeyPath: path.resolve(process.env.GOOGLE_CLOUD_KEY_PATH),
+  gCloudKeyPath: process.env.GOOGLE_CLOUD_KEY_PATH ? path.resolve(process.env.GOOGLE_CLOUD_KEY_PATH) : null,
 
   form: formConfig,
 };

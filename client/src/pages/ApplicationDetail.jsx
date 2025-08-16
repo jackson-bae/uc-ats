@@ -4,6 +4,7 @@ import { ArrowLeftIcon, DocumentIcon } from '@heroicons/react/24/outline';
 import apiClient from '../utils/api';
 import AuthenticatedImage from '../components/AuthenticatedImage';
 import AuthenticatedFileLink from '../components/AuthenticatedFileLink';
+import DocumentPreviewModal from '../components/DocumentPreviewModal';
 import '../styles/ApplicationDetail.css';
 
 export default function ApplicationDetail() {
@@ -35,6 +36,7 @@ export default function ApplicationDetail() {
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
   const [commentError, setCommentError] = useState('');
+  const [preview, setPreview] = useState({ open: false, src: '', kind: 'pdf', title: '' });
 
   const resetGrades = async () => {
     try {
@@ -410,38 +412,47 @@ export default function ApplicationDetail() {
             <div className="info-grid">
               {application.resumeUrl && (
                 <div className="info-item">
-                  <AuthenticatedFileLink
-                    href={application.resumeUrl}
-                    filename={`${application.firstName}_${application.lastName}_Resume.pdf`}
+                  <a
+                    href="#"
                     className="document-link"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setPreview({ open: true, src: application.resumeUrl, kind: 'pdf', title: `${application.firstName} ${application.lastName} – Resume` });
+                    }}
                   >
                     <DocumentIcon className="document-icon" />
                     Resume (PDF)
-                  </AuthenticatedFileLink>
+                  </a>
                 </div>
               )}
               {application.blindResumeUrl && (
                 <div className="info-item">
-                  <AuthenticatedFileLink
-                    href={application.blindResumeUrl}
-                    filename={`${application.firstName}_${application.lastName}_Blind_Resume.pdf`}
+                  <a
+                    href="#"
                     className="document-link"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setPreview({ open: true, src: application.blindResumeUrl, kind: 'pdf', title: `${application.firstName} ${application.lastName} – Blind Resume` });
+                    }}
                   >
                     <DocumentIcon className="document-icon" />
                     Blind Resume (PDF)
-                  </AuthenticatedFileLink>
+                  </a>
                 </div>
               )}
               {application.coverLetterUrl && (
                 <div className="info-item">
-                  <AuthenticatedFileLink
-                    href={application.coverLetterUrl}
-                    filename={`${application.firstName}_${application.lastName}_Cover_Letter.pdf`}
+                  <a
+                    href="#"
                     className="document-link"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setPreview({ open: true, src: application.coverLetterUrl, kind: 'pdf', title: `${application.firstName} ${application.lastName} – Cover Letter` });
+                    }}
                   >
                     <DocumentIcon className="document-icon" />
                     Cover Letter (PDF)
-                  </AuthenticatedFileLink>
+                  </a>
                 </div>
               )}
               {application.videoUrl && (
@@ -728,6 +739,14 @@ export default function ApplicationDetail() {
           </div>
         </div>
       </div>
+      {preview.open && (
+        <DocumentPreviewModal
+          src={preview.src}
+          kind={preview.kind}
+          title={preview.title}
+          onClose={() => setPreview({ open: false, src: '', kind: 'pdf', title: '' })}
+        />
+      )}
     </div>
   );
 } 
