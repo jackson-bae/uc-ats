@@ -66,7 +66,7 @@ function transformValue(value, mapping) {
   }
 }
 
-// Generate accessible file URL via our API endpoints
+// Generate accessible file URL via our API endpoints (requires Authorization header from client)
 function generateFileUrl(fileData, fileType) {
   if (!fileData || !fileData.fileId) {
     return null;
@@ -75,14 +75,25 @@ function generateFileUrl(fileData, fileType) {
   const fileId = fileData.fileId;
   const baseUrl = process.env.BASE_URL || 'http://localhost:3001';
   
-  // Route to appropriate endpoint based on file type
-  if (fileType === 'image') {
+  // Prefer actual MIME type when present
+  const actualMimeType = fileData.mimeType;
+
+  if (actualMimeType && actualMimeType.startsWith('image/')) {
     return `${baseUrl}/api/files/${fileId}/image`;
-  } else if (fileType === 'pdf') {
+  }
+  if (actualMimeType === 'application/pdf') {
     return `${baseUrl}/api/files/${fileId}/pdf`;
   }
-  
-  // Default to PDF viewer for other file types
+  if (actualMimeType && actualMimeType.startsWith('video/')) {
+    // For now route videos through pdf endpoint; client will download/open externally
+    return `${baseUrl}/api/files/${fileId}/pdf`;
+  }
+
+  // Fallback to configured file type
+  if (fileType === 'image') {
+    return `${baseUrl}/api/files/${fileId}/image`;
+  }
+  // default to pdf
   return `${baseUrl}/api/files/${fileId}/pdf`;
 }
 
@@ -92,4 +103,8 @@ export function getFileUploadQuestions() {
   return Object.entries(mappings)
     .filter(([_, mapping]) => mapping.type === 'file')
     .map(([questionId, mapping]) => ({ questionId, ...mapping }));
+}
+
+function getDatabaseMappings() {
+  return config.form?.database_mappings || {};
 } 

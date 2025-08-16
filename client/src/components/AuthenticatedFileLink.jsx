@@ -12,6 +12,9 @@ const AuthenticatedFileLink = ({ href, children, filename, style, ...props }) =>
     setDownloading(true);
     
     try {
+      console.log('AuthenticatedFileLink: Downloading file from:', href);
+      console.log('AuthenticatedFileLink: Token available:', !!apiClient.token);
+      
       // Use our API client to fetch with authentication
       const response = await fetch(href, {
         headers: {
@@ -19,8 +22,12 @@ const AuthenticatedFileLink = ({ href, children, filename, style, ...props }) =>
         }
       });
 
+      console.log('AuthenticatedFileLink: Response status:', response.status);
+
       if (!response.ok) {
-        throw new Error('Failed to download file');
+        const errorText = await response.text();
+        console.error('AuthenticatedFileLink: Error response:', errorText);
+        throw new Error(`Failed to download file: ${response.status} ${response.statusText}`);
       }
 
       const blob = await response.blob();

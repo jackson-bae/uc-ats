@@ -1,8 +1,126 @@
 import express from 'express';
 import prisma from '../prismaClient.js'; 
 import { requireAuth } from '../middleware/auth.js';
+import { getFormQuestions, getResponses } from '../services/google/forms.js';
+import config from '../config.js';
 
 const router = express.Router();
+
+// Test Google Form API connection
+router.get('/test-google-api', async (req, res) => {
+  try {
+    console.log('Testing Google Form API connection...');
+    
+    // Test 1: Check if config is loaded
+    if (!config.form || !config.form.id) {
+      return res.status(500).json({ 
+        error: 'Form configuration not found',
+        config: {
+          formConfigPath: process.env.FORM_CONFIG_PATH,
+          formId: config.form?.id
+        }
+      });
+    }
+
+    const formId = config.form.id;
+    console.log('Form ID:', formId);
+
+    // Test 2: Test authentication first
+    console.log('Testing Google authentication...');
+    const { getGoogleAuthClient } = await import('../services/google/auth.js');
+    const authClient = await getGoogleAuthClient();
+    
+    // Get service account info
+    const credentials = await authClient.getCredentials();
+    console.log('Service account email:', credentials.client_email);
+    
+    // Test 3: Try to get form questions with detailed error handling
+    console.log('Testing form questions retrieval...');
+    try {
+      const questions = await getFormQuestions(formId);
+      console.log('Questions retrieved:', questions.length);
+    } catch (questionError) {
+      console.error('Form questions error:', questionError);
+      return res.status(500).json({
+        error: 'Failed to get form questions',
+        details: {
+          message: questionError.message,
+          code: questionError.code,
+          status: questionError.status,
+          suggestion: 'The service account may not have access to this specific form. Try sharing the form with the service account email.'
+        },
+        serviceAccount: credentials.client_email,
+        formId: formId
+      });
+    }
+
+    // Test 4: Try to get form responses
+    console.log('Testing form responses retrieval...');
+    try {
+      const responses = await getResponses(formId);
+      console.log('Responses retrieved:', responses.length);
+    } catch (responseError) {
+      console.error('Form responses error:', responseError);
+      return res.status(500).json({
+        error: 'Failed to get form responses',
+        details: {
+          message: responseError.message,
+          code: responseError.code,
+          status: responseError.status,
+          suggestion: 'The service account may not have access to form responses. Make sure the form is shared with Editor permissions.'
+        },
+        serviceAccount: credentials.client_email,
+        formId: formId
+      });
+    }
+
+    // If we get here, both tests passed
+    const questions = await getFormQuestions(formId);
+    const responses = await getResponses(formId);
+
+    res.json({
+      success: true,
+      message: 'Google Form API connection successful',
+      formId: formId,
+      serviceAccount: credentials.client_email,
+      questionsCount: questions.length,
+      responsesCount: responses.length,
+      sampleQuestions: questions.slice(0, 3), // First 3 questions
+      sampleResponses: responses.slice(0, 2)  // First 2 responses
+    });
+
+  } catch (error) {
+    console.error('Google Form API test failed:', error);
+    
+    // Provide detailed error information
+    let errorDetails = {
+      message: error.message,
+      code: error.code,
+      status: error.status
+    };
+
+    // Add specific error handling for common issues
+    if (error.code === 'ENOENT') {
+      errorDetails.suggestion = 'Check if google-cloud-key.json file exists in the server directory';
+    } else if (error.message.includes('invalid_grant')) {
+      errorDetails.suggestion = 'Service account key may be invalid or expired';
+    } else if (error.message.includes('not found')) {
+      errorDetails.suggestion = 'Form ID may be incorrect or form may not exist';
+    } else if (error.message.includes('permission')) {
+      errorDetails.suggestion = 'Service account may not have proper permissions for this form';
+    }
+
+    res.status(500).json({
+      error: 'Google Form API connection failed',
+      details: errorDetails,
+      config: {
+        formConfigPath: process.env.FORM_CONFIG_PATH,
+        gCloudKeyPath: process.env.GOOGLE_CLOUD_KEY_PATH,
+        formId: config.form?.id
+      }
+    });
+  }
+});
 
 // All routes below require authentication
 router.use(requireAuth);

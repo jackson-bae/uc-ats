@@ -20,11 +20,12 @@ app.use('/api/applications', applicationsRoutes);
 app.use('/api/files', filesRoutes);
 app.use('/api/admin', adminRoutes);
 
+// Temporarily disable sync to test auth
 await syncFormResponses();
-cron.schedule('*/5 * * * *', () => {
-  console.log('Running scheduled response sync...');
-  syncFormResponses();
-});
+ cron.schedule('*/5 * * * *', () => {
+   console.log('Running scheduled response sync...');
+ syncFormResponses();
+ });
 
 app.listen(config.port, () => {
   console.log(`Server running on port ${config.port}`);
