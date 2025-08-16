@@ -30,8 +30,10 @@ const Layout = ({ children }) => {
   const navigation = [
     { name: 'Dashboard', href: '/', icon: HomeIcon },
     { name: 'Applications', href: '/application-list', icon: DocumentTextIcon },
+    { name: 'Review Teams', href: '/review-teams', icon: UserGroupIcon },
     ...(user?.role === 'ADMIN' ? [
       { name: 'Cycle Management', href: '/cycles', icon: ClipboardDocumentListIcon },
+      { name: 'User Management', href: '/user-management', icon: UserIcon },
     ] : [])
   ];
 

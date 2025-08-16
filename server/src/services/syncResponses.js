@@ -14,12 +14,23 @@ export default async function syncFormResponses() {
       console.warn('No active recruiting cycle. Skipping sync.');
       return;
     }
+    
+    console.log('Active cycle found:', {
+      id: activeCycle.id,
+      name: activeCycle.name,
+      formUrl: activeCycle.formUrl
+    });
+    
     const formIdToUse = extractFormIdFromUrl(activeCycle.formUrl || '');
+    console.log('Extracted form ID:', formIdToUse);
+    
     if (!formIdToUse) {
       console.warn('Active cycle has no valid Google Form URL. Skipping sync.');
+      console.warn('Form URL was:', activeCycle.formUrl);
       return;
     }
 
+    console.log('Using form ID for API call:', formIdToUse);
     const responses = await getResponses(formIdToUse)
     
     // Get existing response IDs
