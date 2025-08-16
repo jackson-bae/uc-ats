@@ -401,7 +401,8 @@ router.get('/users', requireAuth, async (req, res) => {
         id: true,
         fullName: true,
         email: true,
-        role: true
+        role: true,
+        profileImage: true
       },
       orderBy: {
         fullName: 'asc'

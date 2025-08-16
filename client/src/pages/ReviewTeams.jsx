@@ -19,14 +19,13 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Grid
+  Grid,
+  Autocomplete
 } from '@mui/material';
 import { 
   PlusIcon, 
   UserPlusIcon, 
   TrashIcon,
-  UserIcon,
-  DocumentTextIcon,
   ChevronDownIcon,
   ChevronRightIcon,
   ArrowPathIcon
@@ -47,7 +46,6 @@ export default function ReviewTeams() {
     memberTwo: '', 
     memberThree: '' 
   });
-  const [candidates, setCandidates] = useState([]);
   const [expandedTeams, setExpandedTeams] = useState(new Set());
   const [users, setUsers] = useState([]);
   const [availableCandidates, setAvailableCandidates] = useState([]);
@@ -82,7 +80,6 @@ export default function ReviewTeams() {
         ]);
 
         setTeams(teamsResponse);
-        setCandidates(candidatesResponse);
         setAvailableCandidates(candidatesResponse);
         setUsers(usersResponse);
       } catch (err) {
@@ -227,7 +224,6 @@ export default function ReviewTeams() {
         apiClient.get('/review-teams/users')
       ]);
       setTeams(teamsResponse);
-      setCandidates(candidatesResponse);
       setAvailableCandidates(candidatesResponse);
       setUsers(usersResponse);
       setError('');
@@ -611,63 +607,147 @@ export default function ReviewTeams() {
             
             <Grid container spacing={2}>
               <Grid item xs={12} sm={4}>
-                <FormControl fullWidth>
-                  <InputLabel>Member 1</InputLabel>
-                  <Select
-                    value={newTeamData.memberOne}
-                    onChange={(e) => setNewTeamData({ ...newTeamData, memberOne: e.target.value })}
-                    label="Member 1"
-                  >
-                    <MenuItem value="">
-                      <em>Select a member</em>
-                    </MenuItem>
-                    {users.map((user) => (
-                      <MenuItem key={user.id} value={user.id}>
-                        {user.fullName} ({user.role})
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
+                <Autocomplete
+                  fullWidth
+                  options={users}
+                  getOptionLabel={(option) => option.fullName || ''}
+                  value={users.find(user => user.id === newTeamData.memberOne) || null}
+                  onChange={(_, newValue) => {
+                    setNewTeamData({ ...newTeamData, memberOne: newValue?.id || '' });
+                  }}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Member 1"
+                      placeholder="Search and select team member..."
+                    />
+                  )}
+                  renderOption={(props, option) => {
+                    const { key, ...otherProps } = props;
+                    return (
+                      <Box component="li" key={key} {...otherProps}>
+                        <Stack direction="row" alignItems="center" spacing={2}>
+                          <Avatar
+                            sx={{ 
+                              width: 32, 
+                              height: 32, 
+                              bgcolor: 'primary.main',
+                              fontSize: '0.75rem'
+                            }}
+                            src={option.profileImage}
+                          >
+                            {!option.profileImage && option.fullName.split(' ').map(n => n[0]).join('')}
+                          </Avatar>
+                          <Box>
+                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                              {option.fullName}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {option.role}
+                            </Typography>
+                          </Box>
+                        </Stack>
+                      </Box>
+                    );
+                  }}
+                  isOptionEqualToValue={(option, value) => option.id === value?.id}
+                />
               </Grid>
               
               <Grid item xs={12} sm={4}>
-                <FormControl fullWidth>
-                  <InputLabel>Member 2</InputLabel>
-                  <Select
-                    value={newTeamData.memberTwo}
-                    onChange={(e) => setNewTeamData({ ...newTeamData, memberTwo: e.target.value })}
-                    label="Member 2"
-                  >
-                    <MenuItem value="">
-                      <em>Select a member</em>
-                    </MenuItem>
-                    {users.map((user) => (
-                      <MenuItem key={user.id} value={user.id}>
-                        {user.fullName} ({user.role})
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
+                <Autocomplete
+                  fullWidth
+                  options={users}
+                  getOptionLabel={(option) => option.fullName || ''}
+                  value={users.find(user => user.id === newTeamData.memberTwo) || null}
+                  onChange={(_, newValue) => {
+                    setNewTeamData({ ...newTeamData, memberTwo: newValue?.id || '' });
+                  }}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Member 2"
+                      placeholder="Search and select team member..."
+                    />
+                  )}
+                  renderOption={(props, option) => {
+                    const { key, ...otherProps } = props;
+                    return (
+                      <Box component="li" key={key} {...otherProps}>
+                        <Stack direction="row" alignItems="center" spacing={2}>
+                          <Avatar
+                            sx={{ 
+                              width: 32, 
+                              height: 32, 
+                              bgcolor: 'primary.main',
+                              fontSize: '0.75rem'
+                            }}
+                            src={option.profileImage}
+                          >
+                            {!option.profileImage && option.fullName.split(' ').map(n => n[0]).join('')}
+                          </Avatar>
+                          <Box>
+                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                              {option.fullName}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {option.role}
+                            </Typography>
+                          </Box>
+                        </Stack>
+                      </Box>
+                    );
+                  }}
+                  isOptionEqualToValue={(option, value) => option.id === value?.id}
+                />
               </Grid>
               
               <Grid item xs={12} sm={4}>
-                <FormControl fullWidth>
-                  <InputLabel>Member 3</InputLabel>
-                  <Select
-                    value={newTeamData.memberThree}
-                    onChange={(e) => setNewTeamData({ ...newTeamData, memberThree: e.target.value })}
-                    label="Member 3"
-                  >
-                    <MenuItem value="">
-                      <em>Select a member</em>
-                    </MenuItem>
-                    {users.map((user) => (
-                      <MenuItem key={user.id} value={user.id}>
-                        {user.fullName} ({user.role})
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
+                <Autocomplete
+                  fullWidth
+                  options={users}
+                  getOptionLabel={(option) => option.fullName || ''}
+                  value={users.find(user => user.id === newTeamData.memberThree) || null}
+                  onChange={(_, newValue) => {
+                    setNewTeamData({ ...newTeamData, memberThree: newValue?.id || '' });
+                  }}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Member 3"
+                      placeholder="Search and select team member..."
+                    />
+                  )}
+                  renderOption={(props, option) => {
+                    const { key, ...otherProps } = props;
+                    return (
+                      <Box component="li" key={key} {...otherProps}>
+                        <Stack direction="row" alignItems="center" spacing={2}>
+                          <Avatar
+                            sx={{ 
+                              width: 32, 
+                              height: 32, 
+                              bgcolor: 'primary.main',
+                              fontSize: '0.75rem'
+                            }}
+                            src={option.profileImage}
+                          >
+                            {!option.profileImage && option.fullName.split(' ').map(n => n[0]).join('')}
+                          </Avatar>
+                          <Box>
+                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                              {option.fullName}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {option.role}
+                            </Typography>
+                          </Box>
+                        </Stack>
+                      </Box>
+                    );
+                  }}
+                  isOptionEqualToValue={(option, value) => option.id === value?.id}
+                />
               </Grid>
             </Grid>
 
