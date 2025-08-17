@@ -518,5 +518,31 @@ router.get('/:id/grades/average', requireAuth, async (req, res) => {
   }
 });
 
+// Get latest application ID for a candidate
+router.get('/candidate/:candidateId/latest', requireAuth, async (req, res) => {
+  try {
+    const { candidateId } = req.params;
+
+    // Find the latest application for this candidate
+    const latestApplication = await prisma.application.findFirst({
+      where: { candidateId },
+      orderBy: { submittedAt: 'desc' },
+      select: { id: true }
+    });
+
+    if (!latestApplication) {
+      return res.status(404).json({ error: 'No application found for this candidate' });
+    }
+
+    res.json({ applicationId: latestApplication.id });
+  } catch (error) {
+    console.error('Error fetching latest application for candidate:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch latest application for candidate',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
 export default router; 
  

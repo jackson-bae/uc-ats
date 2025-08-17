@@ -14,6 +14,8 @@ import Dashboard from './pages/Dashboard';
 import ReviewTeams from './pages/ReviewTeams';
 import UserManagement from './pages/UserManagement';
 import EventManagement from './pages/EventManagement';
+import Interviews from './pages/Interviews';
+import InterviewDetail from './pages/InterviewDetail';
 import './styles/variables.css';
 // Protected Route wrapper
 const ProtectedRoute = ({ children }) => {
@@ -91,6 +93,24 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute>
             <EventManagement />
+          </ProtectedRoute>
+        }
+      />
+      
+      <Route
+        path="/interviews"
+        element={
+          <ProtectedRoute>
+            <Interviews />
+          </ProtectedRoute>
+        }
+      />
+      
+      <Route
+        path="/interviews/:id"
+        element={
+          <ProtectedRoute>
+            <InterviewDetail />
           </ProtectedRoute>
         }
       />

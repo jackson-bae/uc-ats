@@ -51,16 +51,41 @@ export default async function syncFormResponses() {
     for (const response of newResponses) {
       try {
         const dbRecord = transformFormResponse(response);
-        // Associate with active cycle if exists
+        
+        // Extract candidate information from the application data
+        const studentId = parseInt(dbRecord.studentId);
+        const candidateData = {
+          studentId,
+          firstName: dbRecord.firstName,
+          lastName: dbRecord.lastName,
+          email: dbRecord.email
+        };
+
+        // Check if candidate already exists
+        let candidate = await prisma.candidate.findUnique({
+          where: { studentId }
+        });
+
+        if (!candidate) {
+          // Create new candidate
+          candidate = await prisma.candidate.create({
+            data: candidateData
+          });
+          console.log(`Created new candidate for studentId ${studentId}: ${candidateData.firstName} ${candidateData.lastName}`);
+        }
+
+        // Create application with candidate connection
         const dataToCreate = {
           ...dbRecord,
+          candidateId: candidate.id,
           ...(activeCycle ? { cycleId: activeCycle.id } : {})
         };
+        
         await prisma.application.create({ data: dataToCreate });
         successCount++;
 
       } catch (error) {
-        console.error(`Error processing response ${response.responseId}`);
+        console.error(`Error processing response ${response.responseId}:`, error);
         errorCount++;
       }
     }

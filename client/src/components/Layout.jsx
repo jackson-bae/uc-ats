@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { 
+import {
   HomeIcon, 
   DocumentTextIcon, 
   UserGroupIcon, 
@@ -12,7 +12,8 @@ import {
   ChartBarIcon,
   UserIcon,
   Cog6ToothIcon,
-  CalendarDaysIcon
+  CalendarDaysIcon,
+  UserGroupIcon as UserGroupIcon2
 } from '@heroicons/react/24/outline';
 import UConsultingLogo from './UConsultingLogo';
 import '../styles/Layout.css';
@@ -34,6 +35,7 @@ const Layout = ({ children }) => {
     { name: 'Review Teams', href: '/review-teams', icon: UserGroupIcon },
     ...(user?.role === 'ADMIN' ? [
       { name: 'Cycle Management', href: '/cycles', icon: ClipboardDocumentListIcon },
+      { name: 'Interviews', href: '/interviews', icon: UserGroupIcon2 },
       { name: 'Event Management', href: '/events', icon: CalendarDaysIcon },
       { name: 'User Management', href: '/user-management', icon: UserIcon },
     ] : [])

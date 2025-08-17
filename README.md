@@ -1,132 +1,128 @@
-# Club ATS
+# UConsulting Application Tracking System
 
-This is a fullstack web application built for our CS 35L final project. It serves as an Applicant Tracking System (ATS) for student clubs to manage their application and recruitment processes.
+A comprehensive application tracking system for UConsulting's recruitment process.
 
-## Tech Stack
+## Features
 
-- **Frontend**: React (with Vite)
-- **Backend**: Express.js
-- **ORM**: Prisma
-- **Database**: Supabase (PostgreSQL)
+### Core Functionality
+- **Application Management**: Track and review candidate applications
+- **Review Teams**: Assign applications to review teams for evaluation
+- **Cycle Management**: Manage recruiting cycles with start/end dates
+- **Event Management**: Create and manage recruitment events with RSVP/attendance tracking
+- **User Management**: Admin user management with role-based access
+- **Interviews**: Schedule and manage interview rounds (Coffee Chat, Round 1, Round 2)
+
+### Interview Management
+The system now includes a comprehensive interview management feature that allows admins to:
+
+- **Create Interview Events**: Schedule interviews for different rounds within a recruiting cycle
+- **Interview Types**: Support for three interview types:
+  - Coffee Chat Round
+  - Round 1
+  - Round 2
+- **Interview Details**: Each interview can include:
+  - Name and description
+  - Start and end dates/times
+  - Location (physical or virtual)
+  - Maximum number of candidates
+  - Associated recruiting cycle
+- **Status Tracking**: Automatic status calculation (Upcoming, Active, Completed)
+- **Visual Organization**: Separate sections for active/upcoming and past interviews
+
+## Technology Stack
+
+### Frontend
+- React with Vite
+- Material-UI (MUI) for components
+- React Router for navigation
+- Heroicons for icons
+
+### Backend
+- Node.js with Express
+- Prisma ORM with PostgreSQL
+- Supabase for authentication and database
+- Google Drive API integration for file management
 
 ## Getting Started
 
-### 1. Clone the repository
+### Prerequisites
+- Node.js (v16 or higher)
+- PostgreSQL database
+- Supabase account
 
-```bash
-git clone https://github.com/rahulnanda15/35L-ClubATS.git
-cd club-ats
-```
+### Installation
 
-### 2. Install dependencies
+1. Clone the repository
+2. Install dependencies:
+   ```bash
+   cd client && npm install
+   cd ../server && npm install
+   ```
 
-Install frontend and backend dependencies:
+3. Set up environment variables:
+   - Copy `.env.example` to `.env` in the server directory
+   - Configure your database and API keys
 
-```bash
-# Frontend
-cd client
-npm install
+4. Run database migrations:
+   ```bash
+   cd server && npx prisma migrate deploy
+   ```
 
-# Backend
-cd ../server
-npm install
-```
+5. Start the development servers:
+   ```bash
+   # Terminal 1 - Backend
+   cd server && npm start
+   
+   # Terminal 2 - Frontend
+   cd client && npm run dev
+   ```
 
-### 3. Generate Prisma client
+## Usage
 
-This step generates the Prisma client which allows you to query your database in a type-safe way. It reads your `schema.prisma` file and creates a client tailored to your data models in the `node_modules/@prisma/client` folder.
+### Admin Features
+1. **Cycle Management**: Create and manage recruiting cycles
+2. **Event Management**: Schedule events and track RSVPs/attendance
+3. **Interview Management**: Create interview schedules for different rounds
+4. **User Management**: Manage admin users and permissions
+5. **Application Review**: Review and score candidate applications
 
-You need to run this every time the database schema changes (e.g., you add or modify a model in `schema.prisma`) to ensure the client reflects the current structure of the database.
+### Interview Management Workflow
+1. Navigate to the "Interviews" page (admin only)
+2. Click "New Interview" to create an interview event
+3. Fill in the required details:
+   - Interview name
+   - Type (Coffee Chat, Round 1, or Round 2)
+   - Recruiting cycle
+   - Start and end dates/times
+   - Location and capacity
+4. View and manage existing interviews in the organized sections
 
-```bash
-cd server
-npx prisma generate
-```
+## API Endpoints
 
-## Testing  
-### 1. Start the backend server
+### Interview Management
+- `GET /api/admin/interviews` - Get all interviews
+- `POST /api/admin/interviews` - Create new interview
+- `DELETE /api/admin/interviews/:id` - Delete interview
 
-The backend is run locally on local port 3001.
+## Database Schema
 
-```bash
-cd server
-npm run dev
-```
+The system includes a comprehensive database schema with models for:
+- Users and authentication
+- Candidates and applications
+- Recruiting cycles
+- Events and RSVPs
+- Interviews
+- Review teams and evaluations
+- Grades and comments
 
-### 2. Start the frontend
+## Contributing
 
-The frontend is run locally on local port 5173.
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
 
-```bash
-cd client
-npm run dev
-```
+## License
 
-## User Flow
-### 0. Google Form Applications
-
-All of the applications in our applicant tracking system are fueled by responses from a Google Form: https://docs.google.com/forms/d/e/1FAIpQLSdpXneX-5RIdqclQGnk8DWOSHsQVcLxyCW2_EBMaI3eB8UdpA/viewform?pli=1. You can test this out after reading the below instructions by filling out the Google Form. Once you put in a new application, you will need to restart the backend once again for the applicant to be updated onto the website. 
-
-```bash
-cd server
-npm run dev
-```
-
-### 1. Sign up
-
-You should now log on to http://localhost:5173/...
-
-As a new user, you are a part of the board of one of UCLA's renowned clubs and because it is the Fall, you have a new application cycle and a lot of new applicants to review in collaboration with your fellow board members. 
-
-Because you are new to the platform, click on the Sign Up button and enter your new credentials. 
-
-### 2. Application Grading
-
-Upon landing to the application tracking system, you will see a list of applicants. You can use a series of dropdown menus to sort and filter out applicants as you need. You are also given the opportunity to grade applicants. Some of them already have grades, which should be visible, while others do not. The grades visible currently are the average scores aggregated from every board member that has graded that application. You will have a chance to individually grade each applicant yourself by clicking onto the applicant.
-
-Clicking on any applicant, you will see a variety of information about them, including its existing applicant grades, photo, and basic information such as major, academic information, and demographic information. As a board member, you are to grade applications using the grading panel on the right, based on their resume, cover letter, and optional video. If an applicant did not submit any of these items, select N/A for that category. Once you are ready to submit your grades for an applicant, click Save Grades!
-
-If you return back to the Application List page, you should see that your grade for that applicant should appear on its horizontal display card or should have influenced the average grades for that applicant. 
-
-### 3. Round Management
-
-The following feature allows club administrators to manage recruitment candidates through various stages of the club application process.
-
-Core Functionality:
-  1. Candidate overview: View all of the candidates in an organized table
-  2. Status Tracking: Monitor all candidates throughout each round of the recruitment process
-  3. Approval System: Visual indicators on the table allow for approval, rejection, and pending of candidates throughout each round
-  4. Bulk Advancement: Advance all candidates simultaneously
-  5. Individual Actions: Advance, approve, reject, or waitlist applicants one at a time as well
-  6. Data Management: Edit candidate information through the edit icon in each cell. Rounds are the only editable information for the candidates.
-  7. Reset Functionality: The administrator can reset all decisions and start over
-
-  #### User Workflow
-
-  The Candidate Management feature supports the following candidate statuses:
-  
-### Rounds
-
-1. **Submitted**: Initial application has been received.
-2. **Under Review**: Application is being evaluated; it has made it past the submission stage.
-3. **Accepted**: Candidate has been selected to join the club.
-4. **Rejected**: Application has been declined.
-5. **Waitlisted**: Candidate’s status is on hold. They may later be **Accepted** or **Rejected** from this state.
-
-
- ### Notes
-
-- The **Approval Status** cell is only for the **Bulk Advancement** feature.
-- To use **Bulk Advancement**, candidates must be either **Approved** or **Rejected** via the **Approval Status** buttons (thumbs up / thumbs down).
-- For **individual advancements**, use the **Advance** and **Reject** buttons in the **Actions** cell for that candidate.
-- To **Waitlist** a candidate:
-  - Click the **edit icon (pencil)** in the **Actions** cell.
-  - Use the **Round dropdown** in the modal to select **Waitlisted**.
-- **Waitlisted candidates cannot be rejected** through Bulk Advancement.
-- If a **Waitlisted candidate** is approved through Bulk Advancement, their **Round Status** will remain **Waitlisted**.
-- In the **Actions** cell, waitlisted candidates will have **Accept** and **Reject** buttons.
-  - These are the only ways to remove a candidate from the Waitlist.
-  - Click a button to update the candidate's status.
-- Use the **filter dropdown** to filter the table by **Round** or **Approval Status**.
-- The **Refresh** button reloads the page content without refreshing the entire browser.
-- The **Reset All** button resets the **Round Status** for **all candidates** in case the administrator wants to start over.
+This project is proprietary to UConsulting.

@@ -1,0 +1,37 @@
+{
+    "name": "Event Attendance Check-in Form",
+    "description": "Configuration for event attendance/check-in Google Forms based on the provided form structure",
+    "database_mappings": {
+    },
+    "field_patterns": {
+        "email": {
+            "field": "email",
+            "type": "string",
+            "required": true,
+            "validation": "email",
+            "patterns": ["email", "e-mail", "email address"]
+        },
+        "firstName": {
+            "field": "firstName", 
+            "type": "string",
+            "required": true,
+            "patterns": ["first name", "firstname", "first", "given name"]
+        },
+        "lastName": {
+            "field": "lastName",
+            "type": "string", 
+            "required": true,
+            "patterns": ["last name", "lastname", "last", "surname", "family name"]
+        },
+        "studentId": {
+            "field": "studentId",
+            "type": "string",
+            "required": true,
+            "validation": "numeric",
+            "transform_regex": "\\D",
+            "transform_replace": "",
+            "patterns": ["student id", "studentid", "ucla student id", "id number", "student number"]
+        }
+    },
+    "prisma_model": "EventAttendance"
+}
