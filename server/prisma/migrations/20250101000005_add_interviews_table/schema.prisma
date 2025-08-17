@@ -99,20 +99,15 @@ model Application {
 
   rawResponses          Json
 
-  @@map("applications")
-
-  approved              Boolean?
-  currentRound          String?
-
-  // Recruiting cycle relation
-  cycleId               String?
-  cycle                 RecruitingCycle?    @relation(fields: [cycleId], references: [id])
-
-  // Enhanced Candidate relation - now required and automatically linked
+  // Relations
   candidateId           String
   candidate             Candidate           @relation(fields: [candidateId], references: [id])
-
+  cycleId               String
+  cycle                 RecruitingCycle     @relation(fields: [cycleId], references: [id])
+  grades                Grade[]
   comments              Comment[]
+
+  @@map("applications")
 }
 
 enum ApplicationStatus {
@@ -124,16 +119,16 @@ enum ApplicationStatus {
 }
 
 model RecruitingCycle {
-  id         String   @id @default(uuid())
-  name       String
-  formUrl    String?
-  isActive   Boolean  @default(false)
-  startDate  DateTime?
-  endDate    DateTime?
-  createdAt  DateTime @default(now())
+  id        String   @id @default(uuid())
+  name      String
+  formUrl   String?
+  startDate DateTime?
+  endDate   DateTime?
+  isActive  Boolean  @default(false)
+  createdAt DateTime @default(now())
 
+  // Relations
   applications Application[]
-  groups      Groups[]
   events      Events[]
   interviews  Interview[]
 
@@ -156,65 +151,53 @@ model Interview {
   @@map("interviews")
 }
 
-model Comment {
-  id            String       @id @default(uuid())
-  applicationId String
-  application   Application  @relation(fields: [applicationId], references: [id])
-  userId        String
-  user          User         @relation(fields: [userId], references: [id])
-  content       String
-  createdAt     DateTime     @default(now())
-
-  @@map("comments")
-}
-
 model Grade {
-  id            String   @id @default(uuid())
-  resume        String?
-  video         String?
-  createdAt     DateTime @default(now())
-  cover_letter  String?
-
-  applicant   String?
-  user        String?
+  id            String    @id @default(uuid())
+  overallScore  Decimal   @db.Decimal(5,2)
+  scoreOne      Int?
+  scoreTwo      Int?
+  scoreThree    Int?
+  notesOne      String?
+  notesTwo      String?
+  notesThree    String?
+  adminScore    Decimal?  @db.Decimal(5,2)
+  adminNotes    String?
+  status        String?
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id])
+  evaluatorId   String?
+  evaluator     User?     @relation(fields: [evaluatorId], references: [id])
+  assignedGroupId String?
+  assignedGroup Groups?   @relation(fields: [assignedGroupId], references: [id])
+  createdAt     DateTime  @default(now())
 
   @@map("grades")
 }
 
-// Evaluation system models
-model Evaluation {
-  id          String    @id @default(uuid())
-  notes       String?
-  score       Int
-  evaluatorId String
-  evaluator   User      @relation(fields: [evaluatorId], references: [id])
-  createdAt   DateTime  @default(now())
+model Comment {
+  id            String    @id @default(uuid())
+  content       String
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id])
+  userId        String
+  user          User      @relation(fields: [userId], references: [id])
+  createdAt     DateTime  @default(now())
 
-  // Relations to evaluation types
-  coffeeChat  CoffeeChat? @relation(fields: [coffeeChatId], references: [id])
-  coffeeChatId String?
-  roundOne    RoundOne?   @relation(fields: [roundOneId], references: [id])
-  roundOneId  String?
-  roundTwo    RoundTwo?   @relation(fields: [roundTwoId], references: [id])
-  roundTwoId  String?
-
-  @@map("evaluations")
+  @@map("comments")
 }
 
 model Groups {
-  id            String   @id @default(uuid())
+  id            String    @id @default(uuid())
+  name          String
   memberOne     String?
   memberTwo     String?
   memberThree   String?
-  avgScore      Decimal? @db.Decimal(5,2)
-  cycleId       String
-  cycle         RecruitingCycle @relation(fields: [cycleId], references: [id])
-  createdAt     DateTime @default(now())
+  createdAt     DateTime  @default(now())
 
-  // User relations for team members
-  memberOneUser     User?     @relation("GroupMemberOne", fields: [memberOne], references: [id])
-  memberTwoUser     User?     @relation("GroupMemberTwo", fields: [memberTwo], references: [id])
-  memberThreeUser   User?     @relation("GroupMemberThree", fields: [memberThree], references: [id])
+  // Member relations
+  memberOneUser   User?     @relation("GroupMemberOne", fields: [memberOne], references: [id])
+  memberTwoUser   User?     @relation("GroupMemberTwo", fields: [memberTwo], references: [id])
+  memberThreeUser User?     @relation("GroupMemberThree", fields: [memberThree], references: [id])
 
   // Relations to scoring models
   resumeScores     ResumeScore[]
@@ -388,4 +371,21 @@ model Referral {
   createdAt     DateTime  @default(now())
 
   @@map("referrals")
+}
+
+model Evaluation {
+  id            String    @id @default(uuid())
+  score         Decimal   @db.Decimal(5,2)
+  feedback      String?
+  coffeeChatId  String?
+  coffeeChat    CoffeeChat? @relation(fields: [coffeeChatId], references: [id])
+  roundOneId    String?
+  roundOne      RoundOne? @relation(fields: [roundOneId], references: [id])
+  roundTwoId    String?
+  roundTwo      RoundTwo? @relation(fields: [roundTwoId], references: [id])
+  evaluatorId   String
+  evaluator     User      @relation(fields: [evaluatorId], references: [id])
+  createdAt     DateTime  @default(now())
+
+  @@map("evaluations")
 }
