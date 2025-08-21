@@ -134,33 +134,58 @@ export function createDynamicEventMapping(formResponse, eventId, configType) {
     rawResponse: formResponse
   };
 
+  console.log(`Dynamic mapping for ${configType} - Raw answers:`, JSON.stringify(answers, null, 2));
+
+  // First, check for respondentEmail at the top level (Google Forms provides this)
+  if (formResponse.respondentEmail && !mappedData.email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (emailRegex.test(formResponse.respondentEmail)) {
+      mappedData.email = formResponse.respondentEmail;
+      console.log(`Found email from respondentEmail: ${formResponse.respondentEmail}`);
+    }
+  }
+
   // Try to extract common fields by analyzing answer values
   Object.entries(answers).forEach(([questionId, answerData]) => {
     const value = extractAnswerValue(answerData);
     if (!value) return;
 
     const stringValue = String(value).trim();
+    console.log(`Processing question ${questionId}: "${stringValue}"`);
     
-    // Email detection
-    if (stringValue.includes('@') && !mappedData.email) {
-      mappedData.email = stringValue;
+    // Email detection - more comprehensive (only if not already found)
+    if (!mappedData.email && stringValue.includes('@') && stringValue.includes('.')) {
+      // Basic email validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (emailRegex.test(stringValue)) {
+        mappedData.email = stringValue;
+        console.log(`Found email from answer: ${stringValue}`);
+      }
     }
     
     // Student ID detection (9 digits)
     if (/^\d{9}$/.test(stringValue) && !mappedData.studentId) {
       mappedData.studentId = parseInt(stringValue);
+      console.log(`Found student ID: ${stringValue}`);
     }
     
-    // Name detection (basic heuristic - first alphabetic fields become names)
-    if (/^[a-zA-Z\s]+$/.test(stringValue) && stringValue.length < 50) {
-      if (!mappedData.firstName) {
-        mappedData.firstName = stringValue;
-      } else if (!mappedData.lastName) {
-        mappedData.lastName = stringValue;
+    // Name detection - improved logic
+    if (/^[a-zA-Z\s]+$/.test(stringValue) && stringValue.length < 50 && stringValue.length > 1) {
+      const nameParts = stringValue.trim().split(/\s+/);
+      if (nameParts.length >= 1 && nameParts.length <= 3) {
+        if (!mappedData.firstName) {
+          mappedData.firstName = nameParts[0];
+          console.log(`Found first name: ${nameParts[0]}`);
+        }
+        if (nameParts.length > 1 && !mappedData.lastName) {
+          mappedData.lastName = nameParts.slice(1).join(' ');
+          console.log(`Found last name: ${nameParts.slice(1).join(' ')}`);
+        }
       }
     }
   });
 
+  console.log(`Final mapped data:`, JSON.stringify(mappedData, null, 2));
   return mappedData;
 }
 

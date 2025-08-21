@@ -2,6 +2,7 @@ import express from 'express';
 import prisma from '../prismaClient.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
 import { syncEventAttendance, syncEventRSVP, syncAllEventForms } from '../services/syncEventResponses.js';
+import { sendRSVPConfirmation, sendAttendanceConfirmation, formatEventDate } from '../services/emailNotifications.js';
 
 const router = express.Router();
 
@@ -990,6 +991,81 @@ router.post('/interviews/:id/evaluations', async (req, res) => {
   } catch (error) {
     console.error('[POST /api/admin/interviews/:id/evaluations]', error);
     res.status(500).json({ error: 'Failed to create evaluation' });
+  }
+});
+
+// Test email notifications endpoint
+router.post('/test-email-notifications', async (req, res) => {
+  try {
+    const { eventId, type, candidateEmail } = req.body;
+    
+    if (!eventId || !type || !candidateEmail) {
+      return res.status(400).json({ 
+        error: 'Missing required fields: eventId, type, candidateEmail' 
+      });
+    }
+    
+    if (!['rsvp', 'attendance'].includes(type)) {
+      return res.status(400).json({ 
+        error: 'Type must be either "rsvp" or "attendance"' 
+      });
+    }
+    
+    // Get event details
+    const event = await prisma.events.findUnique({
+      where: { id: eventId }
+    });
+    
+    if (!event) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+    
+    // Get candidate details
+    const candidate = await prisma.candidate.findUnique({
+      where: { email: candidateEmail }
+    });
+    
+    if (!candidate) {
+      return res.status(404).json({ error: 'Candidate not found' });
+    }
+    
+    const candidateName = `${candidate.firstName} ${candidate.lastName}`;
+    const eventDate = formatEventDate(event.eventStartDate);
+    
+    let result;
+    if (type === 'rsvp') {
+      result = await sendRSVPConfirmation(
+        candidateEmail,
+        candidateName,
+        event.eventName,
+        eventDate,
+        event.eventLocation
+      );
+    } else {
+      result = await sendAttendanceConfirmation(
+        candidateEmail,
+        candidateName,
+        event.eventName,
+        eventDate,
+        event.eventLocation
+      );
+    }
+    
+    if (result.success) {
+      res.json({ 
+        message: `${type.toUpperCase()} confirmation email sent successfully`,
+        details: result
+      });
+    } else {
+      res.status(500).json({ 
+        error: `Failed to send ${type} confirmation email`,
+        details: result.error
+      });
+    }
+    
+  } catch (error) {
+    console.error('[POST /api/admin/test-email-notifications]', error);
+    res.status(500).json({ error: 'Failed to send test email notification' });
   }
 });
 

@@ -35,6 +35,13 @@ export default function EventManagement() {
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
+  const [testEmailOpen, setTestEmailOpen] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [testEmailForm, setTestEmailForm] = useState({
+    candidateEmail: '',
+    type: 'rsvp'
+  });
+  const [emailTestLoading, setEmailTestLoading] = useState(false);
   const [form, setForm] = useState({
     eventName: '',
     eventStartDate: '',
@@ -120,6 +127,41 @@ export default function EventManagement() {
       } catch (e) {
         setError(e.message || 'Failed to delete event');
       }
+    }
+  };
+
+  const openTestEmailDialog = (event) => {
+    setSelectedEvent(event);
+    setTestEmailForm({
+      candidateEmail: '',
+      type: 'rsvp'
+    });
+    setTestEmailOpen(true);
+  };
+
+  const testEmailNotification = async () => {
+    try {
+      setEmailTestLoading(true);
+      setError('');
+      setSuccessMessage('');
+      
+      if (!testEmailForm.candidateEmail) {
+        setError('Please enter a candidate email address');
+        return;
+      }
+
+      await apiClient.post('/admin/test-email-notifications', {
+        eventId: selectedEvent.id,
+        type: testEmailForm.type,
+        candidateEmail: testEmailForm.candidateEmail
+      });
+      
+      setSuccessMessage(`${testEmailForm.type.toUpperCase()} confirmation email sent successfully!`);
+      setTestEmailOpen(false);
+    } catch (e) {
+      setError(e.message || 'Failed to send test email notification');
+    } finally {
+      setEmailTestLoading(false);
     }
   };
 
@@ -323,13 +365,23 @@ export default function EventManagement() {
                     </Stack>
                   </TableCell>
                   <TableCell align="right">
-                    <IconButton
-                      size="small"
-                      color="error"
-                      onClick={() => deleteEvent(event.id)}
-                    >
-                      <TrashIcon style={{ width: '1rem', height: '1rem' }} />
-                    </IconButton>
+                    <Stack direction="row" spacing={1}>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        color="primary"
+                        onClick={() => openTestEmailDialog(event)}
+                      >
+                        Test Email
+                      </Button>
+                      <IconButton
+                        size="small"
+                        color="error"
+                        onClick={() => deleteEvent(event.id)}
+                      >
+                        <TrashIcon style={{ width: '1rem', height: '1rem' }} />
+                      </IconButton>
+                    </Stack>
                   </TableCell>
                 </TableRow>
               );
@@ -417,6 +469,56 @@ export default function EventManagement() {
         <DialogActions>
           <Button onClick={() => setCreateOpen(false)}>Cancel</Button>
           <Button onClick={createEvent} variant="contained">Create Event</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Test Email Notification Dialog */}
+      <Dialog open={testEmailOpen} onClose={() => setTestEmailOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>Test Email Notification</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} mt={1}>
+            <Typography variant="body2" color="text.secondary">
+              Test email notification for: <strong>{selectedEvent?.eventName}</strong>
+            </Typography>
+            
+            <TextField
+              label="Candidate Email"
+              type="email"
+              value={testEmailForm.candidateEmail}
+              onChange={(e) => setTestEmailForm({ ...testEmailForm, candidateEmail: e.target.value })}
+              fullWidth
+              required
+              placeholder="candidate@example.com"
+              helperText="Enter the email address of a candidate to test the notification"
+            />
+
+            <TextField
+              label="Notification Type"
+              select
+              value={testEmailForm.type}
+              onChange={(e) => setTestEmailForm({ ...testEmailForm, type: e.target.value })}
+              fullWidth
+              required
+            >
+              <MenuItem value="rsvp">RSVP Confirmation</MenuItem>
+              <MenuItem value="attendance">Attendance Confirmation</MenuItem>
+            </TextField>
+
+            <Alert severity="info">
+              This will send a test email notification to verify that the email system is working correctly.
+              Make sure the candidate email exists in the system.
+            </Alert>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setTestEmailOpen(false)}>Cancel</Button>
+          <Button 
+            onClick={testEmailNotification} 
+            variant="contained"
+            disabled={emailTestLoading}
+          >
+            {emailTestLoading ? <CircularProgress size={20} /> : 'Send Test Email'}
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>
