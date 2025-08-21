@@ -235,6 +235,73 @@ router.post('/:id/comments', async (req, res) => {
   }
 });
 
+// Get all applications for the current user (candidate)
+router.get('/my-applications', requireAuth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    console.log('Fetching applications for user:', userId);
+
+    // First, get the user to find their studentId
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { studentId: true, email: true, fullName: true }
+    });
+
+    console.log('User found:', user);
+
+    if (!user || !user.studentId) {
+      console.log('No user or studentId found for user:', userId);
+      return res.status(404).json({ 
+        error: 'User not found or no studentId associated',
+        details: {
+          userId,
+          hasUser: !!user,
+          hasStudentId: user ? !!user.studentId : false
+        }
+      });
+    }
+
+    // Directly query applications table by studentId
+    // Convert user.studentId to string since applications table stores it as string
+    const applications = await prisma.application.findMany({
+      where: { 
+        studentId: user.studentId.toString()
+      },
+      include: {
+        cycle: {
+          select: {
+            id: true,
+            name: true,
+            isActive: true,
+            startDate: true,
+            endDate: true
+          }
+        }
+      },
+      orderBy: { submittedAt: 'desc' }
+    });
+
+    console.log(`Found ${applications.length} applications for studentId: ${user.studentId}`);
+
+    // If no applications found, let's check what studentIds exist in the applications table
+    if (applications.length === 0) {
+      const allStudentIds = await prisma.application.findMany({
+        select: { studentId: true },
+        distinct: ['studentId']
+      });
+      console.log('Available studentIds in applications table:', allStudentIds.map(app => app.studentId));
+    }
+
+    res.json(applications);
+  } catch (error) {
+    console.error('Error fetching user applications:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch user applications',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
 // Get single application by ID
 router.get('/:id', async (req, res) => {
   try {
