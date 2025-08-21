@@ -2,6 +2,7 @@ import prisma from '../prismaClient.js';
 import { getResponses } from './google/forms.js'
 import { extractFormIdFromUrl } from '../utils/formUtils.js'
 import { transformEventFormResponse, createDynamicEventMapping } from '../utils/eventDataMapper.js'
+import { sendRSVPConfirmation, sendAttendanceConfirmation, formatEventDate } from './emailNotifications.js'
 
 // Transform event form responses using configuration-based mapping
 function transformEventResponse(response, eventId, formType) {
@@ -77,14 +78,29 @@ export async function syncEventAttendance(eventId) {
           });
         }
 
+        // Auto-create candidate if not found
         if (!candidate) {
-          console.warn(`No candidate found for attendance response: ${JSON.stringify({
-            studentId: transformedData.studentId,
-            email: transformedData.email,
-            name: `${transformedData.firstName} ${transformedData.lastName}`
-          })}`);
-          errorCount++;
-          continue;
+          if (!transformedData.firstName || !transformedData.lastName || !transformedData.email) {
+            console.warn(`Missing required candidate information for attendance response: ${JSON.stringify({
+              studentId: transformedData.studentId,
+              email: transformedData.email,
+              firstName: transformedData.firstName,
+              lastName: transformedData.lastName
+            })}`);
+            errorCount++;
+            continue;
+          }
+
+          console.log(`Creating new candidate for attendance response: ${transformedData.firstName} ${transformedData.lastName}`);
+          
+          candidate = await prisma.candidate.create({
+            data: {
+              firstName: transformedData.firstName,
+              lastName: transformedData.lastName,
+              email: transformedData.email,
+              studentId: transformedData.studentId
+            }
+          });
         }
 
         // Create attendance record
@@ -95,6 +111,23 @@ export async function syncEventAttendance(eventId) {
             candidateId: candidate.id
           }
         });
+
+        // Send attendance confirmation email
+        try {
+          const candidateName = `${candidate.firstName} ${candidate.lastName}`;
+          const eventDate = formatEventDate(event.eventStartDate);
+          
+          await sendAttendanceConfirmation(
+            candidate.email,
+            candidateName,
+            event.eventName,
+            eventDate,
+            event.eventLocation
+          );
+        } catch (emailError) {
+          console.error('Error sending attendance confirmation email:', emailError);
+          // Don't fail the sync if email fails
+        }
 
         successCount++;
       } catch (error) {
@@ -159,6 +192,8 @@ export async function syncEventRSVP(eventId) {
       try {
         const transformedData = transformEventResponse(response, eventId, 'rsvp');
         
+        console.log(`Transformed data for RSVP response:`, JSON.stringify(transformedData, null, 2));
+        
         // Find or create the candidate
         let candidate = null;
         if (transformedData.studentId) {
@@ -173,14 +208,29 @@ export async function syncEventRSVP(eventId) {
           });
         }
 
+        // Auto-create candidate if not found
         if (!candidate) {
-          console.warn(`No candidate found for RSVP response: ${JSON.stringify({
-            studentId: transformedData.studentId,
-            email: transformedData.email,
-            name: `${transformedData.firstName} ${transformedData.lastName}`
-          })}`);
-          errorCount++;
-          continue;
+          if (!transformedData.firstName || !transformedData.lastName || !transformedData.email) {
+            console.warn(`Missing required candidate information for RSVP response: ${JSON.stringify({
+              studentId: transformedData.studentId,
+              email: transformedData.email,
+              firstName: transformedData.firstName,
+              lastName: transformedData.lastName
+            })}`);
+            errorCount++;
+            continue;
+          }
+
+          console.log(`Creating new candidate for RSVP response: ${transformedData.firstName} ${transformedData.lastName}`);
+          
+          candidate = await prisma.candidate.create({
+            data: {
+              firstName: transformedData.firstName,
+              lastName: transformedData.lastName,
+              email: transformedData.email,
+              studentId: transformedData.studentId
+            }
+          });
         }
 
         // Create RSVP record
@@ -191,6 +241,23 @@ export async function syncEventRSVP(eventId) {
             candidateId: candidate.id
           }
         });
+
+        // Send RSVP confirmation email
+        try {
+          const candidateName = `${candidate.firstName} ${candidate.lastName}`;
+          const eventDate = formatEventDate(event.eventStartDate);
+          
+          await sendRSVPConfirmation(
+            candidate.email,
+            candidateName,
+            event.eventName,
+            eventDate,
+            event.eventLocation
+          );
+        } catch (emailError) {
+          console.error('Error sending RSVP confirmation email:', emailError);
+          // Don't fail the sync if email fails
+        }
 
         successCount++;
       } catch (error) {
