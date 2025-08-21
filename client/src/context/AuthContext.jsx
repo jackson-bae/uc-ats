@@ -69,6 +69,20 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const registerMember = async (userData) => {
+    try {
+      const data = await apiClient.post('/auth/register-member', userData);
+
+      localStorage.setItem('token', data.token);
+      setToken(data.token);
+      setUser(data.user);
+      return { success: true };
+
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  };
+
   const logout = () => {
     localStorage.removeItem('token');
     setToken(null);
@@ -83,6 +97,7 @@ export const AuthProvider = ({ children }) => {
     loading,
     login,
     register,
+    registerMember,
     logout
   };
 
