@@ -4,6 +4,7 @@ import ApplicationList from './pages/ApplicationList';
 import ApplicationDetail from './pages/ApplicationDetail';
 import Login from './pages/Login';
 import SignUp from './pages/SignUp';
+import MemberSignUp from './pages/MemberSignUp';
 import Layout from './components/Layout';
 import CandidateLayout from './components/CandidateLayout';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -49,6 +50,7 @@ const AppRoutes = () => {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<SignUp />} />
+      <Route path="/member-signup" element={<MemberSignUp />} />
       
       {/* Protected Routes - Different content based on user role */}
       <Route path="/" element={

@@ -31,7 +31,8 @@ import {
   Edit as EditIcon, 
   Delete as DeleteIcon, 
   PhotoCamera as PhotoCameraIcon,
-  Close as CloseIcon
+  Close as CloseIcon,
+  ContentCopy as ContentCopyIcon
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import apiClient from '../utils/api';
@@ -42,6 +43,7 @@ const UserManagement = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  const [copySuccess, setCopySuccess] = useState(null);
   const [selectedUser, setSelectedUser] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -167,6 +169,20 @@ const UserManagement = () => {
     }
   };
 
+  const handleCopyMemberSignupLink = async () => {
+    const memberSignupLink = `${window.location.origin}/member-signup?token=member-access-2024`;
+    
+    try {
+      await navigator.clipboard.writeText(memberSignupLink);
+      setCopySuccess('Member signup link copied to clipboard!');
+      // Clear success message after 3 seconds
+      setTimeout(() => setCopySuccess(null), 3000);
+    } catch (err) {
+      setError('Failed to copy link to clipboard');
+      console.error('Error copying to clipboard:', err);
+    }
+  };
+
   const openEditModal = (user) => {
     setSelectedUser(user);
     setEditForm({
@@ -249,13 +265,22 @@ const UserManagement = () => {
                 Manage user accounts, roles, and permissions
               </Typography>
             </Box>
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => setShowCreateModal(true)}
-            >
-              Add New User
-            </Button>
+            <Stack direction="row" spacing={2}>
+              <Button
+                variant="outlined"
+                startIcon={<ContentCopyIcon />}
+                onClick={handleCopyMemberSignupLink}
+              >
+                Copy Member Signup Link
+              </Button>
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={() => setShowCreateModal(true)}
+              >
+                Add New User
+              </Button>
+            </Stack>
           </Stack>
 
         {/* Error Message */}
@@ -293,6 +318,25 @@ const UserManagement = () => {
             }
           >
             {success}
+          </Alert>
+        )}
+
+        {/* Copy Success Message */}
+        {copySuccess && (
+          <Alert 
+            severity="success" 
+            sx={{ mb: 3 }}
+            action={
+              <IconButton
+                color="inherit"
+                size="small"
+                onClick={() => setCopySuccess(null)}
+              >
+                <CloseIcon fontSize="inherit" />
+              </IconButton>
+            }
+          >
+            {copySuccess}
           </Alert>
         )}
 

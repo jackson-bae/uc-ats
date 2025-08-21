@@ -266,4 +266,78 @@ router.post('/reset-password', async (req, res) => {
   }
 });
 
+// Register new member (special endpoint)
+router.post('/register-member', async (req, res) => {
+  try {
+    const { email, password, fullName, graduationClass, studentId, accessToken } = req.body;
+    
+    // Verify access token
+    const requiredToken = 'member-access-2024';
+    if (!accessToken || accessToken !== requiredToken) {
+      return res.status(403).json({ error: 'Unauthorized access' });
+    }
+    
+    // Validate required fields
+    if (!email || !password || !fullName || !graduationClass || !studentId) {
+      return res.status(400).json({ error: 'All fields are required' });
+    }
+    
+    // Validate student ID is exactly 9 digits
+    if (!/^\d{9}$/.test(studentId.toString())) {
+      return res.status(400).json({ error: 'Student ID must be exactly 9 digits' });
+    }
+    
+    // Check if user already exists
+    const existingUser = await prisma.user.findUnique({
+      where: { email }
+    });
+    
+    if (existingUser) {
+      return res.status(400).json({ error: 'User already exists with this email. Sign in instead.' });
+    }
+    
+    // Check if student ID is already taken
+    const existingStudentId = await prisma.user.findFirst({
+      where: { studentId: parseInt(studentId, 10) }
+    });
+    
+    if (existingStudentId) {
+      return res.status(400).json({ error: 'Student ID is already registered' });
+    }
+    
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 12);
+    
+    // Create user with MEMBER role
+    const user = await prisma.user.create({
+      data: {
+        email,
+        password: hashedPassword,
+        fullName,
+        graduationClass,
+        studentId: parseInt(studentId, 10),
+        role: 'MEMBER', // Automatically set as MEMBER
+      }
+    });
+    
+    // Generate JWT token
+    const token = jwt.sign(
+      { userId: user.id, email: user.email, role: user.role },
+      config.jwtSecret,
+    );
+    
+    // Return user info (without password) and token
+    const { password: _, ...userWithoutPassword } = user;
+    res.status(201).json({
+      message: 'Member created successfully',
+      user: userWithoutPassword,
+      token
+    });
+    
+  } catch (error) {
+    console.error('Member registration error:', error);
+    res.status(500).json({ error: 'Failed to create member' });
+  }
+});
+
 export default router; 
