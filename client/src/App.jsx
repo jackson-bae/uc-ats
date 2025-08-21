@@ -5,19 +5,24 @@ import ApplicationDetail from './pages/ApplicationDetail';
 import Login from './pages/Login';
 import SignUp from './pages/SignUp';
 import Layout from './components/Layout';
+import CandidateLayout from './components/CandidateLayout';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import CandidateManagement from './pages/CandidateManagement';
 import CycleManagement from './pages/CycleManagement';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
+import CandidateDashboard from './pages/CandidateDashboard';
 import ReviewTeams from './pages/ReviewTeams';
 import UserManagement from './pages/UserManagement';
 import EventManagement from './pages/EventManagement';
+import CandidateEvents from './pages/CandidateEvents';
+import CandidateApplications from './pages/CandidateApplications';
+import InterviewPreparation from './pages/InterviewPreparation';
 import Interviews from './pages/Interviews';
 import InterviewDetail from './pages/InterviewDetail';
 import './styles/variables.css';
-// Protected Route wrapper
+// Protected Route wrapper for admin/member users
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
   
@@ -29,19 +34,30 @@ const ProtectedRoute = ({ children }) => {
     return <Navigate to="/login" />;
   }
   
+  // Use different layouts based on user role
+  if (user.role === 'USER') {
+    return <CandidateLayout>{children}</CandidateLayout>;
+  }
+  
   return <Layout>{children}</Layout>;
 };
 
 const AppRoutes = () => {
+  const { user } = useAuth();
+  
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<SignUp />} />
       
-      {/* Protected Routes */}
-      <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+      {/* Protected Routes - Different content based on user role */}
+      <Route path="/" element={
+        <ProtectedRoute>
+          {user?.role === 'USER' ? <CandidateDashboard /> : <Dashboard />}
+        </ProtectedRoute>
+      } />
 
-      {/* Redirect legacy Round Management to Applications */}
+      {/* Admin/Member Routes */}
       <Route path="/candidate-management" element={<Navigate to="/application-list" />} />
       <Route
         path="/cycles"
@@ -92,7 +108,7 @@ const AppRoutes = () => {
         path="/events"
         element={
           <ProtectedRoute>
-            <EventManagement />
+            {user?.role === 'USER' ? <CandidateEvents /> : <EventManagement />}
           </ProtectedRoute>
         }
       />
@@ -115,11 +131,29 @@ const AppRoutes = () => {
         }
       />
       
+      {/* Candidate-specific routes */}
+      <Route
+        path="/applications"
+        element={
+          <ProtectedRoute>
+            <CandidateApplications />
+          </ProtectedRoute>
+        }
+      />
+      
+      <Route
+        path="/interview-prep"
+        element={
+          <ProtectedRoute>
+            <InterviewPreparation />
+          </ProtectedRoute>
+        }
+      />
+      
       <Route path="/forgot-password" element={<ForgotPassword />} />
-
       <Route path="/reset-password" element={<ResetPassword />} />
-        </Routes>
-      );
+    </Routes>
+  );
 };
 
 export default function App() {

@@ -11,11 +11,16 @@ const router = express.Router();
 // Register new user
 router.post('/register', async (req, res) => {
   try {
-    const { email, password, fullName, graduationClass } = req.body;
+    const { email, password, fullName, graduationClass, studentId } = req.body;
     
     // Validate required fields
-    if (!email || !password || !fullName || !graduationClass) {
-      return res.status(400).json({ error: 'Email, password, and full name are required' });
+    if (!email || !password || !fullName || !graduationClass || !studentId) {
+      return res.status(400).json({ error: 'All fields are required' });
+    }
+    
+    // Validate student ID is exactly 9 digits
+    if (!/^\d{9}$/.test(studentId.toString())) {
+      return res.status(400).json({ error: 'Student ID must be exactly 9 digits' });
     }
     
     // Check if user already exists
@@ -25,6 +30,15 @@ router.post('/register', async (req, res) => {
     
     if (existingUser) {
       return res.status(400).json({ error: 'User already exists with this email. Sign in instead.' });
+    }
+    
+    // Check if student ID is already taken
+    const existingStudentId = await prisma.user.findFirst({
+      where: { studentId: parseInt(studentId, 10) }
+    });
+    
+    if (existingStudentId) {
+      return res.status(400).json({ error: 'Student ID is already registered' });
     }
     
     // Hash password
@@ -37,8 +51,33 @@ router.post('/register', async (req, res) => {
         password: hashedPassword,
         fullName,
         graduationClass,
+        studentId: parseInt(studentId, 10),
       }
     });
+    
+    // If user role is USER, automatically create a candidate record
+    if (user.role === 'USER') {
+      try {
+        // Split full name into first and last name
+        const nameParts = fullName.trim().split(' ');
+        const firstName = nameParts[0] || '';
+        const lastName = nameParts.slice(1).join(' ') || '';
+        
+        await prisma.candidate.create({
+          data: {
+            studentId: parseInt(studentId, 10),
+            firstName,
+            lastName,
+            email,
+          }
+        });
+        console.log(`Created candidate record for user: ${email}`);
+      } catch (candidateError) {
+        console.error('Error creating candidate record:', candidateError);
+        // Don't fail the registration if candidate creation fails
+        // The user can still be created and function normally
+      }
+    }
     
     // Generate JWT token
     const token = jwt.sign(

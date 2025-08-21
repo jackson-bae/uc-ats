@@ -1,0 +1,161 @@
+@import './variables.css';
+
+.candidate-applications-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+  font-family: var(--font-family);
+}
+
+.applications-header {
+  margin-bottom: 2rem;
+}
+
+.applications-title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 0.5rem 0;
+  font-family: var(--font-family-heading);
+}
+
+.applications-subtitle {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.applications-content {
+  margin-top: 2rem;
+}
+
+.no-applications {
+  text-align: center;
+  padding: 3rem;
+  background-color: var(--bg-white);
+  border: 1px solid var(--border-light);
+  border-radius: var(--border-radius);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.no-applications h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 1rem 0;
+}
+
+.no-applications p {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.applications-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.application-card {
+  background-color: var(--bg-white);
+  border: 1px solid var(--border-light);
+  border-radius: var(--border-radius);
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: box-shadow 0.2s ease;
+}
+
+.application-card:hover {
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.application-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.application-header h3 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.status {
+  padding: 0.25rem 0.75rem;
+  border-radius: var(--border-radius);
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.status.submitted {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
+.status.under_review {
+  background-color: #dbeafe;
+  color: #1e40af;
+}
+
+.status.accepted {
+  background-color: #d1fae5;
+  color: #065f46;
+}
+
+.status.rejected {
+  background-color: #fee2e2;
+  color: #991b1b;
+}
+
+.status.waitlisted {
+  background-color: #f3e8ff;
+  color: #7c3aed;
+}
+
+.application-details {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.application-details p {
+  margin: 0.25rem 0;
+}
+
+.application-details strong {
+  color: var(--text-primary);
+}
+
+.loading,
+.error {
+  text-align: center;
+  padding: 3rem;
+  color: var(--text-secondary);
+  font-size: 1rem;
+}
+
+.error {
+  color: var(--error-color);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .candidate-applications-container {
+    padding: 1rem;
+  }
+  
+  .applications-title {
+    font-size: 1.5rem;
+  }
+  
+  .application-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+}

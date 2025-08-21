@@ -14,6 +14,7 @@ model User {
   fullName         String
   graduationClass  String?
   profileImage     String?
+  studentId        Int?       // Link to Candidate model
   role             UserRole   @default(USER)
   createdAt        DateTime   @default(now())
   resetToken       String? 
