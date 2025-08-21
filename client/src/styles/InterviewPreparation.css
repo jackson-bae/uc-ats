@@ -1,0 +1,68 @@
+@import './variables.css';
+
+.interview-prep-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+  font-family: var(--font-family);
+}
+
+.interview-prep-header {
+  margin-bottom: 2rem;
+}
+
+.interview-prep-title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 0.5rem 0;
+  font-family: var(--font-family-heading);
+}
+
+.interview-prep-subtitle {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.interview-prep-content {
+  margin-top: 2rem;
+}
+
+.prep-section {
+  background-color: var(--bg-white);
+  border: 1px solid var(--border-light);
+  border-radius: var(--border-radius);
+  padding: 2rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+
+.prep-section h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 1rem 0;
+}
+
+.prep-section p {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.6;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .interview-prep-container {
+    padding: 1rem;
+  }
+  
+  .interview-prep-title {
+    font-size: 1.5rem;
+  }
+  
+  .prep-section {
+    padding: 1.5rem;
+  }
+}

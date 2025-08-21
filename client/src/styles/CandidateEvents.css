@@ -1,0 +1,246 @@
+@import './variables.css';
+
+.candidate-events-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+  font-family: var(--font-family);
+}
+
+/* Header Section */
+.events-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 2rem;
+}
+
+.events-title-section {
+  flex: 1;
+}
+
+.events-title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 0.5rem 0;
+  font-family: var(--font-family-heading);
+}
+
+.events-subtitle {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  margin: 0;
+  font-weight: 400;
+}
+
+.social-media-prompt {
+  color: #8b5cf6; /* Purple color for social media prompt */
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+/* Events List */
+.events-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* Event Card */
+.event-card {
+  display: flex;
+  align-items: center;
+  background-color: var(--bg-white);
+  border: 1px solid var(--border-light);
+  border-radius: var(--border-radius);
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: box-shadow 0.2s ease;
+}
+
+.event-card:hover {
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Date Section */
+.event-date {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 80px;
+  margin-right: 2rem;
+}
+
+.day-name {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  font-weight: 400;
+  margin-bottom: 0.25rem;
+}
+
+.day-number {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1;
+  margin-bottom: 0.25rem;
+}
+
+.month-year {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+/* Event Details */
+.event-details {
+  flex: 1;
+  margin-right: 2rem;
+}
+
+.event-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--primary-blue);
+  margin: 0 0 0.5rem 0;
+}
+
+.event-location {
+  display: flex;
+  align-items: center;
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.location-icon {
+  width: 1rem;
+  height: 1rem;
+  margin-right: 0.5rem;
+  color: var(--text-muted);
+}
+
+.event-description {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* Action Section */
+.event-action {
+  flex-shrink: 0;
+}
+
+.rsvp-button {
+  background-color: var(--primary-blue);
+  color: var(--text-white);
+  border: none;
+  border-radius: var(--border-radius);
+  padding: 0.75rem 1.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.rsvp-button:hover:not(:disabled) {
+  background-color: var(--primary-blue-dark);
+}
+
+.rsvp-button:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--primary-blue);
+}
+
+.rsvp-button.rsvpd {
+  background-color: var(--text-muted);
+  color: var(--text-white);
+  cursor: not-allowed;
+}
+
+.rsvp-button.attended {
+  background-color: #10b981; /* Green color for attended */
+  color: var(--text-white);
+  cursor: not-allowed;
+}
+
+.rsvp-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* Loading and Error States */
+.loading,
+.error,
+.no-events {
+  text-align: center;
+  padding: 3rem;
+  color: var(--text-secondary);
+  font-size: 1rem;
+}
+
+.error {
+  color: var(--error-color);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .candidate-events-container {
+    padding: 1rem;
+  }
+  
+  .events-header {
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .social-media-prompt {
+    align-self: flex-start;
+  }
+  
+  .event-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  
+  .event-date {
+    flex-direction: row;
+    gap: 1rem;
+    margin-right: 0;
+    min-width: auto;
+  }
+  
+  .event-details {
+    margin-right: 0;
+    width: 100%;
+  }
+  
+  .event-action {
+    width: 100%;
+  }
+  
+  .rsvp-button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .events-title {
+    font-size: 1.5rem;
+  }
+  
+  .event-card {
+    padding: 1rem;
+  }
+  
+  .event-date {
+    gap: 0.5rem;
+  }
+  
+  .day-number {
+    font-size: 1.5rem;
+  }
+}

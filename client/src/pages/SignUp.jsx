@@ -20,6 +20,7 @@ const SignUp = () => {
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [graduationClass, setGraduationClass] = useState('');
+  const [studentId, setStudentId] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
   const { register, user, loading } = useAuth();
@@ -44,8 +45,14 @@ const SignUp = () => {
     e.preventDefault();
     setError('');
 
-    if (!email || !password || !fullName || !graduationClass) {
+    if (!email || !password || !fullName || !graduationClass || !studentId) {
       setError('All fields are required');
+      return;
+    }
+
+    // Validate student ID is exactly 9 digits
+    if (!/^\d{9}$/.test(studentId)) {
+      setError('Student ID must be exactly 9 digits');
       return;
     }
 
@@ -53,7 +60,8 @@ const SignUp = () => {
       email,
       password,
       fullName,
-      graduationClass
+      graduationClass,
+      studentId: parseInt(studentId, 10)
     });
 
     if (result.success) {
@@ -111,6 +119,24 @@ const SignUp = () => {
                 value={graduationClass}
                 onChange={(e) => setGraduationClass(e.target.value)}
                 required
+                sx={{ mb: 3 }}
+              />
+
+              <TextField
+                fullWidth
+                label="Student ID"
+                value={studentId}
+                onChange={(e) => {
+                  // Only allow digits and limit to 9 characters
+                  const value = e.target.value.replace(/\D/g, '').slice(0, 9);
+                  setStudentId(value);
+                }}
+                required
+                helperText="Enter your 9-digit student ID"
+                inputProps={{
+                  pattern: '[0-9]{9}',
+                  maxLength: 9
+                }}
                 sx={{ mb: 3 }}
               />
 
