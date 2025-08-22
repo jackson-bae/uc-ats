@@ -36,6 +36,7 @@ const Layout = ({ children }) => {
     ...(user?.role === 'ADMIN' ? [
       { name: 'Cycle Management', href: '/cycles', icon: ClipboardDocumentListIcon },
       { name: 'Interviews', href: '/interviews', icon: UserGroupIcon2 },
+      { name: 'Interview Prep', href: '/interview-prep', icon: ClipboardDocumentListIcon },
       { name: 'Event Management', href: '/events', icon: CalendarDaysIcon },
       { name: 'User Management', href: '/user-management', icon: UserIcon },
     ] : [])
