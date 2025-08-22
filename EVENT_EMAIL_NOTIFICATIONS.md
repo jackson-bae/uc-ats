@@ -194,3 +194,4 @@ Error sending RSVP confirmation email: SMTP connection failed
 2. Test email functionality using admin interface
 3. Verify environment variables are set correctly
 4. Test with a known valid candidate email
+

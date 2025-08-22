@@ -8,297 +8,237 @@ datasource db {
 }
 
 model User {
-  id               String     @id @default(uuid())
-  email            String     @unique
-  password         String     // Will be hashed
-  fullName         String
-  graduationClass  String?
-  profileImage     String?
-  studentId        Int?       // Link to Candidate model
-  role             UserRole   @default(USER)
-  createdAt        DateTime   @default(now())
-  resetToken       String? 
-  resetTokenExpiry DateTime?
+  id                String             @id @default(uuid())
+  email             String             @unique
+  password          String
+  fullName          String
+  graduationClass   String?
+  studentId         Int?
+  role              UserRole           @default(USER)
+  createdAt         DateTime           @default(now())
+  resetToken        String?
+  resetTokenExpiry  DateTime?
+  profileImage      String?
+  comments          Comment[]
+  coverLetterScores CoverLetterScore[]
+  evaluations       Evaluation[]
+  memberOneGroups   Groups[]           @relation("GroupMemberOne")
+  memberThreeGroups Groups[]           @relation("GroupMemberThree")
+  memberTwoGroups   Groups[]           @relation("GroupMemberTwo")
+  resumeScores      ResumeScore[]
+  videoScores       VideoScore[]
+  interviewResources InterviewResource[]
 
   @@map("users")
-
-  comments         Comment[]
-  resumeScores     ResumeScore[]
-  coverLetterScores CoverLetterScore[]
-  videoScores      VideoScore[]
-  evaluations      Evaluation[]
-  
-  // Group member relations
-  memberOneGroups     Groups[] @relation("GroupMemberOne")
-  memberTwoGroups     Groups[] @relation("GroupMemberTwo")
-  memberThreeGroups   Groups[] @relation("GroupMemberThree")
-}
-
-enum UserRole {
-  USER
-  ADMIN
-  MEMBER
 }
 
 model Candidate {
-  id                String   @id @default(uuid())
-  studentId         Int      @unique
+  id                String             @id @default(uuid())
+  studentId         Int                @unique
   firstName         String
   lastName          String
-  email             String   @unique
+  email             String             @unique
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
   assignedGroupId   String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  // Relations
   applications      Application[]
-  resumeScores      ResumeScore[]
-  coverLetterScores CoverLetterScore[]
-  videoScores       VideoScore[]
-  eventRsvp         EventRsvp[]
-  eventAttendance   EventAttendance[]
+  assignedGroup     Groups?            @relation(fields: [assignedGroupId], references: [id])
   coffeeChat        CoffeeChat[]
+  coverLetterScores CoverLetterScore[]
+  eventAttendance   EventAttendance[]
+  eventRsvp         EventRsvp[]
+  referrals         Referral[]
+  resumeScores      ResumeScore[]
   roundOne          RoundOne[]
   roundTwo          RoundTwo[]
-  referrals         Referral[]
-  
-  // Group assignment relation
-  assignedGroup     Groups? @relation(fields: [assignedGroupId], references: [id])
+  videoScores       VideoScore[]
 
   @@map("candidates")
 }
 
 model Application {
-  id                    String              @id @default(uuid())
-  status                ApplicationStatus   @default(SUBMITTED)
-
-  responseID            String              @unique
-  submittedAt           DateTime            @default(now())
-
-  email                 String              
-  firstName             String
-  lastName              String
-  studentId             String              
-  phoneNumber           String
-
-  graduationYear        String
-  isTransferStudent     Boolean
-  priorCollegeYears     String?
-  cumulativeGpa         Decimal            @db.Decimal(3,2)
-  majorGpa              Decimal            @db.Decimal(3,2)
-  major1                String
-  major2                String?
-
-  gender                String?
-  isFirstGeneration     Boolean
-
-  resumeUrl             String             
-  blindResumeUrl        String?             
-  headshotUrl           String             
-  coverLetterUrl        String?             
-  videoUrl              String?             
-
-  rawResponses          Json
+  id                String            @id @default(uuid())
+  status            ApplicationStatus @default(SUBMITTED)
+  responseID        String            @unique
+  submittedAt       DateTime          @default(now())
+  email             String
+  firstName         String
+  lastName          String
+  studentId         String
+  phoneNumber       String
+  graduationYear    String
+  isTransferStudent Boolean
+  priorCollegeYears String?
+  cumulativeGpa     Decimal           @db.Decimal(3, 2)
+  majorGpa          Decimal           @db.Decimal(3, 2)
+  major1            String
+  major2            String?
+  gender            String?
+  isFirstGeneration Boolean
+  resumeUrl         String
+  blindResumeUrl    String?
+  headshotUrl       String
+  coverLetterUrl    String?
+  videoUrl          String?
+  rawResponses      Json
+  approved          Boolean?
+  currentRound      String?
+  cycleId           String?
+  candidateId       String?
+  candidate         Candidate?        @relation(fields: [candidateId], references: [id])
+  cycle             RecruitingCycle?  @relation(fields: [cycleId], references: [id])
+  comments          Comment[]
 
   @@map("applications")
-
-  approved              Boolean?
-  currentRound          String?
-
-  // Recruiting cycle relation
-  cycleId               String?
-  cycle                 RecruitingCycle?    @relation(fields: [cycleId], references: [id])
-
-  // Enhanced Candidate relation - now required and automatically linked
-  candidateId           String
-  candidate             Candidate           @relation(fields: [candidateId], references: [id])
-
-  comments              Comment[]
-}
-
-enum ApplicationStatus {
-  SUBMITTED
-  UNDER_REVIEW
-  ACCEPTED
-  REJECTED
-  WAITLISTED
 }
 
 model RecruitingCycle {
-  id         String   @id @default(uuid())
-  name       String
-  formUrl    String?
-  isActive   Boolean  @default(false)
-  startDate  DateTime?
-  endDate    DateTime?
-  createdAt  DateTime @default(now())
-
+  id           String        @id @default(uuid())
+  name         String
+  isActive     Boolean       @default(false)
+  startDate    DateTime?
+  endDate      DateTime?
+  createdAt    DateTime      @default(now())
+  formUrl      String?
   applications Application[]
-  groups      Groups[]
-  events      Events[]
-  interviews  Interview[]
+  events       Events[]
+  groups       Groups[]
 
   @@map("recruiting_cycles")
 }
 
-model Interview {
-  id            String   @id @default(uuid())
-  name          String
-  type          String   // COFFEE_CHAT, ROUND_ONE, ROUND_TWO
-  startDate     DateTime
-  endDate       DateTime
-  location      String?
-  maxCandidates Int?
-  description   String?
-  cycleId       String
-  cycle         RecruitingCycle @relation(fields: [cycleId], references: [id])
-  createdAt     DateTime @default(now())
-
-  @@map("interviews")
-}
-
 model Comment {
-  id            String       @id @default(uuid())
+  id            String      @id @default(uuid())
   applicationId String
-  application   Application  @relation(fields: [applicationId], references: [id])
   userId        String
-  user          User         @relation(fields: [userId], references: [id])
   content       String
-  createdAt     DateTime     @default(now())
+  createdAt     DateTime    @default(now())
+  application   Application @relation(fields: [applicationId], references: [id])
+  user          User        @relation(fields: [userId], references: [id])
 
   @@map("comments")
 }
 
 model Grade {
-  id            String   @id @default(uuid())
-  resume        String?
-  video         String?
-  createdAt     DateTime @default(now())
-  cover_letter  String?
-
-  applicant   String?
-  user        String?
+  id           String   @id @default(uuid())
+  resume       String?
+  video        String?
+  createdAt    DateTime @default(now())
+  cover_letter String?
+  applicant    String?
+  user         String?
 
   @@map("grades")
 }
 
-// Evaluation system models
 model Evaluation {
-  id          String    @id @default(uuid())
-  notes       String?
-  score       Int
-  evaluatorId String
-  evaluator   User      @relation(fields: [evaluatorId], references: [id])
-  createdAt   DateTime  @default(now())
-
-  // Relations to evaluation types
-  coffeeChat  CoffeeChat? @relation(fields: [coffeeChatId], references: [id])
+  id           String      @id @default(uuid())
+  notes        String?
+  score        Int
+  evaluatorId  String
+  createdAt    DateTime    @default(now())
   coffeeChatId String?
-  roundOne    RoundOne?   @relation(fields: [roundOneId], references: [id])
-  roundOneId  String?
-  roundTwo    RoundTwo?   @relation(fields: [roundTwoId], references: [id])
-  roundTwoId  String?
+  roundOneId   String?
+  roundTwoId   String?
+  coffeeChat   CoffeeChat? @relation(fields: [coffeeChatId], references: [id])
+  evaluator    User        @relation(fields: [evaluatorId], references: [id])
+  roundOne     RoundOne?   @relation(fields: [roundOneId], references: [id])
+  roundTwo     RoundTwo?   @relation(fields: [roundTwoId], references: [id])
 
   @@map("evaluations")
 }
 
 model Groups {
-  id            String   @id @default(uuid())
-  memberOne     String?
-  memberTwo     String?
-  memberThree   String?
-  avgScore      Decimal? @db.Decimal(5,2)
-  cycleId       String
-  cycle         RecruitingCycle @relation(fields: [cycleId], references: [id])
-  createdAt     DateTime @default(now())
-
-  // User relations for team members
-  memberOneUser     User?     @relation("GroupMemberOne", fields: [memberOne], references: [id])
-  memberTwoUser     User?     @relation("GroupMemberTwo", fields: [memberTwo], references: [id])
-  memberThreeUser   User?     @relation("GroupMemberThree", fields: [memberThree], references: [id])
-
-  // Relations to scoring models
-  resumeScores     ResumeScore[]
-  coverLetterScores CoverLetterScore[]
-  videoScores      VideoScore[]
-
-  // Assigned candidates relation
+  id                 String             @id @default(uuid())
+  memberOne          String?
+  memberTwo          String?
+  memberThree        String?
+  avgScore           Decimal?           @db.Decimal(5, 2)
+  cycleId            String
+  createdAt          DateTime           @default(now())
   assignedCandidates Candidate[]
+  coverLetterScores  CoverLetterScore[]
+  cycle              RecruitingCycle    @relation(fields: [cycleId], references: [id])
+  memberOneUser      User?              @relation("GroupMemberOne", fields: [memberOne], references: [id])
+  memberThreeUser    User?              @relation("GroupMemberThree", fields: [memberThree], references: [id])
+  memberTwoUser      User?              @relation("GroupMemberTwo", fields: [memberTwo], references: [id])
+  resumeScores       ResumeScore[]
+  videoScores        VideoScore[]
 
   @@map("groups")
 }
 
 model ResumeScore {
-  id            String    @id @default(uuid())
-  overallScore  Decimal   @db.Decimal(5,2)
-  scoreOne      Int?
-  scoreTwo      Int?
-  scoreThree    Int?
-  notesOne      String?
-  notesTwo      String?
-  notesThree    String?
-  adminScore    Decimal?  @db.Decimal(5,2)
-  adminNotes    String?
-  status        String?
-  candidateId   String
-  candidate     Candidate @relation(fields: [candidateId], references: [id])
-  evaluatorId   String?
-  evaluator     User?     @relation(fields: [evaluatorId], references: [id])
+  id              String    @id @default(uuid())
+  overallScore    Decimal   @db.Decimal(5, 2)
+  scoreOne        Int?
+  scoreTwo        Int?
+  scoreThree      Int?
+  notesOne        String?
+  notesTwo        String?
+  notesThree      String?
+  adminScore      Decimal?  @db.Decimal(5, 2)
+  adminNotes      String?
+  status          String?
+  candidateId     String
+  evaluatorId     String?
   assignedGroupId String?
-  assignedGroup Groups?   @relation(fields: [assignedGroupId], references: [id])
-  createdAt     DateTime  @default(now())
+  createdAt       DateTime  @default(now())
+  assignedGroup   Groups?   @relation(fields: [assignedGroupId], references: [id])
+  candidate       Candidate @relation(fields: [candidateId], references: [id])
+  evaluator       User?     @relation(fields: [evaluatorId], references: [id])
 
   @@map("resume_scores")
 }
 
 model CoverLetterScore {
-  id            String    @id @default(uuid())
-  overallScore  Decimal   @db.Decimal(5,2)
-  scoreOne      Int?
-  scoreTwo      Int?
-  scoreThree    Int?
-  notesOne      String?
-  notesTwo      String?
-  notesThree    String?
-  adminScore    Decimal?  @db.Decimal(5,2)
-  adminNotes    String?
-  status        String?
-  candidateId   String
-  candidate     Candidate @relation(fields: [candidateId], references: [id])
-  evaluatorId   String?
-  evaluator     User?     @relation(fields: [evaluatorId], references: [id])
+  id              String    @id @default(uuid())
+  overallScore    Decimal   @db.Decimal(5, 2)
+  scoreOne        Int?
+  scoreTwo        Int?
+  scoreThree      Int?
+  notesOne        String?
+  notesTwo        String?
+  notesThree      String?
+  adminScore      Decimal?  @db.Decimal(5, 2)
+  adminNotes      String?
+  status          String?
+  candidateId     String
+  evaluatorId     String?
   assignedGroupId String?
-  assignedGroup Groups?   @relation(fields: [assignedGroupId], references: [id])
-  createdAt     DateTime  @default(now())
+  createdAt       DateTime  @default(now())
+  assignedGroup   Groups?   @relation(fields: [assignedGroupId], references: [id])
+  candidate       Candidate @relation(fields: [candidateId], references: [id])
+  evaluator       User?     @relation(fields: [evaluatorId], references: [id])
 
   @@map("cover_letter_scores")
 }
 
 model VideoScore {
-  id            String    @id @default(uuid())
-  overallScore  Decimal   @db.Decimal(5,2)
-  scoreOne      Int?
-  scoreTwo      Int?
-  scoreThree    Int?
-  notesOne      String?
-  notesTwo      String?
-  notesThree    String?
-  adminScore    Decimal?  @db.Decimal(5,2)
-  adminNotes    String?
-  status        String?
-  candidateId   String
-  candidate     Candidate @relation(fields: [candidateId], references: [id])
-  evaluatorId   String?
-  evaluator     User?     @relation(fields: [evaluatorId], references: [id])
+  id              String    @id @default(uuid())
+  overallScore    Decimal   @db.Decimal(5, 2)
+  scoreOne        Int?
+  scoreTwo        Int?
+  scoreThree      Int?
+  notesOne        String?
+  notesTwo        String?
+  notesThree      String?
+  adminScore      Decimal?  @db.Decimal(5, 2)
+  adminNotes      String?
+  status          String?
+  candidateId     String
+  evaluatorId     String?
   assignedGroupId String?
-  assignedGroup Groups?   @relation(fields: [assignedGroupId], references: [id])
-  createdAt     DateTime  @default(now())
+  createdAt       DateTime  @default(now())
+  assignedGroup   Groups?   @relation(fields: [assignedGroupId], references: [id])
+  candidate       Candidate @relation(fields: [candidateId], references: [id])
+  evaluator       User?     @relation(fields: [evaluatorId], references: [id])
 
   @@map("video_scores")
 }
 
 model Events {
-  id              String    @id @default(uuid())
+  id              String            @id @default(uuid())
   eventName       String
   eventStartDate  DateTime
   eventEndDate    DateTime
@@ -306,12 +246,10 @@ model Events {
   rsvpForm        String?
   attendanceForm  String?
   cycleId         String
-  cycle           RecruitingCycle @relation(fields: [cycleId], references: [id])
-  createdAt       DateTime  @default(now())
-
-  // Relations
-  eventRsvp       EventRsvp[]
+  createdAt       DateTime          @default(now())
   eventAttendance EventAttendance[]
+  eventRsvp       EventRsvp[]
+  cycle           RecruitingCycle   @relation(fields: [cycleId], references: [id])
 
   @@map("events")
 }
@@ -320,10 +258,10 @@ model EventRsvp {
   id          String    @id @default(uuid())
   responseId  String    @unique
   eventId     String
-  event       Events    @relation(fields: [eventId], references: [id])
   candidateId String
-  candidate   Candidate @relation(fields: [candidateId], references: [id])
   createdAt   DateTime  @default(now())
+  candidate   Candidate @relation(fields: [candidateId], references: [id])
+  event       Events    @relation(fields: [eventId], references: [id])
 
   @@map("event_rsvp")
 }
@@ -332,61 +270,96 @@ model EventAttendance {
   id          String    @id @default(uuid())
   responseId  String    @unique
   eventId     String
-  event       Events    @relation(fields: [eventId], references: [id])
   candidateId String
-  candidate   Candidate @relation(fields: [candidateId], references: [id])
   createdAt   DateTime  @default(now())
+  candidate   Candidate @relation(fields: [candidateId], references: [id])
+  event       Events    @relation(fields: [eventId], references: [id])
 
   @@map("event_attendance")
 }
 
 model CoffeeChat {
-  id            String    @id @default(uuid())
-  mentorName    String
-  scheduledAt   DateTime
-  completed     Boolean   @default(false)
-  overallScore  Decimal?  @db.Decimal(5,2)
-  candidateId   String
-  candidate     Candidate @relation(fields: [candidateId], references: [id])
-  evaluations   Evaluation[]
-  createdAt     DateTime  @default(now())
+  id           String       @id @default(uuid())
+  mentorName   String
+  scheduledAt  DateTime
+  completed    Boolean      @default(false)
+  overallScore Decimal?     @db.Decimal(5, 2)
+  candidateId  String
+  createdAt    DateTime     @default(now())
+  candidate    Candidate    @relation(fields: [candidateId], references: [id])
+  evaluations  Evaluation[]
 
   @@map("coffee_chat")
 }
 
 model RoundOne {
-  id            String    @id @default(uuid())
-  status        String    // "passed", "failed", "pending"
-  feedback      String?
-  overallScore  Decimal?  @db.Decimal(5,2)
-  candidateId   String
-  candidate     Candidate @relation(fields: [candidateId], references: [id])
-  evaluations   Evaluation[]
-  createdAt     DateTime  @default(now())
+  id           String       @id @default(uuid())
+  status       String
+  feedback     String?
+  overallScore Decimal?     @db.Decimal(5, 2)
+  candidateId  String
+  createdAt    DateTime     @default(now())
+  evaluations  Evaluation[]
+  candidate    Candidate    @relation(fields: [candidateId], references: [id])
 
   @@map("round_one")
 }
 
 model RoundTwo {
-  id            String    @id @default(uuid())
-  status        String    // "passed", "failed", "pending"
-  feedback      String?
-  overallScore  Decimal?  @db.Decimal(5,2)
-  candidateId   String
-  candidate     Candidate @relation(fields: [candidateId], references: [id])
-  evaluations   Evaluation[]
-  createdAt     DateTime  @default(now())
+  id           String       @id @default(uuid())
+  status       String
+  feedback     String?
+  overallScore Decimal?     @db.Decimal(5, 2)
+  candidateId  String
+  createdAt    DateTime     @default(now())
+  evaluations  Evaluation[]
+  candidate    Candidate    @relation(fields: [candidateId], references: [id])
 
   @@map("round_two")
 }
 
 model Referral {
-  id            String    @id @default(uuid())
-  referrerName  String
-  relationship  String
-  candidateId   String
-  candidate     Candidate @relation(fields: [candidateId], references: [id])
-  createdAt     DateTime  @default(now())
+  id           String    @id @default(uuid())
+  referrerName String
+  relationship String
+  candidateId  String
+  createdAt    DateTime  @default(now())
+  candidate    Candidate @relation(fields: [candidateId], references: [id])
 
   @@map("referrals")
+}
+
+model InterviewResource {
+  id              String    @id @default(uuid())
+  title           String
+  description     String?
+  url             String?
+  fileUrl         String?
+  type            String?   // e.g., "document", "video", "link", "presentation"
+  category        String?   // e.g., "technical", "behavioral", "case-study"
+  round           String    // "firstRound" or "finalRound"
+  order           Int       @default(0)
+  hasExternalLink Boolean   @default(true)
+  icon            String    @default("book")
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  createdBy       String
+  user            User      @relation(fields: [createdBy], references: [id])
+
+  @@map("interview_resources")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+  MEMBER
+}
+
+enum ApplicationStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  ACCEPTED
+  REJECTED
+  WAITLISTED
 }
