@@ -7,17 +7,38 @@ const prisma = new PrismaClient({
       url: process.env.DATABASE_URL,
     },
   },
-  // Add connection management
+  // Add connection management with retry logic
   log: ['error', 'warn'],
 });
 
-// Handle connection issues
-prisma.$connect()
-  .then(() => {
+// Enhanced connection handling with retry logic
+let connectionAttempts = 0;
+const maxRetries = 3;
+
+const connectWithRetry = async () => {
+  try {
+    await prisma.$connect();
     console.log('✅ Database connected successfully');
-  })
-  .catch((error) => {
-    console.error('❌ Database connection failed:', error);
-  });
+    connectionAttempts = 0; // Reset on successful connection
+  } catch (error) {
+    connectionAttempts++;
+    console.error(`❌ Database connection attempt ${connectionAttempts} failed:`, error.message);
+    
+    if (connectionAttempts < maxRetries) {
+      console.log(`🔄 Retrying connection in 5 seconds... (${connectionAttempts}/${maxRetries})`);
+      setTimeout(connectWithRetry, 5000);
+    } else {
+      console.error('❌ Max connection attempts reached. Please check your Supabase project status.');
+    }
+  }
+};
+
+// Initial connection attempt
+connectWithRetry();
+
+// Handle process termination
+process.on('beforeExit', async () => {
+  await prisma.$disconnect();
+});
 
 export default prisma;

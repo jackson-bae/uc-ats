@@ -31,15 +31,24 @@ const Layout = ({ children }) => {
 
   const navigation = [
     { name: 'Dashboard', href: '/', icon: HomeIcon },
-    { name: 'Applications', href: '/application-list', icon: DocumentTextIcon },
-    { name: 'Review Teams', href: '/review-teams', icon: UserGroupIcon },
-    ...(user?.role === 'ADMIN' ? [
+    ...(user?.role === 'MEMBER' ? [
+      { name: 'Document Grading', href: '/document-grading', icon: DocumentTextIcon },
+      { name: 'Events', href: '/events', icon: CalendarDaysIcon },
+      { name: 'Assigned Interviews', href: '/assigned-interviews', icon: UserGroupIcon2 },
+      { name: 'Candidates', href: '/candidates', icon: UserGroupIcon },
+      { name: 'Recruitment Resources and Timeline', href: '/recruitment-resources', icon: ClipboardDocumentListIcon },
+    ] : user?.role === 'ADMIN' ? [
+      { name: 'Applications', href: '/application-list', icon: DocumentTextIcon },
+      { name: 'Review Teams', href: '/review-teams', icon: UserGroupIcon },
       { name: 'Cycle Management', href: '/cycles', icon: ClipboardDocumentListIcon },
       { name: 'Interviews', href: '/interviews', icon: UserGroupIcon2 },
       { name: 'Interview Prep', href: '/interview-prep', icon: ClipboardDocumentListIcon },
       { name: 'Event Management', href: '/events', icon: CalendarDaysIcon },
       { name: 'User Management', href: '/user-management', icon: UserIcon },
-    ] : [])
+    ] : [
+      { name: 'Applications', href: '/application-list', icon: DocumentTextIcon },
+      { name: 'Review Teams', href: '/review-teams', icon: UserGroupIcon },
+    ])
   ];
 
   const isCurrentPath = (path) => location.pathname === path;
@@ -77,7 +86,9 @@ const Layout = ({ children }) => {
             <div className="nav-right">
               <div className="user-info">
                 <p className="user-name">{user?.fullName}</p>
-                <p className="user-role">{user?.role}</p>
+                <p className="user-role">
+                  {user?.role === 'MEMBER' ? 'UC MEMBER' : user?.role}
+                </p>
               </div>
               <button
                 onClick={handleLogout}

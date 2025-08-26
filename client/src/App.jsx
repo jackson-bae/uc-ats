@@ -13,11 +13,17 @@ import CycleManagement from './pages/CycleManagement';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
+import MemberDashboard from './pages/MemberDashboard';
+import DocumentGrading from './pages/DocumentGrading';
+import AssignedInterviews from './pages/AssignedInterviews';
+import Candidates from './pages/Candidates';
+import RecruitmentResources from './pages/RecruitmentResources';
 import CandidateDashboard from './pages/CandidateDashboard';
 import ReviewTeams from './pages/ReviewTeams';
 import UserManagement from './pages/UserManagement';
 import EventManagement from './pages/EventManagement';
 import CandidateEvents from './pages/CandidateEvents';
+import MemberEvents from './pages/MemberEvents';
 import CandidateApplications from './pages/CandidateApplications';
 import InterviewPreparation from './pages/InterviewPreparation';
 import Interviews from './pages/Interviews';
@@ -55,7 +61,8 @@ const AppRoutes = () => {
       {/* Protected Routes - Different content based on user role */}
       <Route path="/" element={
         <ProtectedRoute>
-          {user?.role === 'USER' ? <CandidateDashboard /> : <Dashboard />}
+          {user?.role === 'USER' ? <CandidateDashboard /> : 
+           user?.role === 'MEMBER' ? <MemberDashboard /> : <Dashboard />}
         </ProtectedRoute>
       } />
 
@@ -110,7 +117,45 @@ const AppRoutes = () => {
         path="/events"
         element={
           <ProtectedRoute>
-            {user?.role === 'USER' ? <CandidateEvents /> : <EventManagement />}
+            {user?.role === 'USER' ? <CandidateEvents /> : 
+             user?.role === 'MEMBER' ? <MemberEvents /> : <EventManagement />}
+          </ProtectedRoute>
+        }
+      />
+      
+      {/* Member-specific routes */}
+      <Route
+        path="/document-grading"
+        element={
+          <ProtectedRoute>
+            <DocumentGrading />
+          </ProtectedRoute>
+        }
+      />
+      
+      <Route
+        path="/assigned-interviews"
+        element={
+          <ProtectedRoute>
+            <AssignedInterviews />
+          </ProtectedRoute>
+        }
+      />
+      
+      <Route
+        path="/candidates"
+        element={
+          <ProtectedRoute>
+            <Candidates />
+          </ProtectedRoute>
+        }
+      />
+      
+      <Route
+        path="/recruitment-resources"
+        element={
+          <ProtectedRoute>
+            <RecruitmentResources />
           </ProtectedRoute>
         }
       />

@@ -11,6 +11,7 @@ import reviewTeamsRoutes from './routes/reviewTeams.js';
 import usersRoutes from './routes/users.js';
 import publicRoutes from './routes/public.js';
 import interviewResourcesRoutes from './routes/interviewResources.js';
+import memberRoutes from './routes/member.js';
 import { requireAuth, requireAdmin } from './middleware/auth.js';
 
 const app = express();
@@ -33,6 +34,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/review-teams', reviewTeamsRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/interview-resources', interviewResourcesRoutes);
+app.use('/api/member', memberRoutes);
 app.use('/api', publicRoutes);
 
 // Test endpoint to check if uploads directory is accessible

@@ -8,26 +8,26 @@ datasource db {
 }
 
 model User {
-  id                String             @id @default(uuid())
-  email             String             @unique
-  password          String
-  fullName          String
-  graduationClass   String?
-  studentId         Int?
-  role              UserRole           @default(USER)
-  createdAt         DateTime           @default(now())
-  resetToken        String?
-  resetTokenExpiry  DateTime?
-  profileImage      String?
-  comments          Comment[]
-  coverLetterScores CoverLetterScore[]
-  evaluations       Evaluation[]
-  memberOneGroups   Groups[]           @relation("GroupMemberOne")
-  memberThreeGroups Groups[]           @relation("GroupMemberThree")
-  memberTwoGroups   Groups[]           @relation("GroupMemberTwo")
-  resumeScores      ResumeScore[]
-  videoScores       VideoScore[]
+  id                 String              @id @default(uuid())
+  email              String              @unique
+  password           String
+  fullName           String
+  graduationClass    String?
+  role               UserRole            @default(USER)
+  createdAt          DateTime            @default(now())
+  resetToken         String?
+  resetTokenExpiry   DateTime?
+  profileImage       String?
+  studentId          Int?
+  comments           Comment[]
+  coverLetterScores  CoverLetterScore[]
+  evaluations        Evaluation[]
+  memberOneGroups    Groups[]            @relation("GroupMemberOne")
+  memberThreeGroups  Groups[]            @relation("GroupMemberThree")
+  memberTwoGroups    Groups[]            @relation("GroupMemberTwo")
   interviewResources InterviewResource[]
+  resumeScores       ResumeScore[]
+  videoScores        VideoScore[]
 
   @@map("users")
 }
@@ -238,18 +238,20 @@ model VideoScore {
 }
 
 model Events {
-  id              String            @id @default(uuid())
-  eventName       String
-  eventStartDate  DateTime
-  eventEndDate    DateTime
-  eventLocation   String?
-  rsvpForm        String?
-  attendanceForm  String?
-  cycleId         String
-  createdAt       DateTime          @default(now())
-  eventAttendance EventAttendance[]
-  eventRsvp       EventRsvp[]
-  cycle           RecruitingCycle   @relation(fields: [cycleId], references: [id])
+  id               String            @id @default(uuid())
+  eventName        String
+  eventStartDate   DateTime
+  eventEndDate     DateTime
+  eventLocation    String?
+  rsvpForm         String?
+  attendanceForm   String?
+  cycleId          String
+  createdAt        DateTime          @default(now())
+  memberRsvpUrl    String?
+  showToCandidates Boolean           @default(false)
+  eventAttendance  EventAttendance[]
+  eventRsvp        EventRsvp[]
+  cycle            RecruitingCycle   @relation(fields: [cycleId], references: [id])
 
   @@map("events")
 }
@@ -330,22 +332,22 @@ model Referral {
 }
 
 model InterviewResource {
-  id              String    @id @default(uuid())
+  id              String   @id @default(uuid())
   title           String
   description     String?
   url             String?
   fileUrl         String?
-  type            String?   // e.g., "document", "video", "link", "presentation"
-  category        String?   // e.g., "technical", "behavioral", "case-study"
-  round           String    // "firstRound" or "finalRound"
-  order           Int       @default(0)
-  hasExternalLink Boolean   @default(true)
-  icon            String    @default("book")
-  isActive        Boolean   @default(true)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  type            String?
+  category        String?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
   createdBy       String
-  user            User      @relation(fields: [createdBy], references: [id])
+  hasExternalLink Boolean  @default(true)
+  icon            String   @default("book")
+  order           Int      @default(0)
+  round           String
+  user            User     @relation(fields: [createdBy], references: [id])
 
   @@map("interview_resources")
 }

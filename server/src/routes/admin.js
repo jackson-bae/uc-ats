@@ -523,6 +523,8 @@ router.post('/events', async (req, res) => {
       eventLocation,
       rsvpForm,
       attendanceForm,
+      showToCandidates,
+      memberRsvpUrl,
       cycleId
     } = req.body;
 
@@ -548,6 +550,8 @@ router.post('/events', async (req, res) => {
         eventLocation: eventLocation || null,
         rsvpForm: rsvpForm || null,
         attendanceForm: attendanceForm || null,
+        showToCandidates: showToCandidates || false,
+        memberRsvpUrl: memberRsvpUrl || null,
         cycleId
       }
     });
@@ -596,6 +600,8 @@ router.patch('/events/:id', async (req, res) => {
       eventLocation,
       rsvpForm,
       attendanceForm,
+      showToCandidates,
+      memberRsvpUrl,
       cycleId
     } = req.body;
 
@@ -629,6 +635,8 @@ router.patch('/events/:id', async (req, res) => {
         ...(eventLocation !== undefined && { eventLocation: eventLocation || null }),
         ...(rsvpForm !== undefined && { rsvpForm: rsvpForm || null }),
         ...(attendanceForm !== undefined && { attendanceForm: attendanceForm || null }),
+        ...(showToCandidates !== undefined && { showToCandidates }),
+        ...(memberRsvpUrl !== undefined && { memberRsvpUrl: memberRsvpUrl || null }),
         ...(cycleId !== undefined && { cycleId })
       }
     });
