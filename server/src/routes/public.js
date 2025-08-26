@@ -9,6 +9,9 @@ router.get('/events', async (req, res) => {
     const userEmail = req.query.userEmail; // Get user email from query parameter
     
     const events = await prisma.events.findMany({
+      where: {
+        showToCandidates: true // Only show events that are meant to be visible to candidates
+      },
       include: {
         cycle: true,
         eventRsvp: {
@@ -68,6 +71,34 @@ router.get('/events', async (req, res) => {
   } catch (error) {
     console.error('Error fetching events:', error);
     res.status(500).json({ error: 'Failed to fetch events' });
+  }
+});
+
+// Get all events from active cycle for member timeline (no candidate visibility filter)
+router.get('/member/events', async (req, res) => {
+  try {
+    const events = await prisma.events.findMany({
+      include: {
+        cycle: true
+      },
+      orderBy: {
+        eventStartDate: 'asc'
+      }
+    });
+
+    // Filter to only show events from active cycles
+    const activeEvents = events.filter(event => event.cycle?.isActive);
+
+    // Ensure memberRsvpUrl is included in the response
+    const eventsWithMemberRsvp = activeEvents.map(event => ({
+      ...event,
+      memberRsvpUrl: event.memberRsvpUrl || null
+    }));
+
+    res.json(eventsWithMemberRsvp);
+  } catch (error) {
+    console.error('Error fetching member events:', error);
+    res.status(500).json({ error: 'Failed to fetch member events' });
   }
 });
 

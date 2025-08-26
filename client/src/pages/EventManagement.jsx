@@ -23,7 +23,7 @@ import {
   Alert,
   Tooltip,
 } from '@mui/material';
-import { TrashIcon } from '@heroicons/react/24/outline';
+import { TrashIcon, PencilIcon } from '@heroicons/react/24/outline';
 import apiClient from '../utils/api';
 
 export default function EventManagement() {
@@ -35,6 +35,7 @@ export default function EventManagement() {
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [testEmailOpen, setTestEmailOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [testEmailForm, setTestEmailForm] = useState({
@@ -42,6 +43,7 @@ export default function EventManagement() {
     type: 'rsvp'
   });
   const [emailTestLoading, setEmailTestLoading] = useState(false);
+  const [editLoading, setEditLoading] = useState(false);
   const [form, setForm] = useState({
     eventName: '',
     eventStartDate: '',
@@ -49,6 +51,19 @@ export default function EventManagement() {
     eventLocation: '',
     rsvpForm: '',
     attendanceForm: '',
+    showToCandidates: false,
+    memberRsvpUrl: '',
+    cycleId: ''
+  });
+  const [editForm, setEditForm] = useState({
+    eventName: '',
+    eventStartDate: '',
+    eventEndDate: '',
+    eventLocation: '',
+    rsvpForm: '',
+    attendanceForm: '',
+    showToCandidates: false,
+    memberRsvpUrl: '',
     cycleId: ''
   });
 
@@ -110,6 +125,8 @@ export default function EventManagement() {
         eventLocation: '',
         rsvpForm: '',
         attendanceForm: '',
+        showToCandidates: false,
+        memberRsvpUrl: '',
         cycleId: ''
       });
       
@@ -127,6 +144,50 @@ export default function EventManagement() {
       } catch (e) {
         setError(e.message || 'Failed to delete event');
       }
+    }
+  };
+
+  const openEditDialog = (event) => {
+    setSelectedEvent(event);
+    setEditForm({
+      eventName: event.eventName,
+      eventStartDate: event.eventStartDate.slice(0, 16), // Format for datetime-local input
+      eventEndDate: event.eventEndDate.slice(0, 16), // Format for datetime-local input
+      eventLocation: event.eventLocation || '',
+      rsvpForm: event.rsvpForm || '',
+      attendanceForm: event.attendanceForm || '',
+      showToCandidates: event.showToCandidates,
+      memberRsvpUrl: event.memberRsvpUrl || '',
+      cycleId: event.cycleId
+    });
+    setEditOpen(true);
+  };
+
+  const updateEvent = async () => {
+    try {
+      setEditLoading(true);
+      setError('');
+      
+      // Validate required fields
+      if (!editForm.eventName || !editForm.eventStartDate || !editForm.eventEndDate || !editForm.cycleId) {
+        setError('Please fill in all required fields');
+        return;
+      }
+
+      await apiClient.patch(`/admin/events/${selectedEvent.id}`, {
+        ...editForm,
+        eventStartDate: new Date(editForm.eventStartDate).toISOString(),
+        eventEndDate: new Date(editForm.eventEndDate).toISOString(),
+      });
+      
+      setEditOpen(false);
+      setSelectedEvent(null);
+      await fetchEvents();
+      setSuccessMessage('Event updated successfully!');
+    } catch (e) {
+      setError(e.message || 'Failed to update event');
+    } finally {
+      setEditLoading(false);
     }
   };
 
@@ -282,6 +343,7 @@ export default function EventManagement() {
               <TableCell>End Date</TableCell>
               <TableCell>Location</TableCell>
               <TableCell>Cycle</TableCell>
+              <TableCell>Show to Candidates</TableCell>
               <TableCell>RSVP</TableCell>
               <TableCell>Attendance</TableCell>
               <TableCell align="right">Actions</TableCell>
@@ -298,6 +360,14 @@ export default function EventManagement() {
                   <TableCell>{formatDateTime(event.eventEndDate)}</TableCell>
                   <TableCell>{event.eventLocation || '-'}</TableCell>
                   <TableCell>{getCycleName(event.cycleId)}</TableCell>
+                  <TableCell>
+                    <Chip 
+                      label={event.showToCandidates ? 'Yes' : 'No'} 
+                      size="small" 
+                      color={event.showToCandidates ? 'success' : 'default'} 
+                      variant="outlined"
+                    />
+                  </TableCell>
                   <TableCell>
                     <Stack spacing={1} alignItems="flex-start">
                       {event.rsvpForm ? (
@@ -366,6 +436,14 @@ export default function EventManagement() {
                   </TableCell>
                   <TableCell align="right">
                     <Stack direction="row" spacing={1}>
+                      <IconButton
+                        size="small"
+                        color="primary"
+                        onClick={() => openEditDialog(event)}
+                        title="Edit Event"
+                      >
+                        <PencilIcon style={{ width: '1rem', height: '1rem' }} />
+                      </IconButton>
                       <Button
                         size="small"
                         variant="outlined"
@@ -378,6 +456,7 @@ export default function EventManagement() {
                         size="small"
                         color="error"
                         onClick={() => deleteEvent(event.id)}
+                        title="Delete Event"
                       >
                         <TrashIcon style={{ width: '1rem', height: '1rem' }} />
                       </IconButton>
@@ -464,11 +543,142 @@ export default function EventManagement() {
               placeholder="https://forms.gle/..."
               helperText="Paste the Google Form URL for event attendance tracking"
             />
+
+            <TextField
+              label="Member RSVP Google Form URL"
+              value={form.memberRsvpUrl}
+              onChange={(e) => setForm({ ...form, memberRsvpUrl: e.target.value })}
+              fullWidth
+              placeholder="https://forms.gle/..."
+              helperText="Paste the Google Form URL for UC member RSVPs"
+            />
+
+            <TextField
+              label="Show to Candidates"
+              select
+              value={form.showToCandidates ? 'true' : 'false'}
+              onChange={(e) => setForm({ ...form, showToCandidates: e.target.value === 'true' })}
+              fullWidth
+              helperText="Choose whether this event should be visible to candidates"
+            >
+              <MenuItem value="false">No - Internal Event Only</MenuItem>
+              <MenuItem value="true">Yes - Show to Candidates</MenuItem>
+            </TextField>
           </Stack>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setCreateOpen(false)}>Cancel</Button>
           <Button onClick={createEvent} variant="contained">Create Event</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Edit Event Dialog */}
+      <Dialog open={editOpen} onClose={() => setEditOpen(false)} fullWidth maxWidth="md">
+        <DialogTitle>Edit Event</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} mt={1}>
+            <TextField
+              label="Event Name *"
+              value={editForm.eventName}
+              onChange={(e) => setEditForm({ ...editForm, eventName: e.target.value })}
+              fullWidth
+              required
+            />
+            
+            <Stack direction="row" spacing={2}>
+              <TextField
+                label="Start Date & Time *"
+                type="datetime-local"
+                value={editForm.eventStartDate}
+                onChange={(e) => setEditForm({ ...editForm, eventStartDate: e.target.value })}
+                fullWidth
+                required
+                InputLabelProps={{ shrink: true }}
+              />
+              <TextField
+                label="End Date & Time *"
+                type="datetime-local"
+                value={editForm.eventEndDate}
+                onChange={(e) => setEditForm({ ...editForm, eventEndDate: e.target.value })}
+                fullWidth
+                required
+                InputLabelProps={{ shrink: true }}
+              />
+            </Stack>
+
+            <TextField
+              label="Location"
+              value={editForm.eventLocation}
+              onChange={(e) => setEditForm({ ...editForm, eventLocation: e.target.value })}
+              fullWidth
+              placeholder="e.g., Business Building Room 101"
+            />
+
+            <TextField
+              label="Recruiting Cycle *"
+              select
+              value={editForm.cycleId}
+              onChange={(e) => setEditForm({ ...editForm, cycleId: e.target.value })}
+              fullWidth
+              required
+            >
+              <MenuItem value="">Select a cycle</MenuItem>
+              {cycles.map((cycle) => (
+                <MenuItem key={cycle.id} value={cycle.id}>
+                  {cycle.name} {cycle.isActive && '(Active)'}
+                </MenuItem>
+              ))}
+            </TextField>
+
+            <TextField
+              label="RSVP Google Form URL"
+              value={editForm.rsvpForm}
+              onChange={(e) => setEditForm({ ...editForm, rsvpForm: e.target.value })}
+              fullWidth
+              placeholder="https://forms.gle/..."
+              helperText="Paste the Google Form URL for event RSVPs"
+            />
+
+            <TextField
+              label="Attendance Check-in Google Form URL"
+              value={editForm.attendanceForm}
+              onChange={(e) => setEditForm({ ...editForm, attendanceForm: e.target.value })}
+              fullWidth
+              placeholder="https://forms.gle/..."
+              helperText="Paste the Google Form URL for event attendance tracking"
+            />
+
+            <TextField
+              label="Member RSVP Google Form URL"
+              value={editForm.memberRsvpUrl}
+              onChange={(e) => setEditForm({ ...editForm, memberRsvpUrl: e.target.value })}
+              fullWidth
+              placeholder="https://forms.gle/..."
+              helperText="Paste the Google Form URL for UC member RSVPs"
+            />
+
+            <TextField
+              label="Show to Candidates"
+              select
+              value={editForm.showToCandidates ? 'true' : 'false'}
+              onChange={(e) => setEditForm({ ...editForm, showToCandidates: e.target.value === 'true' })}
+              fullWidth
+              helperText="Choose whether this event should be visible to candidates"
+            >
+              <MenuItem value="false">No - Internal Event Only</MenuItem>
+              <MenuItem value="true">Yes - Show to Candidates</MenuItem>
+            </TextField>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditOpen(false)}>Cancel</Button>
+          <Button 
+            onClick={updateEvent} 
+            variant="contained"
+            disabled={editLoading}
+          >
+            {editLoading ? <CircularProgress size={20} /> : 'Update Event'}
+          </Button>
         </DialogActions>
       </Dialog>
 
