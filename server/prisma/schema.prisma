@@ -103,6 +103,7 @@ model RecruitingCycle {
   applications Application[]
   events       Events[]
   groups       Groups[]
+  resumeScores ResumeScore[]
 
   @@map("recruiting_cycles")
 }
@@ -174,21 +175,22 @@ model ResumeScore {
   scoreOne        Int?
   scoreTwo        Int?
   scoreThree      Int?
-  notesOne        String?
-  notesTwo        String?
-  notesThree      String?
+  notes           String?
   adminScore      Decimal?  @db.Decimal(5, 2)
   adminNotes      String?
   status          String?
   candidateId     String
-  evaluatorId     String?
+  evaluatorId     String
   assignedGroupId String?
+  cycleId         String?
   createdAt       DateTime  @default(now())
   assignedGroup   Groups?   @relation(fields: [assignedGroupId], references: [id])
   candidate       Candidate @relation(fields: [candidateId], references: [id])
-  evaluator       User?     @relation(fields: [evaluatorId], references: [id])
+  evaluator       User      @relation(fields: [evaluatorId], references: [id])
+  cycle           RecruitingCycle? @relation(fields: [cycleId], references: [id])
 
   @@map("resume_scores")
+  @@unique([candidateId, evaluatorId])
 }
 
 model CoverLetterScore {

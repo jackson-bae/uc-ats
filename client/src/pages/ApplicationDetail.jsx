@@ -32,6 +32,11 @@ export default function ApplicationDetail() {
     count: 0
   }); // Store average grades
 
+  // Resume scores
+  const [resumeScores, setResumeScores] = useState([]);
+  const [selectedScore, setSelectedScore] = useState(null);
+  const [scoreModalOpen, setScoreModalOpen] = useState(false);
+
   // Comments
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
@@ -131,6 +136,15 @@ export default function ApplicationDetail() {
     }
   };
 
+  const fetchResumeScores = async () => {
+    try {
+      const scores = await apiClient.get(`/review-teams/resume-scores/${application?.candidateId}`);
+      setResumeScores(scores);
+    } catch (e) {
+      console.error('Error fetching resume scores:', e);
+    }
+  };
+
   // Toggle N/A for a grade type
   const toggleNa = (type) => {
     const newState = !isNa[type];
@@ -201,6 +215,9 @@ export default function ApplicationDetail() {
 
         // Load comments
         await fetchComments();
+        
+        // Load resume scores
+        await fetchResumeScores();
         
       } catch (err) {
         console.error('Error loading data:', err);
@@ -739,6 +756,185 @@ export default function ApplicationDetail() {
           </div>
         </div>
       </div>
+
+      {/* Resume Scores Section */}
+      <div className="info-section" style={{ marginTop: '2rem' }}>
+        <h2 className="section-title">Resume Scores</h2>
+        {resumeScores.length === 0 ? (
+          <div className="empty-state">No resume scores yet.</div>
+        ) : (
+          <div className="resume-scores-list">
+            {resumeScores.map((score) => (
+              <div 
+                key={score.id} 
+                className="resume-score-item"
+                style={{
+                  padding: '12px',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '8px',
+                  marginBottom: '8px',
+                  cursor: 'pointer',
+                  backgroundColor: '#f9fafb',
+                  transition: 'background-color 0.2s'
+                }}
+                onMouseEnter={(e) => e.target.style.backgroundColor = '#f3f4f6'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = '#f9fafb'}
+                onClick={() => {
+                  setSelectedScore(score);
+                  setScoreModalOpen(true);
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontWeight: '600', color: '#374151' }}>
+                      {score.evaluator?.fullName || score.evaluator?.email || 'Unknown Evaluator'}
+                    </div>
+                    <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '2px' }}>
+                      {new Date(score.createdAt).toLocaleDateString()} at {new Date(score.createdAt).toLocaleTimeString()}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '1.125rem', fontWeight: '600', color: '#059669' }}>
+                      {score.overallScore}/10
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                      Overall Score
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Score Detail Modal */}
+      {scoreModalOpen && selectedScore && (
+        <div 
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}
+          onClick={() => setScoreModalOpen(false)}
+        >
+          <div 
+            style={{
+              backgroundColor: '#fff',
+              borderRadius: '12px',
+              padding: '24px',
+              maxWidth: '500px',
+              width: '90%',
+              maxHeight: '80vh',
+              overflow: 'auto'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '600' }}>
+                Resume Score Details
+              </h3>
+              <button 
+                onClick={() => setScoreModalOpen(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '1.5rem',
+                  cursor: 'pointer',
+                  color: '#6b7280'
+                }}
+              >
+                ×
+              </button>
+            </div>
+            
+            <div style={{ marginBottom: '16px' }}>
+              <div style={{ fontWeight: '600', color: '#374151', marginBottom: '4px' }}>
+                Evaluator
+              </div>
+              <div style={{ color: '#6b7280' }}>
+                {selectedScore.evaluator?.fullName || selectedScore.evaluator?.email || 'Unknown'}
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '16px' }}>
+              <div style={{ fontWeight: '600', color: '#374151', marginBottom: '4px' }}>
+                Date & Time
+              </div>
+              <div style={{ color: '#6b7280' }}>
+                {new Date(selectedScore.createdAt).toLocaleString()}
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '16px' }}>
+              <div style={{ fontWeight: '600', color: '#374151', marginBottom: '8px' }}>
+                Category Scores
+              </div>
+              <div style={{ display: 'grid', gap: '8px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px', backgroundColor: '#f9fafb', borderRadius: '4px' }}>
+                  <span>Content & Relevance</span>
+                  <span style={{ fontWeight: '600' }}>{selectedScore.scoreOne || 'N/A'}/10</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px', backgroundColor: '#f9fafb', borderRadius: '4px' }}>
+                  <span>Structure & Formatting</span>
+                  <span style={{ fontWeight: '600' }}>{selectedScore.scoreTwo || 'N/A'}/10</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px', backgroundColor: '#f9fafb', borderRadius: '4px' }}>
+                  <span>Impact & Achievement</span>
+                  <span style={{ fontWeight: '600' }}>{selectedScore.scoreThree || 'N/A'}/10</span>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '16px' }}>
+              <div style={{ fontWeight: '600', color: '#374151', marginBottom: '8px' }}>
+                Overall Score
+              </div>
+              <div style={{ fontSize: '1.25rem', fontWeight: '600', color: '#059669' }}>
+                {selectedScore.overallScore}/10
+              </div>
+            </div>
+
+            {selectedScore.notes && (
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ fontWeight: '600', color: '#374151', marginBottom: '8px' }}>
+                  Notes
+                </div>
+                <div style={{ 
+                  padding: '12px', 
+                  backgroundColor: '#f9fafb', 
+                  borderRadius: '4px',
+                  whiteSpace: 'pre-wrap',
+                  color: '#374151'
+                }}>
+                  {selectedScore.notes}
+                </div>
+              </div>
+            )}
+
+            <div style={{ textAlign: 'right' }}>
+              <button 
+                onClick={() => setScoreModalOpen(false)}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: '#6b7280',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer'
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {preview.open && (
         <DocumentPreviewModal
           src={preview.src}
