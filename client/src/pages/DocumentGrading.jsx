@@ -1,4 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
+import { useAuth } from '../context/AuthContext';
+import apiClient from '../utils/api';
+import ResumeGradingModal from '../components/ResumeGradingModal';
 import {
   Box,
   Typography,
@@ -53,6 +56,7 @@ function TabPanel({ children, value, index, ...other }) {
 }
 
 export default function DocumentGrading() {
+  const { user } = useAuth();
   const [tabValue, setTabValue] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('name-az');
@@ -61,79 +65,189 @@ export default function DocumentGrading() {
   const [genderFilter, setGenderFilter] = useState('all');
   const [firstGenFilter, setFirstGenFilter] = useState('all');
   const [transferFilter, setTransferFilter] = useState('all');
+  const [applications, setApplications] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [gradingModalOpen, setGradingModalOpen] = useState(false);
+  const [selectedApplication, setSelectedApplication] = useState(null);
 
-  // Progress data
-  const progressData = [
-    {
-      title: 'Resume Completion',
-      icon: <DocumentIcon />,
-      completed: 50,
-      total: 175,
-      deadline: 'Oct 5th, EOD',
-      percentage: 29,
-      color: 'success'
-    },
-    {
-      title: 'Cover Letter Completion',
-      icon: <EditIcon />,
-      completed: 90,
-      total: 135,
-      deadline: 'Oct 5th, EOD',
-      percentage: 67,
-      color: 'success'
-    },
-    {
-      title: 'Video Review Completion',
-      icon: <VideoIcon />,
-      completed: 70,
-      total: 75,
-      deadline: 'Oct 5th, EOD',
-      percentage: 93,
-      color: 'success'
-    }
-  ];
+  // Calculate progress data based on actual grading completion
+  const calculateProgressData = () => {
+    const totalApplications = applications.length;
+    
+    const resumeGraded = applications.filter(app => app.hasResumeScore).length;
+    const coverLetterGraded = applications.filter(app => app.hasCoverLetterScore).length;
+    const videoGraded = applications.filter(app => app.hasVideoScore).length;
 
-  // Sample grading data
-  const gradingData = [
-    {
-      id: 1,
-      candidate: 'Ksenya Gotlieb',
-      document: 'Resume',
-      flagged: true,
-      status: 'completed'
-    },
-    {
-      id: 2,
-      candidate: 'Ksenya Gotlieb',
-      document: 'Resume',
-      flagged: false,
-      status: 'pending'
-    },
-    {
-      id: 3,
-      candidate: 'Alex Johnson',
-      document: 'Cover Letter',
-      flagged: false,
-      status: 'pending'
-    },
-    {
-      id: 4,
-      candidate: 'Sarah Chen',
-      document: 'Video',
-      flagged: true,
-      status: 'completed'
-    },
-    {
-      id: 5,
-      candidate: 'Michael Rodriguez',
-      document: 'Resume',
-      flagged: false,
-      status: 'pending'
+    return [
+      {
+        title: 'Resume Completion',
+        icon: <DocumentIcon />,
+        completed: resumeGraded,
+        total: totalApplications,
+        deadline: 'Oct 5th, EOD',
+        percentage: totalApplications > 0 ? Math.round((resumeGraded / totalApplications) * 100) : 0,
+        color: 'success'
+      },
+      {
+        title: 'Cover Letter Completion',
+        icon: <EditIcon />,
+        completed: coverLetterGraded,
+        total: totalApplications,
+        deadline: 'Oct 5th, EOD',
+        percentage: totalApplications > 0 ? Math.round((coverLetterGraded / totalApplications) * 100) : 0,
+        color: 'success'
+      },
+      {
+        title: 'Video Review Completion',
+        icon: <VideoIcon />,
+        completed: videoGraded,
+        total: totalApplications,
+        deadline: 'Oct 5th, EOD',
+        percentage: totalApplications > 0 ? Math.round((videoGraded / totalApplications) * 100) : 0,
+        color: 'success'
+      }
+    ];
+  };
+
+  const progressData = calculateProgressData();
+
+  // Fetch applications assigned to the member's review team
+  useEffect(() => {
+    fetchMemberApplications();
+  }, [user?.id]);
+
+  // Filter and sort applications based on current filters
+  const filteredApplications = applications.filter(app => {
+    const matchesSearch = app.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         app.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         app.major.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesStatus = statusFilter === 'all' || app.status.toLowerCase() === statusFilter;
+    const matchesYear = yearFilter === 'all' || app.year === yearFilter;
+    const matchesGender = genderFilter === 'all' || app.gender.toLowerCase() === genderFilter;
+    const matchesFirstGen = firstGenFilter === 'all' || 
+                           (firstGenFilter === 'yes' && app.isFirstGeneration) ||
+                           (firstGenFilter === 'no' && !app.isFirstGeneration);
+    const matchesTransfer = transferFilter === 'all' || 
+                           (transferFilter === 'yes' && app.isTransferStudent) ||
+                           (transferFilter === 'no' && !app.isTransferStudent);
+
+    return matchesSearch && matchesStatus && matchesYear && matchesGender && matchesFirstGen && matchesTransfer;
+  });
+
+  // Sort applications
+  const sortedApplications = [...filteredApplications].sort((a, b) => {
+    switch (sortBy) {
+      case 'name-az':
+        return a.name.localeCompare(b.name);
+      case 'name-za':
+        return b.name.localeCompare(a.name);
+      case 'date-new':
+        return new Date(b.submittedAt) - new Date(a.submittedAt);
+      case 'date-old':
+        return new Date(a.submittedAt) - new Date(b.submittedAt);
+      default:
+        return 0;
     }
-  ];
+  });
+
+  // Generate grading data for each document type
+  const generateGradingData = (documentType) => {
+    return sortedApplications.map(app => {
+      let document = '';
+      let hasDocument = false;
+      let isGraded = false;
+      let status = 'pending';
+
+      switch (documentType) {
+        case 'resume':
+          document = 'Resume';
+          hasDocument = !!app.resumeUrl;
+          isGraded = app.hasResumeScore;
+          break;
+        case 'coverLetter':
+          document = 'Cover Letter';
+          hasDocument = !!app.coverLetterUrl;
+          isGraded = app.hasCoverLetterScore;
+          break;
+        case 'video':
+          document = 'Video';
+          hasDocument = !!app.videoUrl;
+          isGraded = app.hasVideoScore;
+          break;
+        default:
+          return null;
+      }
+
+      // Determine status based on document availability and grading status
+      if (!hasDocument) {
+        status = 'no-document';
+      } else if (isGraded) {
+        status = 'completed';
+      } else {
+        status = 'pending';
+      }
+
+      return {
+        id: `${app.id}-${documentType}`,
+        candidate: app.name,
+        document,
+        hasDocument,
+        isGraded,
+        status,
+        application: app
+      };
+    }).filter(Boolean);
+  };
 
   const handleTabChange = (event, newValue) => {
     setTabValue(newValue);
+  };
+
+  const handleGradeResume = (application) => {
+    setSelectedApplication(application);
+    setGradingModalOpen(true);
+  };
+
+  const handleCloseGradingModal = () => {
+    setGradingModalOpen(false);
+    setSelectedApplication(null);
+    // Refresh applications to update grading status
+    if (user?.id) {
+      fetchMemberApplications();
+    }
+  };
+
+  const fetchMemberApplications = async () => {
+    if (!user?.id) return;
+    
+    try {
+      setLoading(true);
+      const response = await apiClient.get(`/review-teams/member-applications/${user.id}`);
+      setApplications(response);
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching member applications:', err);
+      setError('Failed to load applications. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
+
+  const getStatusText = (status) => {
+    switch (status) {
+      case 'completed':
+        return 'Completed';
+      case 'pending':
+        return 'Grade Now';
+      case 'no-document':
+        return 'No Document';
+      default:
+        return 'Unknown';
+    }
   };
 
   const getStatusColor = (status) => {
@@ -142,19 +256,10 @@ export default function DocumentGrading() {
         return 'success';
       case 'pending':
         return 'warning';
+      case 'no-document':
+        return 'error';
       default:
         return 'default';
-    }
-  };
-
-  const getStatusText = (status) => {
-    switch (status) {
-      case 'completed':
-        return 'Completed';
-      case 'pending':
-        return 'Grade Now';
-      default:
-        return 'Unknown';
     }
   };
 
@@ -164,6 +269,40 @@ export default function DocumentGrading() {
       <Typography variant="h4" component="h1" sx={{ fontWeight: 700, color: 'primary.dark', mb: 4 }}>
         Document Grading
       </Typography>
+
+      {/* Member Team Summary */}
+      {!loading && !error && (
+        <Paper sx={{ p: 3, mb: 4 }}>
+          <Typography variant="h6" component="h2" sx={{ fontWeight: 600, color: 'primary.dark', mb: 2 }}>
+            Your Review Teams
+          </Typography>
+          {applications.length > 0 ? (
+            <>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                You are assigned to review applications from the following teams:
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                {[...new Set(applications.map(app => app.groupName))].map((teamName, index) => (
+                  <Chip
+                    key={index}
+                    label={teamName}
+                    color="primary"
+                    variant="outlined"
+                    size="small"
+                  />
+                ))}
+              </Box>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+                Total applications assigned: {applications.length}
+              </Typography>
+            </>
+          ) : (
+            <Typography variant="body2" color="text.secondary">
+              You are not currently assigned to any review teams, or there are no applications assigned to your teams.
+            </Typography>
+          )}
+        </Paper>
+      )}
 
       {/* Progress Section */}
       <Paper sx={{ p: 3, mb: 4 }}>
@@ -350,58 +489,94 @@ export default function DocumentGrading() {
         </Box>
 
         {/* Grading Table */}
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 600 }}>Candidate</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Document</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Flag</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {gradingData.map((row) => (
-                <TableRow key={row.id} hover>
-                  <TableCell>
-                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                      {row.candidate}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      startIcon={<DocumentIcon />}
-                      sx={{ textTransform: 'none' }}
-                    >
-                      {row.document}
-                    </Button>
-                  </TableCell>
-                  <TableCell>
-                    <IconButton size="small">
-                      {row.flagged ? (
-                        <FlagIcon sx={{ color: 'black' }} />
-                      ) : (
-                        <FlagOutlinedIcon />
-                      )}
-                    </IconButton>
-                  </TableCell>
-                  <TableCell>
-                    <Chip
-                      label={getStatusText(row.status)}
-                      color={getStatusColor(row.status)}
-                      size="small"
-                      icon={row.status === 'completed' ? <CheckCircleIcon /> : <ScheduleIcon />}
-                      sx={{ fontWeight: 600 }}
-                    />
-                  </TableCell>
+        {loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+            <LinearProgress sx={{ width: '100%' }} />
+          </Box>
+        ) : error ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+            <Typography color="error">{error}</Typography>
+          </Box>
+        ) : (
+          <TableContainer>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 600 }}>Candidate</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Document</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Flag</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
+              </TableHead>
+              <TableBody>
+                {(() => {
+                  const currentGradingData = generateGradingData(
+                    tabValue === 0 ? 'resume' : tabValue === 1 ? 'coverLetter' : 'video'
+                  );
+                  
+                  if (currentGradingData.length === 0) {
+                    return (
+                      <TableRow>
+                        <TableCell colSpan={4} sx={{ textAlign: 'center', py: 4 }}>
+                          <Typography color="text.secondary">
+                            No applications found for this document type.
+                          </Typography>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  }
+
+                  return currentGradingData.map((row) => (
+                    <TableRow key={row.id} hover>
+                      <TableCell>
+                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                          {row.candidate}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {row.application?.major} • {row.application?.year}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          startIcon={<DocumentIcon />}
+                          sx={{ textTransform: 'none' }}
+                          disabled={!row.hasDocument}
+                          onClick={() => row.hasDocument && handleGradeResume(row.application)}
+                        >
+                          {row.document}
+                        </Button>
+                      </TableCell>
+                      <TableCell>
+                        <IconButton size="small">
+                          <FlagOutlinedIcon />
+                        </IconButton>
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={getStatusText(row.status)}
+                          color={getStatusColor(row.status)}
+                          size="small"
+                          icon={row.status === 'completed' ? <CheckCircleIcon /> : <ScheduleIcon />}
+                          sx={{ fontWeight: 600 }}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  ));
+                })()}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
       </Paper>
+
+      {/* Resume Grading Modal */}
+      <ResumeGradingModal
+        open={gradingModalOpen}
+        onClose={handleCloseGradingModal}
+        application={selectedApplication}
+      />
     </Box>
   );
 }

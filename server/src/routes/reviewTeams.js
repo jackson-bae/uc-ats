@@ -475,6 +475,82 @@ router.get('/users', requireAuth, async (req, res) => {
   }
 });
 
+// Get candidates assigned to a specific member's review team
+router.get('/member/:memberId/candidates', requireAuth, async (req, res) => {
+  try {
+    const { memberId } = req.params;
+    
+    // Get the active cycle first
+    const activeCycle = await prisma.recruitingCycle.findFirst({ 
+      where: { isActive: true } 
+    });
+    
+    if (!activeCycle) {
+      return res.json([]);
+    }
+
+    // Find groups where the member is part of the team
+    const memberGroups = await prisma.groups.findMany({
+      where: {
+        cycleId: activeCycle.id,
+        OR: [
+          { memberOne: memberId },
+          { memberTwo: memberId },
+          { memberThree: memberId }
+        ]
+      },
+      include: {
+        assignedCandidates: {
+          include: {
+            applications: {
+              where: {
+                cycleId: activeCycle.id
+              },
+              orderBy: {
+                submittedAt: 'desc'
+              },
+              take: 1 // Only get the latest application
+            }
+          }
+        }
+      }
+    });
+
+    // Collect all candidates from all groups the member is part of
+    const allCandidates = [];
+    
+    memberGroups.forEach(group => {
+      group.assignedCandidates.forEach(candidate => {
+        const latestApplication = candidate.applications[0];
+        
+        if (latestApplication) {
+          allCandidates.push({
+            id: latestApplication.id,
+            candidateId: candidate.id,
+            name: `${latestApplication.firstName} ${latestApplication.lastName}`,
+            major: latestApplication.major1 || 'N/A',
+            year: latestApplication.graduationYear || 'N/A',
+            gpa: latestApplication.cumulativeGpa?.toString() || 'N/A',
+            status: latestApplication.status || 'SUBMITTED',
+            email: latestApplication.email,
+            submittedAt: latestApplication.submittedAt,
+            resumeUrl: latestApplication.resumeUrl,
+            coverLetterUrl: latestApplication.coverLetterUrl,
+            videoUrl: latestApplication.videoUrl,
+            groupId: group.id,
+            groupName: `Team ${group.id.slice(-4)}`
+          });
+        }
+      });
+    });
+
+    res.json(allCandidates);
+  } catch (error) {
+    console.error('Error fetching member candidates:', error);
+    res.status(500).json({ error: 'Failed to fetch member candidates' });
+  }
+});
+
 // Auto-distribute applications evenly among all teams
 router.post('/auto-distribute', requireAuth, async (req, res) => {
   try {
@@ -546,6 +622,267 @@ router.post('/auto-distribute', requireAuth, async (req, res) => {
   } catch (error) {
     console.error('Error auto-distributing applications:', error);
     res.status(500).json({ error: 'Failed to auto-distribute applications' });
+  }
+});
+
+// Get applications assigned to a specific member's review team
+router.get('/member-applications/:memberId', requireAuth, async (req, res) => {
+  try {
+    const { memberId } = req.params;
+    const evaluatorId = req.user?.id;
+    console.log('Fetching applications for member:', memberId);
+    
+    // Get the active cycle first
+    const activeCycle = await prisma.recruitingCycle.findFirst({ 
+      where: { isActive: true } 
+    });
+    
+    console.log('Active cycle:', activeCycle?.id);
+    
+    if (!activeCycle) {
+      console.log('No active cycle found');
+      return res.json([]);
+    }
+
+    // First, let's check if the member exists and get their groups
+    const memberGroups = await prisma.groups.findMany({
+      where: {
+        cycleId: activeCycle.id,
+        OR: [
+          { memberOne: memberId },
+          { memberTwo: memberId },
+          { memberThree: memberId }
+        ]
+      },
+      select: {
+        id: true,
+        memberOne: true,
+        memberTwo: true,
+        memberThree: true
+      }
+    });
+
+    console.log('Member groups found:', memberGroups.length);
+
+    if (memberGroups.length === 0) {
+      console.log('No groups found for member');
+      return res.json([]);
+    }
+
+    // Get candidates assigned to these groups
+    const groupIds = memberGroups.map(group => group.id);
+    const candidates = await prisma.candidate.findMany({
+      where: {
+        assignedGroupId: {
+          in: groupIds
+        }
+      },
+      include: {
+        applications: {
+          where: {
+            cycleId: activeCycle.id
+          },
+          orderBy: {
+            submittedAt: 'desc'
+          },
+          take: 1
+        }
+      }
+    });
+
+    console.log('Candidates found:', candidates.length);
+
+    // Get grading records for these candidates for THIS evaluator
+    const resumeScores = await prisma.resumeScore.findMany({
+      where: {
+        evaluatorId: evaluatorId,
+        candidateId: {
+          in: candidates.map(c => c.id)
+        }
+      },
+      select: {
+        candidateId: true
+      }
+    });
+
+    const coverLetterScores = await prisma.coverLetterScore.findMany({
+      where: {
+        candidateId: {
+          in: candidates.map(c => c.id)
+        }
+      },
+      select: {
+        candidateId: true,
+        overallScore: true
+      }
+    });
+
+    const videoScores = await prisma.videoScore.findMany({
+      where: {
+        candidateId: {
+          in: candidates.map(c => c.id)
+        }
+      },
+      select: {
+        candidateId: true,
+        overallScore: true
+      }
+    });
+
+    // Transform the data
+    const applications = [];
+    
+    candidates.forEach(candidate => {
+      const latestApplication = candidate.applications[0];
+      if (latestApplication) {
+        const group = memberGroups.find(g => g.id === candidate.assignedGroupId);
+        const hasResumeScore = resumeScores.some(score => score.candidateId === candidate.id);
+        const hasCoverLetterScore = coverLetterScores.some(score => score.candidateId === candidate.id);
+        const hasVideoScore = videoScores.some(score => score.candidateId === candidate.id);
+        
+        applications.push({
+          id: latestApplication.id,
+          candidateId: candidate.id,
+          name: `${latestApplication.firstName} ${latestApplication.lastName}`,
+          major: latestApplication.major1 || 'N/A',
+          year: latestApplication.graduationYear || 'N/A',
+          gpa: latestApplication.cumulativeGpa?.toString() || 'N/A',
+          status: latestApplication.status || 'SUBMITTED',
+          email: latestApplication.email,
+          submittedAt: latestApplication.submittedAt,
+          gender: latestApplication.gender || 'N/A',
+          isFirstGeneration: latestApplication.isFirstGeneration,
+          isTransferStudent: latestApplication.isTransferStudent,
+          resumeUrl: latestApplication.resumeUrl,
+          coverLetterUrl: latestApplication.coverLetterUrl,
+          videoUrl: latestApplication.videoUrl,
+          groupId: group?.id,
+          groupName: group ? `Team ${group.id.slice(-4)}` : 'Unknown Team',
+          hasResumeScore,
+          hasCoverLetterScore,
+          hasVideoScore
+        });
+      }
+    });
+
+    console.log('Applications processed:', applications.length);
+    res.json(applications);
+  } catch (error) {
+    console.error('Error fetching member applications:', error);
+    res.status(500).json({ error: 'Failed to fetch member applications', details: error.message });
+  }
+});
+
+// Test endpoint to check if the route is working
+router.get('/test', requireAuth, async (req, res) => {
+  try {
+    res.json({ 
+      message: 'Review teams route is working',
+      user: req.user?.id,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Test endpoint error:', error);
+    res.status(500).json({ error: 'Test endpoint failed' });
+  }
+});
+
+// Save resume score (per evaluator per candidate)
+router.post('/resume-score', requireAuth, async (req, res) => {
+  try {
+    const { candidateId, assignedGroupId, scoreOne, scoreTwo, scoreThree, notes } = req.body;
+    const evaluatorId = req.user.id;
+
+    // Calculate overall score (average of the three scores)
+    const scores = [scoreOne, scoreTwo, scoreThree].filter(score => score !== null && score !== undefined);
+    const overallScore = scores.length > 0 ? scores.reduce((sum, score) => sum + score, 0) / scores.length : 0;
+
+    // Check if a score already exists for this candidate and evaluator
+    const existingScore = await prisma.resumeScore.findFirst({
+      where: { candidateId, evaluatorId }
+    });
+
+    let resumeScore;
+    if (existingScore) {
+      // Update existing score
+      resumeScore = await prisma.resumeScore.update({
+        where: { id: existingScore.id },
+        data: {
+          overallScore,
+          scoreOne,
+          scoreTwo,
+          scoreThree,
+          notes,
+          assignedGroupId,
+          status: 'completed'
+        }
+      });
+    } else {
+      // Create new score
+      resumeScore = await prisma.resumeScore.create({
+        data: {
+          candidateId,
+          evaluatorId,
+          assignedGroupId,
+          overallScore,
+          scoreOne,
+          scoreTwo,
+          scoreThree,
+          notes,
+          status: 'completed'
+        }
+      });
+    }
+
+    res.json(resumeScore);
+  } catch (error) {
+    console.error('Error saving resume score:', error);
+    res.status(500).json({ error: 'Failed to save resume score' });
+  }
+});
+
+// Get resume score for a candidate (for current evaluator)
+router.get('/resume-score/:candidateId', requireAuth, async (req, res) => {
+  try {
+    const { candidateId } = req.params;
+    const evaluatorId = req.user.id;
+
+    const resumeScore = await prisma.resumeScore.findFirst({
+      where: { candidateId, evaluatorId }
+    });
+
+    res.json(resumeScore || null);
+  } catch (error) {
+    console.error('Error fetching resume score:', error);
+    res.status(500).json({ error: 'Failed to fetch resume score' });
+  }
+});
+
+// Get all resume scores for a candidate
+router.get('/resume-scores/:candidateId', requireAuth, async (req, res) => {
+  try {
+    const { candidateId } = req.params;
+
+    const resumeScores = await prisma.resumeScore.findMany({
+      where: { candidateId },
+      include: {
+        evaluator: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    res.json(resumeScores);
+  } catch (error) {
+    console.error('Error fetching resume scores:', error);
+    res.status(500).json({ error: 'Failed to fetch resume scores' });
   }
 });
 
