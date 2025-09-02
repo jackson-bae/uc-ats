@@ -195,3 +195,4 @@ Error sending RSVP confirmation email: SMTP connection failed
 3. Verify environment variables are set correctly
 4. Test with a known valid candidate email
 
+

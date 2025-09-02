@@ -15,8 +15,11 @@ import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
 import MemberDashboard from './pages/MemberDashboard';
 import DocumentGrading from './pages/DocumentGrading';
+import AdminDocumentGrading from './pages/AdminDocumentGrading';
 import AssignedInterviews from './pages/AssignedInterviews';
+import AdminAssignedInterviews from './pages/AdminAssignedInterviews';
 import Candidates from './pages/Candidates';
+import Staging from './pages/Staging';
 import RecruitmentResources from './pages/RecruitmentResources';
 import CandidateDashboard from './pages/CandidateDashboard';
 import ReviewTeams from './pages/ReviewTeams';
@@ -133,6 +136,16 @@ const AppRoutes = () => {
         }
       />
       
+      {/* Admin-specific routes */}
+      <Route
+        path="/admin-document-grading"
+        element={
+          <ProtectedRoute>
+            <AdminDocumentGrading />
+          </ProtectedRoute>
+        }
+      />
+      
       <Route
         path="/assigned-interviews"
         element={
@@ -147,6 +160,15 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute>
             <Candidates />
+          </ProtectedRoute>
+        }
+      />
+      
+      <Route
+        path="/staging"
+        element={
+          <ProtectedRoute>
+            <Staging />
           </ProtectedRoute>
         }
       />
@@ -174,6 +196,15 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute>
             <InterviewDetail />
+          </ProtectedRoute>
+        }
+      />
+      
+      <Route
+        path="/admin/assigned-interviews"
+        element={
+          <ProtectedRoute>
+            <AdminAssignedInterviews />
           </ProtectedRoute>
         }
       />
