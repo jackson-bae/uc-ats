@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import {
   DndContext,
   closestCenter,
@@ -180,6 +181,7 @@ function DraggableApplication({ application, teamId, onRemove, onClick, isDraggi
 }
 
 export default function ReviewTeams() {
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [teams, setTeams] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -230,8 +232,10 @@ export default function ReviewTeams() {
     };
   };
 
-    // Load data from API
+  // Load data from API
   useEffect(() => {
+    if (!user) return; // Don't load data if user is not authenticated
+    
     const loadData = async () => {
       try {
         setLoading(true);
@@ -259,7 +263,7 @@ export default function ReviewTeams() {
     };
 
     loadData();
-  }, []);
+  }, [user]);
 
   const handleCreateTeam = async () => {
     if (newTeamData.name.trim()) {
@@ -519,6 +523,21 @@ export default function ReviewTeams() {
       setLoading(false);
     }
   };
+
+  if (!user) {
+    return (
+      <Box>
+        <Paper sx={{ p: 4, textAlign: 'center' }}>
+          <Typography variant="h4" gutterBottom>
+            Authentication Required
+          </Typography>
+          <Typography variant="body1" color="text.secondary">
+            Please log in to view review teams.
+          </Typography>
+        </Paper>
+      </Box>
+    );
+  }
 
   if (loading) {
     return (

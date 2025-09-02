@@ -43,6 +43,10 @@ export default function ApplicationDetail() {
   const [commentError, setCommentError] = useState('');
   const [preview, setPreview] = useState({ open: false, src: '', kind: 'pdf', title: '' });
 
+  // Event attendance
+  const [eventData, setEventData] = useState({ events: [], totalPoints: 0 });
+  const [eventLoading, setEventLoading] = useState(true);
+
   const resetGrades = async () => {
     try {
       // Fetch the most recent grades for this application and user
@@ -136,12 +140,29 @@ export default function ApplicationDetail() {
     }
   };
 
-  const fetchResumeScores = async () => {
+  const fetchResumeScores = async (candidateId) => {
     try {
-      const scores = await apiClient.get(`/review-teams/resume-scores/${application?.candidateId}`);
+      if (!candidateId) {
+        console.log('No candidateId provided for fetchResumeScores');
+        return;
+      }
+      const scores = await apiClient.get(`/review-teams/resume-scores/${candidateId}`);
       setResumeScores(scores);
+      console.log('Fetched resume scores:', scores);
     } catch (e) {
       console.error('Error fetching resume scores:', e);
+    }
+  };
+
+  const fetchEventData = async () => {
+    try {
+      const data = await apiClient.get(`/applications/${id}/events`);
+      setEventData(data);
+      console.log('Fetched event data:', data);
+    } catch (e) {
+      console.error('Error fetching event data:', e);
+    } finally {
+      setEventLoading(false);
     }
   };
 
@@ -217,7 +238,10 @@ export default function ApplicationDetail() {
         await fetchComments();
         
         // Load resume scores
-        await fetchResumeScores();
+        await fetchResumeScores(appData.candidateId);
+        
+        // Load event data
+        await fetchEventData();
         
       } catch (err) {
         console.error('Error loading data:', err);
@@ -287,7 +311,7 @@ export default function ApplicationDetail() {
                   <span className="average-grade-label">Resume</span>
                   <div>
                     <span className="average-grade-value">{averageGrades.resume.toFixed(1)}</span>
-                    <span className="average-grade-total">/ 10</span>
+                    <span className="average-grade-total">/ 30</span>
                   </div>
                 </div>
                 
@@ -318,6 +342,17 @@ export default function ApplicationDetail() {
                       from {averageGrades.count} {averageGrades.count === 1 ? 'review' : 'reviews'}
                     </div>
                   )}
+                </div>
+                
+                <div className="average-grade" style={{ backgroundColor: '#f0f9ff', borderColor: '#bae6fd' }}>
+                  <span className="average-grade-label">Event Points</span>
+                  <div>
+                    <span className="average-grade-value" style={{ color: '#0369a1' }}>{eventData.totalPoints}</span>
+                    <span className="average-grade-total">pts</span>
+                  </div>
+                  <div className="average-grade-count">
+                    {eventData.events.filter(e => e.attendanceStatus === 'Attended').length} attended
+                  </div>
                 </div>
               </div>
             </div>
@@ -486,6 +521,67 @@ export default function ApplicationDetail() {
               )}
             </div>
           </div>
+
+          {/* Event Attendance */}
+          <div className="info-section">
+            <h2 className="section-title">Event Attendance</h2>
+            {eventLoading ? (
+              <div className="empty-state">Loading event data...</div>
+            ) : eventData.events.length === 0 ? (
+              <div className="empty-state">No events found for this cycle.</div>
+            ) : (
+              <div>
+                <div className="event-summary">
+                  <div style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center' 
+                  }}>
+                    <span style={{ fontWeight: '600', color: '#0369a1' }}>
+                      Total Event Points: {eventData.totalPoints}
+                    </span>
+                    <span style={{ fontSize: '0.875rem', color: '#0369a1' }}>
+                      {eventData.events.filter(e => e.attendanceStatus === 'Attended').length} of {eventData.events.length} events attended
+                    </span>
+                  </div>
+                </div>
+                
+                <div className="events-list">
+                  {eventData.events.map((event) => (
+                    <div 
+                      key={event.id} 
+                      className="event-item"
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                        <div style={{ flex: 1 }}>
+                          <div className="event-name">
+                            {event.eventName}
+                          </div>
+                          <div className="event-details">
+                            {new Date(event.eventStartDate).toLocaleDateString()} • {event.eventLocation || 'Location TBD'}
+                          </div>
+                        </div>
+                        <div style={{ textAlign: 'right', marginLeft: '16px' }}>
+                          <div className={`event-points ${event.points === 0 ? 'no-points' : ''}`}>
+                            {event.points} pts
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="event-status-badges">
+                        <div className={`status-badge ${event.rsvpStatus === 'RSVPed' ? 'rsvped' : 'not-rsvped'}`}>
+                          {event.rsvpStatus}
+                        </div>
+                        <div className={`status-badge ${event.attendanceStatus === 'Attended' ? 'attended' : 'not-attended'}`}>
+                          {event.attendanceStatus}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Right column - Photo */}
@@ -512,7 +608,7 @@ export default function ApplicationDetail() {
               <div className="grading-item">
                 <div className="grading-header">
                   <label className="grading-label">Resume</label>
-                  <span className="grade-value">{resumeGrade}/10</span>
+                  <span className="grade-value">{resumeGrade}/30</span>
                   <button 
                     className={`na-button ${isNa.resume ? 'active' : ''}`}
                     onClick={() => toggleNa('resume')}
@@ -525,14 +621,14 @@ export default function ApplicationDetail() {
                   <input
                     type="range"
                     min="1"
-                    max="10"
+                    max="30"
                     value={isNa.resume ? 0 : resumeGrade}
                     onChange={(e) => setResumeGrade(parseInt(e.target.value))}
                     className="grade-slider"
                     disabled={isNa.resume}
                   />
                   <div className="slider-ticks">
-                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((tick) => (
+                    {[5, 10, 15, 20, 25, 30].map((tick) => (
                       <span key={tick} className="tick"></span>
                     ))}
                   </div>
@@ -620,8 +716,8 @@ export default function ApplicationDetail() {
                     }
 
                     // Validate individual grades that are not N/A
-                    if (!isNa.resume && (resumeGrade < 1 || resumeGrade > 10)) {
-                      setSaveStatus({ type: 'error', message: 'Resume grade must be between 1 and 10' });
+                    if (!isNa.resume && (resumeGrade < 1 || resumeGrade > 30)) {
+                      setSaveStatus({ type: 'error', message: 'Resume grade must be between 1 and 30' });
                       return;
                     }
                     if (!isNa.video && (videoGrade < 1 || videoGrade > 10)) {

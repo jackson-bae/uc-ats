@@ -73,6 +73,8 @@ const UserManagement = () => {
     console.log('UserManagement: user?.role =', user?.role);
     if (user?.role === 'ADMIN') {
       fetchUsers();
+    } else if (user && user.role !== 'ADMIN') {
+      setLoading(false); // Stop loading if user is not admin
     }
   }, [user]);
 
@@ -81,7 +83,7 @@ const UserManagement = () => {
       setLoading(true);
       console.log('Fetching users...');
       console.log('API client token:', apiClient.token);
-      const response = await apiClient.get('/users');
+      const response = await apiClient.get('/admin/users');
       console.log('Fetched users:', response);
       setUsers(response);
     } catch (err) {
@@ -95,7 +97,7 @@ const UserManagement = () => {
   const handleCreateUser = async (e) => {
     e.preventDefault();
     try {
-      await apiClient.post('/users', createForm);
+      await apiClient.post('/admin/users', createForm);
       setShowCreateModal(false);
       setCreateForm({
         email: '',
@@ -114,7 +116,7 @@ const UserManagement = () => {
   const handleUpdateUser = async (e) => {
     e.preventDefault();
     try {
-      await apiClient.patch(`/users/${selectedUser.id}`, editForm);
+      await apiClient.patch(`/admin/users/${selectedUser.id}`, editForm);
       setShowEditModal(false);
       setSelectedUser(null);
       fetchUsers();
@@ -126,7 +128,7 @@ const UserManagement = () => {
 
   const handleUpdateRole = async (userId, newRole) => {
     try {
-      await apiClient.patch(`/users/${userId}/role`, { role: newRole });
+      await apiClient.patch(`/admin/users/${userId}/role`, { role: newRole });
       fetchUsers();
     } catch (err) {
       setError('Failed to update user role');
@@ -142,7 +144,7 @@ const UserManagement = () => {
     formData.append('profileImage', imageFile);
 
     try {
-      const response = await apiClient.post(`/users/${selectedUser.id}/profile-image`, formData);
+      const response = await apiClient.post(`/admin/users/${selectedUser.id}/profile-image`, formData);
       console.log('Upload response:', response);
       setShowImageModal(false);
       setSelectedUser(null);
@@ -439,7 +441,7 @@ const UserManagement = () => {
                       <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                         <Typography variant="body2" color="text.secondary">Activity:</Typography>
                         <Typography variant="body2">
-                          {user._count.comments} comments, {user._count.evaluations} evaluations
+                          {user._count?.comments || 0} comments, {user._count?.evaluations || 0} evaluations
                         </Typography>
                       </Box>
                     </Stack>

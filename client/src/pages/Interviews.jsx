@@ -179,13 +179,22 @@ export default function Interviews() {
     <Box>
       <Stack direction="row" alignItems="center" justifyContent="space-between" mb={3}>
         <Typography variant="h4">Interviews</Typography>
-        <Button 
-          variant="contained" 
-          startIcon={<PlusIcon style={{ width: '1.25rem', height: '1.25rem' }} />}
-          onClick={() => setCreateOpen(true)}
-        >
-          New Interview
-        </Button>
+        <Stack direction="row" spacing={2}>
+          <Button
+            variant="outlined"
+            startIcon={<UserGroupIcon />}
+            onClick={() => navigate('/admin/assigned-interviews')}
+          >
+            View Assigned Interviews
+          </Button>
+          <Button 
+            variant="contained" 
+            startIcon={<PlusIcon style={{ width: '1.25rem', height: '1.25rem' }} />}
+            onClick={() => setCreateOpen(true)}
+          >
+            New Interview
+          </Button>
+        </Stack>
       </Stack>
 
       {error && (

@@ -1,0 +1,442 @@
+/* Staging Page Styles */
+.staging-page {
+  background-color: #ffffff;
+  min-height: 100vh;
+  padding: 1.5rem;
+  font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  font-weight: 300;
+}
+
+.staging-page h1,
+.staging-page h2,
+.staging-page h3,
+.staging-page h4,
+.staging-page h5,
+.staging-page h6 {
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 700;
+  color: #042742;
+}
+
+/* Ensure Material-UI components use proper fonts */
+.MuiButton-root {
+  font-family: 'Montserrat', sans-serif !important;
+  font-weight: 400 !important;
+}
+
+.MuiTypography-h1,
+.MuiTypography-h2,
+.MuiTypography-h3,
+.MuiTypography-h4,
+.MuiTypography-h5,
+.MuiTypography-h6 {
+  font-family: 'Montserrat', sans-serif !important;
+  font-weight: 700 !important;
+  color: #042742 !important;
+}
+
+.MuiTypography-body1,
+.MuiTypography-body2 {
+  font-family: 'Montserrat', sans-serif !important;
+  font-weight: 300 !important;
+}
+
+.MuiTableCell-head {
+  font-family: 'Montserrat', sans-serif !important;
+  font-weight: 700 !important;
+  color: #042742 !important;
+  background-color: #f8fafc !important;
+}
+
+.MuiTableCell-body {
+  font-family: 'Montserrat', sans-serif !important;
+  font-weight: 300 !important;
+}
+
+/* Card styling */
+.MuiCard-root {
+  border-radius: 12px !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+  transition: box-shadow 0.3s ease-in-out !important;
+}
+
+.MuiCard-root:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* Table styling */
+.MuiTableContainer-root {
+  border-radius: 8px !important;
+  overflow: hidden !important;
+}
+
+.MuiTable-root {
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+}
+
+.MuiTableRow-root:hover {
+  background-color: #f8fafc !important;
+}
+
+/* Chip styling */
+.MuiChip-root {
+  font-family: 'Montserrat', sans-serif !important;
+  font-weight: 500 !important;
+  border-radius: 16px !important;
+}
+
+/* Button styling */
+.MuiButton-root {
+  border-radius: 8px !important;
+  text-transform: none !important;
+  font-weight: 600 !important;
+  transition: all 0.3s ease-in-out !important;
+}
+
+.MuiButton-contained {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+}
+
+.MuiButton-contained:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* Dialog styling */
+.MuiDialog-paper {
+  border-radius: 12px !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15) !important;
+}
+
+.MuiDialogTitle-root {
+  font-family: 'Montserrat', sans-serif !important;
+  font-weight: 700 !important;
+  color: #042742 !important;
+}
+
+/* Form control styling */
+.MuiFormControl-root {
+  font-family: 'Montserrat', sans-serif !important;
+}
+
+.MuiInputLabel-root {
+  font-family: 'Montserrat', sans-serif !important;
+  font-weight: 500 !important;
+}
+
+.MuiSelect-select {
+  font-family: 'Montserrat', sans-serif !important;
+  font-weight: 400 !important;
+}
+
+.MuiMenuItem-root {
+  font-family: 'Montserrat', sans-serif !important;
+  font-weight: 400 !important;
+}
+
+/* Text field styling */
+.MuiTextField-root .MuiInputBase-root {
+  font-family: 'Montserrat', sans-serif !important;
+  font-weight: 400 !important;
+}
+
+/* Icon button styling */
+.MuiIconButton-root {
+  transition: all 0.3s ease-in-out !important;
+}
+
+.MuiIconButton-root:hover {
+  transform: scale(1.1) !important;
+}
+
+/* Status indicators */
+.status-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-submitted {
+  background-color: #e3f2fd;
+  color: #1976d2;
+}
+
+.status-under-review {
+  background-color: #fff3e0;
+  color: #f57c00;
+}
+
+.status-accepted {
+  background-color: #e8f5e8;
+  color: #388e3c;
+}
+
+.status-rejected {
+  background-color: #ffebee;
+  color: #d32f2f;
+}
+
+.status-waitlisted {
+  background-color: #fff8e1;
+  color: #f57f17;
+}
+
+/* Score display */
+.score-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.score-bar {
+  width: 40px;
+  height: 8px;
+  background-color: #e0e0e0;
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
+
+.score-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.score-excellent {
+  background-color: #4caf50;
+}
+
+.score-good {
+  background-color: #ff9800;
+}
+
+.score-poor {
+  background-color: #f44336;
+}
+
+/* Attendance display */
+.attendance-display {
+  display: flex;
+  gap: 4px;
+}
+
+.attendance-checkbox {
+  padding: 2px;
+}
+
+/* Decision chips */
+.decision-chip {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .staging-page {
+    padding: 1rem;
+  }
+  
+  .MuiTableContainer-root {
+    overflow-x: auto;
+  }
+  
+  .MuiTableCell-root {
+    padding: 8px 4px;
+    font-size: 0.75rem;
+  }
+}
+
+/* Loading states */
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+}
+
+/* Filter section */
+.filter-section {
+  background-color: #f8fafc;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 24px;
+}
+
+/* Interview round progress */
+.round-progress {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.round-card {
+  padding: 16px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.round-card.active {
+  border-color: #1976d2;
+  background-color: #e3f2fd;
+}
+
+.round-card.completed {
+  border-color: #4caf50;
+  background-color: #e8f5e8;
+}
+
+.round-card.pending {
+  border-color: #e0e0e0;
+  background-color: #fafafa;
+}
+
+/* Candidate table enhancements */
+.candidate-row {
+  transition: background-color 0.3s ease;
+}
+
+.candidate-row:hover {
+  background-color: #f8fafc;
+}
+
+.candidate-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.candidate-name {
+  font-weight: 600;
+  color: #042742;
+}
+
+.candidate-details {
+  font-size: 0.75rem;
+  color: #666;
+}
+
+.candidate-tags {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+/* Action buttons */
+.action-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.action-button {
+  min-width: 32px;
+  height: 32px;
+}
+
+/* Dialog enhancements */
+.decision-dialog .MuiDialogContent-root {
+  padding: 24px;
+}
+
+.decision-options {
+  display: grid;
+  gap: 12px;
+}
+
+.decision-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.decision-option:hover {
+  border-color: #1976d2;
+  background-color: #f8fafc;
+}
+
+.decision-option.selected {
+  border-color: #1976d2;
+  background-color: #e3f2fd;
+}
+
+/* Snackbar styling */
+.MuiSnackbar-root {
+  z-index: 1400;
+}
+
+.MuiAlert-root {
+  font-family: 'Montserrat', sans-serif !important;
+  font-weight: 500 !important;
+  border-radius: 8px !important;
+}
+
+/* Tooltip styling */
+.MuiTooltip-tooltip {
+  font-family: 'Montserrat', sans-serif !important;
+  font-weight: 500 !important;
+  font-size: 0.75rem !important;
+  background-color: #333 !important;
+  border-radius: 6px !important;
+}
+
+/* Accordion styling */
+.MuiAccordion-root {
+  border-radius: 8px !important;
+  margin-bottom: 8px !important;
+}
+
+.MuiAccordionSummary-root {
+  font-family: 'Montserrat', sans-serif !important;
+  font-weight: 600 !important;
+}
+
+/* List styling */
+.MuiList-root {
+  font-family: 'Montserrat', sans-serif !important;
+}
+
+.MuiListItem-root {
+  font-weight: 400 !important;
+}
+
+/* Checkbox styling */
+.MuiCheckbox-root {
+  color: #1976d2 !important;
+}
+
+.MuiCheckbox-root.Mui-checked {
+  color: #4caf50 !important;
+}
+
+/* Switch styling */
+.MuiSwitch-root {
+  font-family: 'Montserrat', sans-serif !important;
+}
+
+/* Tabs styling */
+.MuiTabs-root {
+  font-family: 'Montserrat', sans-serif !important;
+}
+
+.MuiTab-root {
+  font-family: 'Montserrat', sans-serif !important;
+  font-weight: 600 !important;
+  text-transform: none !important;
+}

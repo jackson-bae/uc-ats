@@ -36,14 +36,18 @@ const Layout = ({ children }) => {
       { name: 'Events', href: '/events', icon: CalendarDaysIcon },
       { name: 'Assigned Interviews', href: '/assigned-interviews', icon: UserGroupIcon2 },
       { name: 'Candidates', href: '/candidates', icon: UserGroupIcon },
+      { name: 'Staging', href: '/staging', icon: UserGroupIcon },
       { name: 'Recruitment Resources and Timeline', href: '/recruitment-resources', icon: ClipboardDocumentListIcon },
     ] : user?.role === 'ADMIN' ? [
       { name: 'Applications', href: '/application-list', icon: DocumentTextIcon },
+      { name: 'Document Grading', href: '/admin-document-grading', icon: DocumentTextIcon },
       { name: 'Review Teams', href: '/review-teams', icon: UserGroupIcon },
       { name: 'Cycle Management', href: '/cycles', icon: ClipboardDocumentListIcon },
       { name: 'Interviews', href: '/interviews', icon: UserGroupIcon2 },
+      { name: 'Assigned Interviews', href: '/admin/assigned-interviews', icon: UserGroupIcon2 },
       { name: 'Interview Prep', href: '/interview-prep', icon: ClipboardDocumentListIcon },
       { name: 'Event Management', href: '/events', icon: CalendarDaysIcon },
+      { name: 'Staging', href: '/staging', icon: UserGroupIcon },
       { name: 'User Management', href: '/user-management', icon: UserIcon },
     ] : [
       { name: 'Applications', href: '/application-list', icon: DocumentTextIcon },

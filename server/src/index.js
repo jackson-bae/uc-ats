@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import cron from 'node-cron';
 import config from './config.js';
+import prisma from './prismaClient.js';
 import syncFormResponses from './services/syncResponses.js';
 import applicationsRoutes from './routes/applications.js';
 import filesRoutes from './routes/files.js';
@@ -59,12 +60,33 @@ app.get('/api/test-uploads', (req, res) => {
   }
 });
 
+// Health check endpoint to test database connection
+app.get('/api/health', async (req, res) => {
+  try {
+    // Test database connection
+    await prisma.$queryRaw`SELECT 1`;
+    res.json({ 
+      status: 'healthy',
+      database: 'connected',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Health check failed:', error);
+    res.status(500).json({ 
+      status: 'unhealthy',
+      database: 'disconnected',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // Temporarily disable sync to test auth
-await syncFormResponses();
- cron.schedule('*/5 * * * *', () => {
-   console.log('Running scheduled response sync...');
- syncFormResponses();
- });
+// await syncFormResponses();
+// cron.schedule('*/5 * * * *', () => {
+//   console.log('Running scheduled response sync...');
+//   syncFormResponses();
+// });
 
 app.listen(config.port, () => {
   console.log(`Server running on port ${config.port}`);

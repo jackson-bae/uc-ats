@@ -213,6 +213,187 @@ router.get('/:id/comments', async (req, res) => {
   }
 });
 
+// Get latest grades for an application and user (for the old grading system compatibility)
+router.get('/:id/grades/latest', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    // Get the application to find the candidate ID
+    const application = await prisma.application.findUnique({
+      where: { id },
+      select: { candidateId: true }
+    });
+
+    if (!application || !application.candidateId) {
+      return res.status(404).json({ error: 'Application not found or not linked to a candidate' });
+    }
+
+    // Get the latest resume score for this candidate and user
+    const resumeScore = await prisma.resumeScore.findFirst({
+      where: {
+        candidateId: application.candidateId,
+        evaluatorId: userId
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    if (!resumeScore) {
+      return res.status(404).json({ error: 'No grades found for this application and user' });
+    }
+
+    // Convert to the old format for compatibility
+    // Resume is the sum of all three scores (0-30), video and cover letter are separate 0-10 scores
+    res.json({
+      resume: (resumeScore.scoreOne || 0) + (resumeScore.scoreTwo || 0) + (resumeScore.scoreThree || 0), // Sum of all three categories
+      video: resumeScore.scoreTwo, // Using scoreTwo as video for compatibility
+      cover_letter: resumeScore.scoreThree, // Using scoreThree as cover letter for compatibility
+      createdAt: resumeScore.createdAt
+    });
+  } catch (error) {
+    console.error('Error fetching latest grades:', error);
+    res.status(500).json({ error: 'Failed to fetch latest grades' });
+  }
+});
+
+// Get average grades for an application (for the old grading system compatibility)
+router.get('/:id/grades/average', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Get the application to find the candidate ID
+    const application = await prisma.application.findUnique({
+      where: { id },
+      select: { candidateId: true }
+    });
+
+    if (!application || !application.candidateId) {
+      return res.status(404).json({ 
+        error: 'Application not found or not linked to a candidate',
+        averages: {
+          resume: 0,
+          video: 0,
+          cover_letter: 0,
+          total: 0,
+          count: 0
+        }
+      });
+    }
+
+    // Get all resume scores for this candidate
+    const resumeScores = await prisma.resumeScore.findMany({
+      where: { candidateId: application.candidateId }
+    });
+
+    if (resumeScores.length === 0) {
+      return res.status(404).json({ 
+        error: 'No grades found for this application',
+        averages: {
+          resume: 0,
+          video: 0,
+          cover_letter: 0,
+          total: 0,
+          count: 0
+        }
+      });
+    }
+
+    // Calculate averages from resume scores
+    const validScores = resumeScores.filter(score => score.overallScore !== null);
+    
+    // Resume is sum of all three categories (0-30), video and cover letter are separate (0-10)
+    const avgResume = validScores.length > 0 ? 
+      (validScores.reduce((sum, score) => {
+        const totalResume = (parseFloat(score.scoreOne || 0) + parseFloat(score.scoreTwo || 0) + parseFloat(score.scoreThree || 0));
+        return sum + totalResume;
+      }, 0) / validScores.length).toFixed(1) : 0;
+    
+    const avgVideo = validScores.length > 0 ? 
+      (validScores.reduce((sum, score) => sum + parseFloat(score.scoreTwo || 0), 0) / validScores.length).toFixed(1) : 0;
+    
+    const avgCoverLetter = validScores.length > 0 ? 
+      (validScores.reduce((sum, score) => sum + parseFloat(score.scoreThree || 0), 0) / validScores.length).toFixed(1) : 0;
+    
+    const avgTotal = validScores.length > 0 ? 
+      (validScores.reduce((sum, score) => sum + parseFloat(score.overallScore || 0), 0) / validScores.length).toFixed(1) : 0;
+
+    res.json({
+      resume: parseFloat(avgResume),
+      video: parseFloat(avgVideo),
+      cover_letter: parseFloat(avgCoverLetter),
+      total: parseFloat(avgTotal),
+      count: validScores.length
+    });
+  } catch (error) {
+    console.error('Error fetching average grades:', error);
+    res.status(500).json({ error: 'Failed to fetch average grades' });
+  }
+});
+
+// Save grades for an application (for the old grading system compatibility)
+router.post('/:id/grades', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+    const { resume_grade, video_grade, cover_letter_grade } = req.body;
+
+    // Get the application to find the candidate ID
+    const application = await prisma.application.findUnique({
+      where: { id },
+      select: { candidateId: true }
+    });
+
+    if (!application || !application.candidateId) {
+      return res.status(404).json({ error: 'Application not found or not linked to a candidate' });
+    }
+
+    // Check if a score already exists for this candidate and user
+    const existingScore = await prisma.resumeScore.findFirst({
+      where: {
+        candidateId: application.candidateId,
+        evaluatorId: userId
+      }
+    });
+
+    // Calculate overall score
+    const scores = [resume_grade, video_grade, cover_letter_grade].filter(score => score !== null && score !== undefined);
+    const overallScore = scores.length > 0 ? scores.reduce((sum, score) => sum + score, 0) / scores.length : 0;
+
+    let resumeScore;
+    if (existingScore) {
+      // Update existing score
+      resumeScore = await prisma.resumeScore.update({
+        where: { id: existingScore.id },
+        data: {
+          overallScore,
+          scoreOne: resume_grade,
+          scoreTwo: video_grade,
+          scoreThree: cover_letter_grade,
+          status: 'completed'
+        }
+      });
+    } else {
+      // Create new score
+      resumeScore = await prisma.resumeScore.create({
+        data: {
+          candidateId: application.candidateId,
+          evaluatorId: userId,
+          overallScore,
+          scoreOne: resume_grade,
+          scoreTwo: video_grade,
+          scoreThree: cover_letter_grade,
+          status: 'completed'
+        }
+      });
+    }
+
+    res.json(resumeScore);
+  } catch (error) {
+    console.error('Error saving grades:', error);
+    res.status(500).json({ error: 'Failed to save grades' });
+  }
+});
+
 // Comments: add to an application
 router.post('/:id/comments', async (req, res) => {
   try {
@@ -606,6 +787,96 @@ router.get('/candidate/:candidateId/latest', requireAuth, async (req, res) => {
     console.error('Error fetching latest application for candidate:', error);
     res.status(500).json({ 
       error: 'Failed to fetch latest application for candidate',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Get events and attendance for a specific application's cycle
+router.get('/:id/events', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Get the application with cycle information
+    const application = await prisma.application.findUnique({
+      where: { id },
+      select: {
+        cycleId: true,
+        candidateId: true,
+        cycle: {
+          select: {
+            id: true,
+            isActive: true
+          }
+        }
+      }
+    });
+
+    if (!application) {
+      return res.status(404).json({ error: 'Application not found' });
+    }
+
+    if (!application.cycleId) {
+      return res.json({ events: [], totalPoints: 0 });
+    }
+
+    // Get all events for this cycle
+    const events = await prisma.events.findMany({
+      where: { cycleId: application.cycleId },
+      orderBy: { eventStartDate: 'asc' },
+      select: {
+        id: true,
+        eventName: true,
+        eventStartDate: true,
+        eventEndDate: true,
+        eventLocation: true
+      }
+    });
+
+    // Get RSVP and attendance status for the candidate
+    const candidateId = application.candidateId;
+    if (!candidateId) {
+      return res.json({ events: [], totalPoints: 0 });
+    }
+
+    const eventsWithStatus = await Promise.all(
+      events.map(async (event) => {
+        // Check RSVP status
+        const rsvp = await prisma.eventRsvp.findFirst({
+          where: {
+            eventId: event.id,
+            candidateId: candidateId
+          }
+        });
+
+        // Check attendance status
+        const attendance = await prisma.eventAttendance.findFirst({
+          where: {
+            eventId: event.id,
+            candidateId: candidateId
+          }
+        });
+
+        return {
+          ...event,
+          rsvpStatus: rsvp ? 'RSVPed' : 'Not RSVPed',
+          attendanceStatus: attendance ? 'Attended' : 'Not Attended',
+          points: attendance ? 5 : 0
+        };
+      })
+    );
+
+    const totalPoints = eventsWithStatus.reduce((sum, event) => sum + event.points, 0);
+
+    res.json({
+      events: eventsWithStatus,
+      totalPoints
+    });
+
+  } catch (error) {
+    console.error('Error fetching events for application:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch events for application',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }

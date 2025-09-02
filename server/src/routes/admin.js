@@ -17,9 +17,11 @@ router.get('/stats', async (req, res) => {
       return res.json({ totalApplicants: 0, tasks: 0, candidates: 0, currentRound: 'SUBMITTED' });
     }
 
-    const [totalApplicants, totalGrades, candidates] = await Promise.all([
+    const [totalApplicants, resumeGrades, coverLetterGrades, videoGrades, candidates] = await Promise.all([
       prisma.application.count({ where: { cycleId: active.id } }),
-      prisma.grade.count(), // grades are not linked to cycles; consider linking in future
+      prisma.resumeScore.count(),
+      prisma.coverLetterScore.count(),
+      prisma.videoScore.count(),
       prisma.application.findMany({
         where: {
           cycleId: active.id,
@@ -27,6 +29,8 @@ router.get('/stats', async (req, res) => {
         }
       })
     ]);
+
+    const totalGrades = resumeGrades + coverLetterGrades + videoGrades;
 
     const statusCounts = candidates.reduce((acc, candidate) => {
       acc[candidate.status] = (acc[candidate.status] || 0) + 1;
@@ -1002,6 +1006,163 @@ router.post('/interviews/:id/evaluations', async (req, res) => {
   }
 });
 
+// Get all applications for admin document grading
+router.get('/applications', async (req, res) => {
+  try {
+    // Get the active cycle first
+    const activeCycle = await prisma.recruitingCycle.findFirst({ 
+      where: { isActive: true } 
+    });
+    
+    if (!activeCycle) {
+      return res.json([]);
+    }
+
+    // Get all candidates with their latest applications
+    const candidates = await prisma.candidate.findMany({
+      include: {
+        applications: {
+          where: {
+            cycleId: activeCycle.id
+          },
+          orderBy: {
+            submittedAt: 'desc'
+          },
+          take: 1
+        }
+      }
+    });
+
+    // Get all groups and their members for the active cycle
+    const groups = await prisma.groups.findMany({
+      where: {
+        cycleId: activeCycle.id
+      },
+      select: {
+        id: true,
+        memberOne: true,
+        memberTwo: true,
+        memberThree: true
+      }
+    });
+
+    // Get all grading records for these candidates
+    const resumeScores = await prisma.resumeScore.findMany({
+      where: {
+        candidateId: {
+          in: candidates.map(c => c.id)
+        }
+      },
+      select: {
+        candidateId: true,
+        evaluatorId: true,
+        assignedGroupId: true
+      }
+    });
+
+    const coverLetterScores = await prisma.coverLetterScore.findMany({
+      where: {
+        candidateId: {
+          in: candidates.map(c => c.id)
+        }
+      },
+      select: {
+        candidateId: true,
+        evaluatorId: true,
+        assignedGroupId: true
+      }
+    });
+
+    const videoScores = await prisma.videoScore.findMany({
+      where: {
+        candidateId: {
+          in: candidates.map(c => c.id)
+        }
+      },
+      select: {
+        candidateId: true,
+        evaluatorId: true,
+        assignedGroupId: true
+      }
+    });
+
+    // Helper function to check team completion and get missing grades count
+    const checkTeamCompletion = (candidateId, groupId, scores, scoreType) => {
+      if (!groupId) return { completed: false, missingGrades: 0, totalMembers: 0 };
+      
+      const group = groups.find(g => g.id === groupId);
+      if (!group) return { completed: false, missingGrades: 0, totalMembers: 0 };
+      
+      // Get all assigned team members (filter out null/undefined)
+      const teamMembers = [group.memberOne, group.memberTwo, group.memberThree].filter(Boolean);
+      if (teamMembers.length === 0) return { completed: false, missingGrades: 0, totalMembers: 0 };
+      
+      // Get scores for this candidate and group
+      const candidateScores = scores.filter(score => 
+        score.candidateId === candidateId && score.assignedGroupId === groupId
+      );
+      
+      // Check if all team members have completed their scores
+      const completedEvaluators = candidateScores.map(score => score.evaluatorId);
+      const allMembersCompleted = teamMembers.every(memberId => 
+        completedEvaluators.includes(memberId)
+      );
+      
+      const missingGrades = teamMembers.length - completedEvaluators.length;
+      
+      return {
+        completed: allMembersCompleted,
+        missingGrades,
+        totalMembers: teamMembers.length
+      };
+    };
+
+    // Transform the data
+    const applications = [];
+    
+    candidates.forEach(candidate => {
+      const latestApplication = candidate.applications[0];
+      if (latestApplication) {
+        const resumeStatus = checkTeamCompletion(candidate.id, candidate.assignedGroupId, resumeScores, 'resume');
+        const coverLetterStatus = checkTeamCompletion(candidate.id, candidate.assignedGroupId, coverLetterScores, 'coverLetter');
+        const videoStatus = checkTeamCompletion(candidate.id, candidate.assignedGroupId, videoScores, 'video');
+        
+        applications.push({
+          id: latestApplication.id,
+          candidateId: candidate.id,
+          name: `${latestApplication.firstName} ${latestApplication.lastName}`,
+          major: latestApplication.major1 || 'N/A',
+          year: latestApplication.graduationYear || 'N/A',
+          gpa: latestApplication.cumulativeGpa?.toString() || 'N/A',
+          status: latestApplication.status || 'SUBMITTED',
+          email: latestApplication.email,
+          submittedAt: latestApplication.submittedAt,
+          gender: latestApplication.gender || 'N/A',
+          isFirstGeneration: latestApplication.isFirstGeneration,
+          isTransferStudent: latestApplication.isTransferStudent,
+          resumeUrl: latestApplication.resumeUrl,
+          coverLetterUrl: latestApplication.coverLetterUrl,
+          videoUrl: latestApplication.videoUrl,
+          hasResumeScore: resumeStatus.completed,
+          hasCoverLetterScore: coverLetterStatus.completed,
+          hasVideoScore: videoStatus.completed,
+          resumeMissingGrades: resumeStatus.missingGrades,
+          coverLetterMissingGrades: coverLetterStatus.missingGrades,
+          videoMissingGrades: videoStatus.missingGrades,
+          resumeTotalMembers: resumeStatus.totalMembers,
+          coverLetterTotalMembers: coverLetterStatus.totalMembers,
+          videoTotalMembers: videoStatus.totalMembers
+        });
+      }
+    });
+
+    res.json(applications);
+  } catch (error) {
+    console.error('Error fetching admin applications:', error);
+    res.status(500).json({ error: 'Failed to fetch applications', details: error.message });
+  }
+});
+
 // Test email notifications endpoint
 router.post('/test-email-notifications', async (req, res) => {
   try {
@@ -1074,6 +1235,246 @@ router.post('/test-email-notifications', async (req, res) => {
   } catch (error) {
     console.error('[POST /api/admin/test-email-notifications]', error);
     res.status(500).json({ error: 'Failed to send test email notification' });
+  }
+});
+
+// Staging endpoints
+
+// Get staging candidates with comprehensive data
+router.get('/staging/candidates', async (req, res) => {
+  try {
+    const active = await prisma.recruitingCycle.findFirst({ where: { isActive: true } });
+    if (!active) {
+      return res.json([]);
+    }
+
+    const applications = await prisma.application.findMany({
+      where: { cycleId: active.id },
+      include: {
+        candidate: {
+          include: {
+            eventAttendance: {
+              include: {
+                event: true
+              }
+            },
+            eventRsvp: {
+              include: {
+                event: true
+              }
+            },
+            resumeScores: {
+              include: {
+                evaluator: {
+                  select: {
+                    fullName: true
+                  }
+                }
+              }
+            },
+            coverLetterScores: {
+              include: {
+                evaluator: {
+                  select: {
+                    fullName: true
+                  }
+                }
+              }
+            },
+            videoScores: {
+              include: {
+                evaluator: {
+                  select: {
+                    fullName: true
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      orderBy: { submittedAt: 'desc' }
+    });
+
+    const stagingCandidates = applications.map(app => {
+      // Calculate average scores
+      const resumeScores = app.candidate.resumeScores.map(s => s.overallScore);
+      const coverLetterScores = app.candidate.coverLetterScores.map(s => s.overallScore);
+      const videoScores = app.candidate.videoScores.map(s => s.overallScore);
+
+      const avgResume = resumeScores.length > 0 ? 
+        resumeScores.reduce((a, b) => a + b, 0) / resumeScores.length : 0;
+      const avgCoverLetter = coverLetterScores.length > 0 ? 
+        coverLetterScores.reduce((a, b) => a + b, 0) / coverLetterScores.length : 0;
+      const avgVideo = videoScores.length > 0 ? 
+        videoScores.reduce((a, b) => a + b, 0) / videoScores.length : 0;
+
+      const overallScore = [avgResume, avgCoverLetter, avgVideo]
+        .filter(score => score > 0)
+        .reduce((a, b) => a + b, 0) / 3;
+
+      // Build attendance object
+      const attendance = {};
+      app.candidate.eventAttendance.forEach(att => {
+        attendance[att.event.eventName] = true;
+      });
+
+      // Determine current round based on status
+      let currentRound = 1; // Resume Review
+      if (app.status === 'UNDER_REVIEW') currentRound = 2; // First Interview
+      else if (app.status === 'ACCEPTED') currentRound = 4; // Final Decision
+      else if (app.status === 'REJECTED') currentRound = 4; // Final Decision
+
+      return {
+        id: app.id,
+        candidateId: app.candidateId,
+        firstName: app.firstName,
+        lastName: app.lastName,
+        email: app.email,
+        studentId: app.studentId,
+        major: app.major1,
+        graduationYear: app.graduationYear,
+        cumulativeGpa: parseFloat(app.cumulativeGpa),
+        majorGpa: parseFloat(app.majorGpa),
+        status: app.status,
+        currentRound,
+        submittedAt: app.submittedAt,
+        isTransferStudent: app.isTransferStudent,
+        isFirstGeneration: app.isFirstGeneration,
+        gender: app.gender,
+        phoneNumber: app.phoneNumber,
+        attendance,
+        scores: {
+          resume: parseFloat(avgResume.toFixed(1)),
+          coverLetter: parseFloat(avgCoverLetter.toFixed(1)),
+          video: parseFloat(avgVideo.toFixed(1)),
+          overall: parseFloat(overallScore.toFixed(1))
+        },
+        decisions: {
+          resumeReview: app.status === 'SUBMITTED' ? null : 'ADVANCE',
+          firstInterview: app.status === 'UNDER_REVIEW' ? null : 
+                         app.status === 'ACCEPTED' || app.status === 'REJECTED' ? 'ADVANCE' : null,
+          secondInterview: app.status === 'ACCEPTED' || app.status === 'REJECTED' ? 'ADVANCE' : null,
+          final: app.status === 'ACCEPTED' ? 'ACCEPT' : 
+                 app.status === 'REJECTED' ? 'REJECT' : null
+        },
+        notes: ''
+      };
+    });
+
+    res.json(stagingCandidates);
+  } catch (error) {
+    console.error('[GET /api/admin/staging/candidates]', error);
+    res.status(500).json({ error: 'Failed to fetch staging candidates' });
+  }
+});
+
+// Update candidate status for staging
+router.patch('/staging/candidates/:id/status', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, notes } = req.body;
+
+    const application = await prisma.application.update({
+      where: { id },
+      data: { 
+        status,
+        approved: status === 'ACCEPTED' ? true : status === 'REJECTED' ? false : null
+      }
+    });
+
+    // Add comment if notes provided
+    if (notes && notes.trim()) {
+      await prisma.comment.create({
+        data: {
+          applicationId: id,
+          userId: req.user.id,
+          content: notes
+        }
+      });
+    }
+
+    res.json(application);
+  } catch (error) {
+    console.error('[PATCH /api/admin/staging/candidates/:id/status]', error);
+    res.status(500).json({ error: 'Failed to update candidate status' });
+  }
+});
+
+// Submit final decision
+router.post('/staging/candidates/:id/final-decision', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { decision, feedback } = req.body;
+
+    const status = decision === 'ACCEPT' ? 'ACCEPTED' : 
+                   decision === 'REJECT' ? 'REJECTED' : 'WAITLISTED';
+
+    const application = await prisma.application.update({
+      where: { id },
+      data: { 
+        status,
+        approved: decision === 'ACCEPT' ? true : decision === 'REJECT' ? false : null
+      }
+    });
+
+    // Add comment if feedback provided
+    if (feedback && feedback.trim()) {
+      await prisma.comment.create({
+        data: {
+          applicationId: id,
+          userId: req.user.id,
+          content: `Final Decision: ${decision}. Feedback: ${feedback}`
+        }
+      });
+    }
+
+    res.json(application);
+  } catch (error) {
+    console.error('[POST /api/admin/staging/candidates/:id/final-decision]', error);
+    res.status(500).json({ error: 'Failed to submit final decision' });
+  }
+});
+
+// Get interview rounds configuration
+router.get('/interview-rounds', async (req, res) => {
+  try {
+    const rounds = [
+      { id: 1, name: 'Resume Review', status: 'completed' },
+      { id: 2, name: 'First Interview', status: 'active' },
+      { id: 3, name: 'Second Interview', status: 'pending' },
+      { id: 4, name: 'Final Decision', status: 'pending' }
+    ];
+
+    res.json(rounds);
+  } catch (error) {
+    console.error('[GET /api/admin/interview-rounds]', error);
+    res.status(500).json({ error: 'Failed to fetch interview rounds' });
+  }
+});
+
+// Advance candidate to next round
+router.post('/staging/candidates/:id/advance-round', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { roundNumber } = req.body;
+
+    // Determine next status based on round
+    let nextStatus;
+    if (roundNumber === 1) nextStatus = 'UNDER_REVIEW';
+    else if (roundNumber === 2) nextStatus = 'UNDER_REVIEW'; // Could be different for second interview
+    else if (roundNumber === 3) nextStatus = 'UNDER_REVIEW'; // Could be different for final round
+    else nextStatus = 'ACCEPTED';
+
+    const application = await prisma.application.update({
+      where: { id },
+      data: { status: nextStatus }
+    });
+
+    res.json(application);
+  } catch (error) {
+    console.error('[POST /api/admin/staging/candidates/:id/advance-round]', error);
+    res.status(500).json({ error: 'Failed to advance candidate' });
   }
 });
 

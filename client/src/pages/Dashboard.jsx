@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Paper, Stack, Typography, Button } from '@mui/material';
+import { useAuth } from '../context/AuthContext';
 import apiClient from '../utils/api';
 
 export default function Dashboard() {
+  const { user } = useAuth();
   const [stats, setStats] = useState({ totalApplicants: 0, tasks: 0, candidates: 0, currentRound: 'SUBMITTED' });
   const [activeCycle, setActiveCycle] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -24,7 +26,26 @@ export default function Dashboard() {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { 
+    if (user) {
+      load(); 
+    }
+  }, [user]);
+
+  if (!user) {
+    return (
+      <Box>
+        <Paper sx={{ p: 4, textAlign: 'center' }}>
+          <Typography variant="h4" gutterBottom>
+            Authentication Required
+          </Typography>
+          <Typography variant="body1" color="text.secondary">
+            Please log in to view the dashboard.
+          </Typography>
+        </Paper>
+      </Box>
+    );
+  }
 
   return (
     <Box>

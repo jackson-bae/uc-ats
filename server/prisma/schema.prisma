@@ -28,6 +28,10 @@ model User {
   interviewResources InterviewResource[]
   resumeScores       ResumeScore[]
   videoScores        VideoScore[]
+  // New interview relations
+  createdInterviews  Interview[]         @relation("InterviewCreator")
+  interviewAssignments InterviewAssignment[] @relation("InterviewAssignment")
+  completedActionItems InterviewActionItem[] @relation("InterviewActionItemCompletion")
 
   @@map("users")
 }
@@ -104,6 +108,7 @@ model RecruitingCycle {
   events       Events[]
   groups       Groups[]
   resumeScores ResumeScore[]
+  interviews   Interview[]
 
   @@map("recruiting_cycles")
 }
@@ -170,27 +175,27 @@ model Groups {
 }
 
 model ResumeScore {
-  id              String    @id @default(uuid())
-  overallScore    Decimal   @db.Decimal(5, 2)
+  id              String           @id @default(uuid())
+  overallScore    Decimal          @db.Decimal(5, 2)
   scoreOne        Int?
   scoreTwo        Int?
   scoreThree      Int?
-  notes           String?
-  adminScore      Decimal?  @db.Decimal(5, 2)
+  adminScore      Decimal?         @db.Decimal(5, 2)
   adminNotes      String?
   status          String?
   candidateId     String
   evaluatorId     String
   assignedGroupId String?
+  createdAt       DateTime         @default(now())
   cycleId         String?
-  createdAt       DateTime  @default(now())
-  assignedGroup   Groups?   @relation(fields: [assignedGroupId], references: [id])
-  candidate       Candidate @relation(fields: [candidateId], references: [id])
-  evaluator       User      @relation(fields: [evaluatorId], references: [id])
+  notes           String?
+  assignedGroup   Groups?          @relation(fields: [assignedGroupId], references: [id])
+  candidate       Candidate        @relation(fields: [candidateId], references: [id])
   cycle           RecruitingCycle? @relation(fields: [cycleId], references: [id])
+  evaluator       User             @relation(fields: [evaluatorId], references: [id])
 
-  @@map("resume_scores")
   @@unique([candidateId, evaluatorId])
+  @@map("resume_scores")
 }
 
 model CoverLetterScore {
@@ -366,4 +371,92 @@ enum ApplicationStatus {
   ACCEPTED
   REJECTED
   WAITLISTED
+}
+
+// New models for interview management
+model Interview {
+  id                    String                @id @default(uuid())
+  title                 String
+  description           String?
+  interviewType         InterviewType
+  startDate            DateTime
+  endDate              DateTime
+  deliberationsStart   DateTime?
+  deliberationsEnd     DateTime?
+  location             String
+  dresscode            String?
+  maxCandidates        Int?
+  currentCandidates    Int                    @default(0)
+  status               InterviewStatus        @default(UPCOMING)
+  cycleId              String
+  createdBy            String
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  
+  // Relations
+  cycle                RecruitingCycle       @relation(fields: [cycleId], references: [id])
+  creator              User                  @relation("InterviewCreator", fields: [createdBy], references: [id])
+  assignments          InterviewAssignment[]
+  actionItems          InterviewActionItem[]
+  
+  @@map("interviews")
+}
+
+model InterviewAssignment {
+  id            String    @id @default(uuid())
+  interviewId   String
+  userId        String
+  role          InterviewerRole
+  assignedAt    DateTime  @default(now())
+  notes         String?
+  
+  // Relations
+  interview     Interview @relation(fields: [interviewId], references: [id])
+  user         User      @relation("InterviewAssignment", fields: [userId], references: [id])
+  
+  @@unique([interviewId, userId])
+  @@map("interview_assignments")
+}
+
+model InterviewActionItem {
+  id            String    @id @default(uuid())
+  interviewId   String
+  title         String
+  description   String?
+  isCompleted   Boolean   @default(false)
+  completedAt   DateTime?
+  completedBy   String?
+  order         Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  
+  // Relations
+  interview     Interview @relation(fields: [interviewId], references: [id])
+  completedByUser User?   @relation("InterviewActionItemCompletion", fields: [completedBy], references: [id])
+  
+  @@map("interview_action_items")
+}
+
+// New enums for interview management
+enum InterviewType {
+  COFFEE_CHAT
+  ROUND_ONE
+  ROUND_TWO
+  FINAL_ROUND
+  DELIBERATIONS
+}
+
+enum InterviewStatus {
+  DRAFT
+  UPCOMING
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum InterviewerRole {
+  LEAD_INTERVIEWER
+  INTERVIEWER
+  OBSERVER
+  DELIBERATOR
 }
