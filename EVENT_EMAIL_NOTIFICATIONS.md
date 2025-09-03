@@ -196,3 +196,4 @@ Error sending RSVP confirmation email: SMTP connection failed
 4. Test with a known valid candidate email
 
 
+
