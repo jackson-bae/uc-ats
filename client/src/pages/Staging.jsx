@@ -110,6 +110,10 @@ const stagingAPI = {
     return await apiClient.get('/admin/events');
   },
 
+  async fetchReviewTeams() {
+    return await apiClient.get('/admin/review-teams');
+  },
+
   async updateCandidateStatus(candidateId, status, notes = '') {
     return await apiClient.patch(`/admin/staging/candidates/${candidateId}/status`, {
       status,
@@ -138,6 +142,22 @@ const stagingAPI = {
 
   async advanceRound() {
     return await apiClient.post('/admin/advance-round', {});
+  },
+
+  async processDecisions() {
+    return await apiClient.post('/admin/process-decisions', {});
+  },
+
+  async loadExistingDecisions() {
+    return await apiClient.get('/admin/existing-decisions');
+  },
+
+  async saveDecision(candidateId, decision, phase = 'resume') {
+    return await apiClient.post('/admin/save-decision', { 
+      candidateId, 
+      decision, 
+      phase 
+    });
   }
 };
 
@@ -237,22 +257,120 @@ const ScoreDisplay = ({ score, maxScore = 10 }) => {
   );
 };
 
-const AttendanceDisplay = ({ attendance }) => {
-  const events = Object.keys(attendance);
+const AttendanceDisplay = ({ attendance, events }) => {
   
+  if (!events || events.length === 0) {
+    return (
+      <Box display="flex" alignItems="center" justifyContent="center" minHeight="60px">
+        <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+          No events available for this cycle
+        </Typography>
+      </Box>
+    );
+  }
+
+  // Handle different attendance data structures
+  const getAttendanceStatus = (event) => {
+    // The events API returns events with eventName property
+    // The attendance object uses eventName as the key
+    const eventName = event.eventName || event.name || event.id;
+    
+    // Try different ways to access attendance data
+    let isAttended = false;
+    
+    if (attendance && eventName) {
+      // Try direct key access with eventName
+      if (attendance[eventName] !== undefined) {
+        isAttended = Boolean(attendance[eventName]);
+      } else {
+        // Try to find any key that might match
+        const attendanceKeys = Object.keys(attendance);
+        const matchingKey = attendanceKeys.find(key => 
+          key.toLowerCase() === eventName.toLowerCase() ||
+          key.toLowerCase().includes(eventName.toLowerCase()) || 
+          eventName.toLowerCase().includes(key.toLowerCase())
+        );
+        if (matchingKey !== undefined) {
+          isAttended = Boolean(attendance[matchingKey]);
+        }
+      }
+    }
+    
+    return isAttended;
+  };
+
+  // Calculate attendance summary
+  const totalEvents = events.length;
+  const attendedEvents = events.filter(event => getAttendanceStatus(event)).length;
+  const attendancePercentage = totalEvents > 0 ? Math.round((attendedEvents / totalEvents) * 100) : 0;
+
+  // Handle case where no attendance data exists
+  if (!attendance || Object.keys(attendance).length === 0) {
+    return (
+      <Box display="flex" alignItems="center" justifyContent="center" minHeight="60px">
+        <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+          No attendance data available
+        </Typography>
+      </Box>
+    );
+  }
+
   return (
-    <Stack direction="row" spacing={1}>
-      {events.map((event) => (
-        <Tooltip key={event} title={event}>
-          <Checkbox
-            checked={attendance[event]}
-            disabled
-            size="small"
-            icon={<CancelIcon fontSize="small" />}
-            checkedIcon={<CheckCircleIcon fontSize="small" />}
-          />
+    <Stack spacing={0.5}>
+      {/* Summary row */}
+      <Box display="flex" alignItems="center" gap={1} sx={{ mb: 0.5 }}>
+        <Tooltip 
+          title={`${attendedEvents} out of ${totalEvents} events attended (${attendancePercentage}% attendance rate)`}
+          arrow
+        >
+          <Typography 
+            variant="caption" 
+            color={attendancePercentage >= 80 ? "success.main" : 
+                   attendancePercentage >= 60 ? "warning.main" : 
+                   attendancePercentage >= 40 ? "info.main" : "error.main"}
+            sx={{ 
+              fontWeight: 600, 
+              fontSize: '0.75rem',
+              cursor: 'help'
+            }}
+          >
+            {attendedEvents}/{totalEvents} ({attendancePercentage}%)
+          </Typography>
         </Tooltip>
-      ))}
+      </Box>
+      
+      {/* Individual events */}
+      {events.map((event) => {
+        const isAttended = getAttendanceStatus(event);
+        const eventName = event.eventName || event.name || event.id;
+        
+        return (
+          <Box key={event.id || event.name} display="flex" alignItems="center" gap={0.5}>
+            <Checkbox
+              checked={isAttended}
+              disabled
+              size="small"
+              sx={{ padding: 0.5 }}
+              icon={<CancelIcon fontSize="small" />}
+              checkedIcon={<CheckCircleIcon fontSize="small" />}
+            />
+            <Typography 
+              variant="caption" 
+              color={isAttended ? "success.main" : "text.secondary"}
+              sx={{ 
+                fontSize: '0.7rem',
+                fontWeight: isAttended ? 500 : 400,
+                maxWidth: '120px',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              {eventName}
+            </Typography>
+          </Box>
+        );
+      })}
     </Stack>
   );
 };
@@ -273,8 +391,63 @@ const getDecisionHighlight = (decision) => {
   }
 };
 
+// Helper function to check if a decision is valid for pushing
+const isValidDecision = (decision) => {
+  return decision === 'yes' || decision === 'no';
+};
+
+const GradingStatusDisplay = ({ candidate, gradingData }) => {
+  if (!gradingData) {
+    return (
+      <Chip label="No Grading Data" color="default" size="small" />
+    );
+  }
+  
+  const { complete, hasResume, hasCoverLetter, hasVideo, hasResumeScore, hasCoverLetterScore, hasVideoScore } = gradingData;
+  
+  if (complete) {
+    const tooltipText = `All available documents have been scored:
+${hasResume ? '✓ Resume' : '✗ No Resume'}
+${hasCoverLetter ? '✓ Cover Letter' : '✗ No Cover Letter'}
+${hasVideo ? '✓ Video' : '✗ No Video'}`;
+    
+    return (
+      <Tooltip title={tooltipText} arrow>
+        <Chip label="Grading Complete" color="success" size="small" />
+      </Tooltip>
+    );
+  }
+  
+  // Show what's missing
+  const missingItems = [];
+  if (hasResume && !hasResumeScore) missingItems.push('Resume Score');
+  if (hasCoverLetter && !hasCoverLetterScore) missingItems.push('Cover Letter Score');
+  if (hasVideo && !hasVideoScore) missingItems.push('Video Score');
+  
+  const tooltipText = `Grading Progress:
+${hasResume ? (hasResumeScore ? '✓ Resume Scored' : '⏳ Resume Pending') : '✗ No Resume'}
+${hasCoverLetter ? (hasCoverLetterScore ? '✓ Cover Letter Scored' : '⏳ Cover Letter Pending') : '✗ No Cover Letter'}
+${hasVideo ? (hasVideoScore ? '✓ Video Scored' : '⏳ Video Pending') : '✗ No Video'}`;
+  
+  return (
+    <Tooltip title={tooltipText} arrow>
+      <Box>
+        <Chip label="Grading in Progress" color="warning" size="small" sx={{ mb: 1 }} />
+        <Typography variant="caption" display="block" color="text.secondary">
+          Missing: {missingItems.join(', ')}
+        </Typography>
+        <Typography variant="caption" display="block" color="text.secondary">
+          Documents: {[hasResume && 'Resume', hasCoverLetter && 'Cover Letter', hasVideo && 'Video'].filter(Boolean).join(', ')}
+        </Typography>
+      </Box>
+    </Tooltip>
+  );
+};
+
 export default function Staging() {
   const [candidates, setCandidates] = useState([]);
+  const [events, setEvents] = useState([]); // Add events state
+  const [reviewTeams, setReviewTeams] = useState([]); // Add review teams state
 
   const [loading, setLoading] = useState(true);
   const [currentCycle, setCurrentCycle] = useState(null);
@@ -288,6 +461,8 @@ export default function Staging() {
     status: 'all',
     round: 'all',
     decision: 'all',
+    attendance: 'all',
+    reviewTeam: 'all',
     search: ''
   });
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
@@ -295,7 +470,11 @@ export default function Staging() {
   const [pushAllConfirmText, setPushAllConfirmText] = useState('');
   const [pushAllAcknowledge, setPushAllAcknowledge] = useState(false);
   const [pushAllLoading, setPushAllLoading] = useState(false);
-  const [pushAllPreview, setPushAllPreview] = useState({ totalApproved: 0 });
+  const [pushAllPreview, setPushAllPreview] = useState({ 
+    totalApproved: 0, 
+    invalidDecisions: 0, 
+    invalidDecisionCandidates: [] 
+  });
   const [appModalOpen, setAppModalOpen] = useState(false);
   const [appModalLoading, setAppModalLoading] = useState(false);
   const [appModal, setAppModal] = useState(null);
@@ -320,19 +499,54 @@ export default function Staging() {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const [candidatesData, activeCycle, adminApplications] = await Promise.all([
+        const [candidatesData, activeCycle, adminApplications, eventsData, reviewTeamsData, existingDecisionsData] = await Promise.all([
           stagingAPI.fetchCandidates(),
           stagingAPI.fetchActiveCycle(),
-          stagingAPI.fetchAdminApplications()
+          stagingAPI.fetchAdminApplications(),
+          stagingAPI.fetchEventAttendance(),
+          stagingAPI.fetchReviewTeams(),
+          stagingAPI.loadExistingDecisions()
         ]);
+        
         setCandidates(candidatesData);
         setCurrentCycle(activeCycle);
+        setEvents(eventsData || []); // Store events data
+        setReviewTeams(reviewTeamsData || []); // Store review teams data
+
+        // Load existing decisions from database
+        if (existingDecisionsData && existingDecisionsData.decisions) {
+          setInlineDecisions(existingDecisionsData.decisions);
+        }
 
         // Build grading completion map by candidateId
         const gradingMap = {};
         (adminApplications || []).forEach(app => {
-          const complete = Boolean(app.hasResumeScore) && Boolean(app.hasCoverLetterScore) && Boolean(app.hasVideoScore);
-          gradingMap[app.candidateId] = complete;
+          // Check which documents the candidate has
+          const hasResume = Boolean(app.resumeUrl);
+          const hasCoverLetter = Boolean(app.coverLetterUrl);
+          const hasVideo = Boolean(app.videoUrl);
+          
+          // Check which documents have been scored
+          const hasResumeScore = Boolean(app.hasResumeScore);
+          const hasCoverLetterScore = Boolean(app.hasCoverLetterScore);
+          const hasVideoScore = Boolean(app.hasVideoScore);
+          
+          // Grading is complete if all available documents have scores
+          let gradingComplete = true;
+          
+          if (hasResume && !hasResumeScore) gradingComplete = false;
+          if (hasCoverLetter && !hasCoverLetterScore) gradingComplete = false;
+          if (hasVideo && !hasVideoScore) gradingComplete = false;
+          
+          gradingMap[app.candidateId] = {
+            complete: gradingComplete,
+            hasResume,
+            hasCoverLetter,
+            hasVideo,
+            hasResumeScore,
+            hasCoverLetterScore,
+            hasVideoScore
+          };
         });
         setGradingCompleteByCandidate(gradingMap);
       } catch (error) {
@@ -352,15 +566,43 @@ export default function Staging() {
 
   const fetchCandidates = async () => {
     try {
-      const [data, adminApplications] = await Promise.all([
+      const [data, adminApplications, eventsData, reviewTeamsData] = await Promise.all([
         stagingAPI.fetchCandidates(),
-        stagingAPI.fetchAdminApplications()
+        stagingAPI.fetchAdminApplications(),
+        stagingAPI.fetchEventAttendance(),
+        stagingAPI.fetchReviewTeams()
       ]);
       setCandidates(data);
+      setEvents(eventsData || []); // Update events data
+      setReviewTeams(reviewTeamsData || []); // Update review teams data
       const gradingMap = {};
       (adminApplications || []).forEach(app => {
-        const complete = Boolean(app.hasResumeScore) && Boolean(app.hasCoverLetterScore) && Boolean(app.hasVideoScore);
-        gradingMap[app.candidateId] = complete;
+        // Check which documents the candidate has
+        const hasResume = Boolean(app.resumeUrl);
+        const hasCoverLetter = Boolean(app.coverLetterUrl);
+        const hasVideo = Boolean(app.videoUrl);
+        
+        // Check which documents have been scored
+        const hasResumeScore = Boolean(app.hasResumeScore);
+        const hasCoverLetterScore = Boolean(app.hasCoverLetterScore);
+        const hasVideoScore = Boolean(app.hasVideoScore);
+        
+        // Grading is complete if all available documents have scores
+        let gradingComplete = true;
+        
+        if (hasResume && !hasResumeScore) gradingComplete = false;
+        if (hasCoverLetter && !hasCoverLetterScore) gradingComplete = false;
+        if (hasVideo && !hasVideoScore) gradingComplete = false;
+        
+        gradingMap[app.candidateId] = {
+          complete: gradingComplete,
+          hasResume,
+          hasCoverLetter,
+          hasVideo,
+          hasResumeScore,
+          hasCoverLetterScore,
+          hasVideoScore
+        };
       });
       setGradingCompleteByCandidate(gradingMap);
     } catch (error) {
@@ -450,29 +692,21 @@ export default function Staging() {
 
   const handleInlineDecisionChange = async (candidate, value, phase = 'resume') => {
     try {
-      // Persist decision
-      if (value === 'yes') {
-        await stagingAPI.updateApproval(candidate.id, true);
-      } else if (value === 'no') {
-        await stagingAPI.updateApproval(candidate.id, false);
-      } else if (value === 'maybe_yes') {
-        await stagingAPI.updateApproval(candidate.id, null);
-        await stagingAPI.addApplicationComment(candidate.id, `${phase === 'coffee' ? 'Coffee Chat' : 'Resume Review'} decision: Maybe - Yes`);
-      } else if (value === 'maybe_no') {
-        await stagingAPI.updateApproval(candidate.id, null);
-        await stagingAPI.addApplicationComment(candidate.id, `${phase === 'coffee' ? 'Coffee Chat' : 'Resume Review'} decision: Maybe - No`);
-      }
+      // Save decision to database immediately
+      // Note: candidate.id is actually the application ID from the staging candidates endpoint
+      await stagingAPI.saveDecision(candidate.id, value, phase);
 
       // Update local UI selection
       setInlineDecisions(prev => ({ ...prev, [candidate.id]: value }));
 
-      // Refresh data to reflect any downstream effects
-      await fetchCandidates();
-
-      setSnackbar({ open: true, message: 'Decision saved', severity: 'success' });
+      // Show success message
+      setSnackbar({ open: true, message: 'Decision saved successfully', severity: 'success' });
     } catch (error) {
       console.error('Error saving inline decision:', error);
       setSnackbar({ open: true, message: 'Failed to save decision', severity: 'error' });
+      
+      // Revert the UI change if save failed
+      setInlineDecisions(prev => ({ ...prev, [candidate.id]: prev[candidate.id] || '' }));
     }
   };
 
@@ -481,10 +715,22 @@ export default function Staging() {
       const adminCandidates = await stagingAPI.fetchAdminCandidates();
       const eligibleStatuses = ['SUBMITTED', 'UNDER_REVIEW', 'WAITLISTED'];
       const totalApproved = adminCandidates.filter(c => c.approved === true && eligibleStatuses.includes(c.status)).length;
-      setPushAllPreview({ totalApproved });
+      
+      // Check for applications with invalid decisions (not "yes" or "no") or no decisions
+      const invalidDecisions = adminCandidates.filter(c => {
+        // Check if candidate has a decision that's not "yes" or "no", or no decision at all
+        const decision = c.approved; // Use the approved field from the database
+        return decision === null || (decision !== true && decision !== false);
+      });
+      
+      setPushAllPreview({ 
+        totalApproved,
+        invalidDecisions: invalidDecisions.length,
+        invalidDecisionCandidates: invalidDecisions
+      });
     } catch (e) {
       console.error('Error preparing push-all preview:', e);
-      setPushAllPreview({ totalApproved: 0 });
+      setPushAllPreview({ totalApproved: 0, invalidDecisions: 0, invalidDecisionCandidates: [] });
     }
     setPushAllConfirmText('');
     setPushAllAcknowledge(false);
@@ -494,29 +740,122 @@ export default function Staging() {
   const confirmPushAll = async () => {
     try {
       setPushAllLoading(true);
-      await stagingAPI.advanceRound();
+      
+      // Process decisions with emails and round advancement
+      // The backend will read decisions from the database
+      const result = await stagingAPI.processDecisions();
+      
       setPushAllDialogOpen(false);
-      setSnackbar({ open: true, message: 'Decisions pushed successfully', severity: 'success' });
+      
+      // Show success message with results
+      const { summary } = result;
+      setSnackbar({ 
+        open: true, 
+        message: `Successfully processed ${summary.totalApplications} candidates: ${summary.accepted} accepted, ${summary.rejected} rejected. ${summary.emailsSent} emails sent.`, 
+        severity: 'success' 
+      });
+      
+      // Refresh candidates data
       await fetchCandidates();
+      
     } catch (e) {
-      console.error('Error pushing decisions:', e);
-      setSnackbar({ open: true, message: 'Failed to push decisions', severity: 'error' });
+      console.error('Error processing decisions:', e);
+      setSnackbar({ open: true, message: 'Failed to process decisions', severity: 'error' });
     } finally {
       setPushAllLoading(false);
     }
   };
 
+  const fixInvalidDecision = async (candidateId, newDecision) => {
+    try {
+      // Update the decision
+      // Note: candidateId is actually the application ID from the staging candidates endpoint
+      await stagingAPI.saveDecision(candidateId, newDecision, 'resume');
+      
+      // Update the preview to reflect the change
+      setPushAllPreview(prev => ({
+        ...prev,
+        invalidDecisions: prev.invalidDecisions - 1,
+        invalidDecisionCandidates: prev.invalidDecisionCandidates.filter(c => c.id !== candidateId)
+      }));
+      
+      // Refresh candidates to get updated data
+      await fetchCandidates();
+      
+      setSnackbar({ open: true, message: 'Decision updated successfully', severity: 'success' });
+    } catch (error) {
+      console.error('Error fixing invalid decision:', error);
+      setSnackbar({ open: true, message: 'Failed to update decision', severity: 'error' });
+    }
+  };
+
   const filteredCandidates = candidates.filter(candidate => {
     const matchesStatus = filters.status === 'all' || candidate.status === filters.status;
-    const matchesRound = filters.round === 'all' || candidate.currentRound === parseInt(filters.round);
+    const matchesRound = filters.round === 'all' || parseInt(candidate.currentRound) === parseInt(filters.round);
     const matchesDecision = filters.decision === 'all' || 
       (filters.decision === 'pending' && !candidate.decisions[`round${candidate.currentRound}`]) ||
       (filters.decision !== 'pending' && candidate.decisions[`round${candidate.currentRound}`] === filters.decision);
+    
+    // Attendance filtering
+    let matchesAttendance = true;
+    if (filters.attendance !== 'all' && events.length > 0) {
+      const totalEvents = events.length;
+      const attendedEvents = events.filter(event => {
+        const eventName = event.eventName || event.name || event.id;
+        if (!candidate.attendance || !eventName) return false;
+        
+        // Try direct key access with eventName
+        if (candidate.attendance[eventName] !== undefined) {
+          return Boolean(candidate.attendance[eventName]);
+        }
+        
+        // Try to find any key that might match
+        const attendanceKeys = Object.keys(candidate.attendance);
+        const matchingKey = attendanceKeys.find(key => 
+          key.toLowerCase() === eventName.toLowerCase() ||
+          key.toLowerCase().includes(eventName.toLowerCase()) || 
+          eventName.toLowerCase().includes(key.toLowerCase())
+        );
+        return matchingKey !== undefined ? Boolean(candidate.attendance[matchingKey]) : false;
+      }).length;
+      const attendancePercentage = totalEvents > 0 ? Math.round((attendedEvents / totalEvents) * 100) : 0;
+      
+      switch (filters.attendance) {
+        case 'high':
+          matchesAttendance = attendancePercentage >= 80;
+          break;
+        case 'medium':
+          matchesAttendance = attendancePercentage >= 60 && attendancePercentage < 80;
+          break;
+        case 'low':
+          matchesAttendance = attendancePercentage >= 40 && attendancePercentage < 60;
+          break;
+        case 'very_low':
+          matchesAttendance = attendancePercentage < 40;
+          break;
+        case 'none':
+          matchesAttendance = attendedEvents === 0;
+          break;
+        default:
+          matchesAttendance = true;
+      }
+    }
+    
+    // Review team filtering
+    let matchesReviewTeam = true;
+    if (filters.reviewTeam !== 'all') {
+      if (filters.reviewTeam === 'unassigned') {
+        matchesReviewTeam = !candidate.reviewTeam;
+      } else {
+        matchesReviewTeam = candidate.reviewTeam && candidate.reviewTeam.id === filters.reviewTeam;
+      }
+    }
+    
     const matchesSearch = filters.search === '' || 
       `${candidate.firstName} ${candidate.lastName}`.toLowerCase().includes(filters.search.toLowerCase()) ||
       candidate.email.toLowerCase().includes(filters.search.toLowerCase());
 
-    return matchesStatus && matchesRound && matchesDecision && matchesSearch;
+    return matchesStatus && matchesRound && matchesDecision && matchesAttendance && matchesReviewTeam && matchesSearch;
   });
 
   if (loading) {
@@ -549,6 +888,29 @@ export default function Staging() {
           </Box>
         </Box>
 
+        {/* Invalid Decisions Summary */}
+        {(() => {
+          // Check candidates from the database for decisions
+          const invalidDecisionsCount = candidates.filter(c => 
+            c.approved === null || (c.approved !== true && c.approved !== false)
+          ).length;
+          
+          if (invalidDecisionsCount > 0) {
+            return (
+              <Alert severity="warning" sx={{ mb: 3 }}>
+                <Typography variant="subtitle2" gutterBottom>
+                  ⚠️ {invalidDecisionsCount} candidate(s) have no decision, intermediate decisions, or decisions that are not "Yes" or "No"
+                </Typography>
+                <Typography variant="body2">
+                  These candidates cannot proceed to the next round until their decisions are updated to either "Yes" or "No". 
+                  "Maybe - Yes" and "Maybe - No" are intermediate decisions that need to be resolved to final decisions.
+                  "Yes" decisions will advance to Coffee Chats, "No" decisions will receive rejection emails.
+                </Typography>
+              </Alert>
+            );
+          }
+          return null;
+        })()}
 
 
         {/* Tabs */}
@@ -627,7 +989,42 @@ export default function Staging() {
                   </Select>
                 </FormControl>
               </Grid>
-              <Grid item xs={12} md={3}>
+              <Grid item xs={12} md={2}>
+                <FormControl fullWidth>
+                  <InputLabel>Attendance</InputLabel>
+                  <Select
+                    value={filters.attendance}
+                    onChange={(e) => setFilters({ ...filters, attendance: e.target.value })}
+                    label="Attendance"
+                  >
+                    <MenuItem value="all">All Attendance</MenuItem>
+                    <MenuItem value="high">High (≥80%)</MenuItem>
+                    <MenuItem value="medium">Medium (60-79%)</MenuItem>
+                    <MenuItem value="low">Low (40-59%)</MenuItem>
+                    <MenuItem value="very_low">Very Low (&lt;40%)</MenuItem>
+                    <MenuItem value="none">No Events</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} md={2}>
+                <FormControl fullWidth>
+                  <InputLabel>Review Team</InputLabel>
+                  <Select
+                    value={filters.reviewTeam}
+                    onChange={(e) => setFilters({ ...filters, reviewTeam: e.target.value })}
+                    label="Review Team"
+                  >
+                    <MenuItem value="all">All Teams</MenuItem>
+                    <MenuItem value="unassigned">Unassigned</MenuItem>
+                    {reviewTeams.map((team) => (
+                      <MenuItem key={team.id} value={team.id}>
+                        {team.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} md={1}>
                 <Stack direction="row" spacing={1}>
                   <Button
                     variant="outlined"
@@ -643,6 +1040,8 @@ export default function Staging() {
                       status: 'all',
                       round: 'all',
                       decision: 'all',
+                      attendance: 'all',
+                      reviewTeam: 'all',
                       search: ''
                     })}
                   >
@@ -662,9 +1061,18 @@ export default function Staging() {
             <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
               Resume Review — Applications ({filteredCandidates.length})
             </Typography>
-            <Box mb={2} display="flex" justifyContent="flex-end">
+            <Box mb={2} display="flex" justifyContent="space-between" alignItems="center">
+              <Typography variant="body2" color="text.secondary">
+                ⚠️ All candidates must have a "Yes" or "No" decision. "Yes" advances to Coffee Chats, "No" receives rejection email.
+              </Typography>
               <Button variant="contained" color="primary" startIcon={<SkipNextIcon />} onClick={openPushAll}>
-                Push All Decisions
+                Process All Decisions
+                {(() => {
+                  const invalidCount = candidates.filter(c => 
+                    c.approved === null || (c.approved !== true && c.approved !== false)
+                  ).length;
+                  return invalidCount > 0 ? ` (${invalidCount} issues)` : '';
+                })()}
               </Button>
             </Box>
             
@@ -676,6 +1084,7 @@ export default function Staging() {
                     <TableCell>Grading Status</TableCell>
                     <TableCell>Current Round</TableCell>
                     <TableCell>Scores</TableCell>
+                    <TableCell>Review Team</TableCell>
                     <TableCell>Attendance</TableCell>
                     <TableCell>Decisions</TableCell>
                   </TableRow>
@@ -717,21 +1126,17 @@ export default function Staging() {
                         </Box>
                       </TableCell>
                       <TableCell>
-                        {gradingCompleteByCandidate[candidate.candidateId] ? (
-                          <Chip label="Grading Complete" color="success" size="small" />
-                        ) : (
-                          <Chip label="Grading in Progress" color="warning" size="small" />
-                        )}
+                        <GradingStatusDisplay candidate={candidate} gradingData={gradingCompleteByCandidate[candidate.candidateId]} />
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2" fontWeight="bold">
                           Round {candidate.currentRound}
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
-                          {candidate.currentRound === 1 ? 'Resume Review' : 
-                           candidate.currentRound === 2 ? 'Coffee Chats' : 
-                           candidate.currentRound === 3 ? 'First Round Interviews' : 
-                           candidate.currentRound === 4 ? 'Final Decision' : 
+                          {parseInt(candidate.currentRound) === 1 ? 'Resume Review' : 
+                           parseInt(candidate.currentRound) === 2 ? 'Coffee Chats' : 
+                           parseInt(candidate.currentRound) === 3 ? 'First Round Interviews' : 
+                           parseInt(candidate.currentRound) === 4 ? 'Final Decision' : 
                            `Round ${candidate.currentRound}`}
                         </Typography>
                       </TableCell>
@@ -752,7 +1157,36 @@ export default function Staging() {
                         </Box>
                       </TableCell>
                       <TableCell>
-                        <AttendanceDisplay attendance={candidate.attendance} />
+                        <Box>
+                          {candidate.reviewTeam ? (
+                            <Tooltip 
+                              title={`${candidate.reviewTeam.name}
+Members: ${candidate.reviewTeam.members.map(m => m.fullName).join(', ')}`}
+                              arrow
+                            >
+                              <Box>
+                                <Typography variant="caption" fontWeight="bold" color="primary">
+                                  {candidate.reviewTeam.name}
+                                </Typography>
+                                <Typography variant="caption" display="block" color="text.secondary">
+                                  {candidate.reviewTeam.memberCount} member{candidate.reviewTeam.memberCount !== 1 ? 's' : ''}
+                                </Typography>
+                                <Typography variant="caption" display="block" color="text.secondary">
+                                  {candidate.reviewTeam.members.map(m => m.fullName.split(' ')[0]).join(', ')}
+                                </Typography>
+                              </Box>
+                            </Tooltip>
+                          ) : (
+                            <Box>
+                              <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                                Unassigned
+                              </Typography>
+                            </Box>
+                          )}
+                        </Box>
+                      </TableCell>
+                      <TableCell>
+                        <AttendanceDisplay attendance={candidate.attendance} events={events} />
                       </TableCell>
                       <TableCell>
                         <Box>
@@ -794,6 +1228,48 @@ export default function Staging() {
                               <MenuItem value="no">No</MenuItem>
                             </Select>
                           </FormControl>
+                          
+                          {/* Warning indicator for invalid decisions */}
+                          {(candidate.approved === null || (candidate.approved !== true && candidate.approved !== false)) && (
+                            <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <Tooltip title={
+                                candidate.approved === null ? 
+                                "No decision selected - must choose 'Yes' or 'No' to proceed" : 
+                                "This decision must be 'Yes' or 'No' to proceed to next round"
+                              } arrow>
+                                <Alert severity="warning" sx={{ py: 0, px: 1, fontSize: '0.7rem' }}>
+                                  ⚠️ {candidate.approved === null ? 'No decision' : 'Decision must be Yes/No'}
+                                </Alert>
+                              </Tooltip>
+                            </Box>
+                          )}
+                          
+                          {/* Decision outcome indicator */}
+                          {candidate.approved === true && (
+                            <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <Alert severity="success" sx={{ py: 0, px: 1, fontSize: '0.7rem' }}>
+                                ✅ Will advance to Coffee Chats + acceptance email
+                              </Alert>
+                            </Box>
+                          )}
+                          
+                          {candidate.approved === false && (
+                            <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <Alert severity="error" sx={{ py: 0, px: 1, fontSize: '0.7rem' }}>
+                                ❌ Will receive rejection email
+                              </Alert>
+                            </Box>
+                          )}
+                          
+                          {/* Intermediate decision indicator */}
+                          {candidate.approved === null && inlineDecisions[candidate.id] && 
+                           (inlineDecisions[candidate.id] === 'maybe_yes' || inlineDecisions[candidate.id] === 'maybe_no') && (
+                            <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <Alert severity="info" sx={{ py: 0, px: 1, fontSize: '0.7rem' }}>
+                                ℹ️ Intermediate decision: {inlineDecisions[candidate.id] === 'maybe_yes' ? 'Maybe - Yes' : 'Maybe - No'} (needs final decision)
+                              </Alert>
+                            </Box>
+                          )}
                         </Box>
                       </TableCell>
                       
@@ -813,6 +1289,11 @@ export default function Staging() {
             <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
               Coffee Chats — Candidates
             </Typography>
+            <Box mb={2}>
+              <Typography variant="body2" color="text.secondary">
+                ⚠️ All candidates must have a "Yes" or "No" decision. "Yes" advances to First Round Interviews, "No" receives rejection email.
+              </Typography>
+            </Box>
             <TableContainer>
               <Table>
                 <TableHead>
@@ -826,7 +1307,7 @@ export default function Staging() {
                 </TableHead>
                 <TableBody>
                   {candidates
-                    .filter(c => c.currentRound >= 2)
+                    .filter(c => parseInt(c.currentRound) >= 2)
                     .map((candidate) => (
                       <TableRow key={candidate.id}>
                         <TableCell>
@@ -844,10 +1325,10 @@ export default function Staging() {
                             Round {candidate.currentRound}
                           </Typography>
                           <Typography variant="caption" color="text.secondary">
-                            {candidate.currentRound === 1 ? 'Resume Review' : 
-                             candidate.currentRound === 2 ? 'Coffee Chats' : 
-                             candidate.currentRound === 3 ? 'First Round Interviews' : 
-                             candidate.currentRound === 4 ? 'Final Decision' : 
+                            {parseInt(candidate.currentRound) === 1 ? 'Resume Review' : 
+                             parseInt(candidate.currentRound) === 2 ? 'Coffee Chats' : 
+                             parseInt(candidate.currentRound) === 3 ? 'First Round Interviews' : 
+                             parseInt(candidate.currentRound) === 4 ? 'Final Decision' : 
                              `Round ${candidate.currentRound}`}
                           </Typography>
                         </TableCell>
@@ -862,7 +1343,7 @@ export default function Staging() {
                           </Box>
                         </TableCell>
                         <TableCell>
-                          <AttendanceDisplay attendance={candidate.attendance} />
+                          <AttendanceDisplay attendance={candidate.attendance} events={events} />
                         </TableCell>
                         <TableCell>
                           <Box>
@@ -904,6 +1385,44 @@ export default function Staging() {
                                 <MenuItem value="no">No</MenuItem>
                               </Select>
                             </FormControl>
+                            
+                            {/* Warning indicator for invalid decisions */}
+                            {(candidate.approved === null || (candidate.approved !== true && candidate.approved !== false)) && (
+                              <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                <Tooltip title={candidate.approved === null ? "No decision selected - must choose 'Yes' or 'No' to proceed" : "This decision must be 'Yes' or 'No' to proceed to next round"} arrow>
+                                  <Alert severity="warning" sx={{ py: 0, px: 1, fontSize: '0.7rem' }}>
+                                    ⚠️ {candidate.approved === null ? 'No decision' : 'Decision must be Yes/No'}
+                                  </Alert>
+                                </Tooltip>
+                              </Box>
+                            )}
+                            
+                            {/* Decision outcome indicator */}
+                            {candidate.approved === true && (
+                              <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                <Alert severity="success" sx={{ py: 0, px: 1, fontSize: '0.7rem' }}>
+                                  ✅ Will advance to First Round Interviews + acceptance email
+                                </Alert>
+                              </Box>
+                            )}
+                            
+                            {candidate.approved === false && (
+                              <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                <Alert severity="error" sx={{ py: 0, px: 1, fontSize: '0.7rem' }}>
+                                  ❌ Will receive rejection email
+                                </Alert>
+                              </Box>
+                            )}
+                            
+                            {/* Intermediate decision indicator */}
+                            {candidate.approved === null && inlineDecisions[candidate.id] && 
+                             (inlineDecisions[candidate.id] === 'maybe_yes' || inlineDecisions[candidate.id] === 'maybe_no') && (
+                              <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                <Alert severity="info" sx={{ py: 0, px: 1, fontSize: '0.7rem' }}>
+                                  ℹ️ Intermediate decision: {inlineDecisions[candidate.id] === 'maybe_yes' ? 'Maybe - Yes' : 'Maybe - No'} (needs final decision)
+                                </Alert>
+                              </Box>
+                            )}
                           </Box>
                         </TableCell>
                       </TableRow>
@@ -975,26 +1494,111 @@ export default function Staging() {
         )}
 
         {/* Push All Decisions Confirmation Dialog */}
-        <Dialog open={pushAllDialogOpen} onClose={() => setPushAllDialogOpen(false)} maxWidth="sm" fullWidth>
-          <DialogTitle>Confirm Push All Decisions</DialogTitle>
+        <Dialog open={pushAllDialogOpen} onClose={() => {
+          setPushAllDialogOpen(false);
+          setPushAllPreview({ totalApproved: 0, invalidDecisions: 0, invalidDecisionCandidates: [] });
+        }} maxWidth="md" fullWidth>
+          <DialogTitle>Process All Decisions</DialogTitle>
           <DialogContent>
             <Stack spacing={2} sx={{ mt: 1 }}>
-              <Alert severity="warning">
-                This will advance all approved candidates to the next round. This action cannot be easily undone.
+              <Alert severity="info">
+                <Typography variant="subtitle2" gutterBottom>
+                  📧 This will send emails and advance candidates to the next round
+                </Typography>
+                <Typography variant="body2">
+                  • <strong>Yes</strong> decisions: Acceptance emails + advance to Coffee Chats round<br/>
+                  • <strong>No</strong> decisions: Rejection emails + mark as rejected<br/>
+                  • This action cannot be easily undone
+                </Typography>
               </Alert>
+              
+              {/* Warning for invalid decisions */}
+              {pushAllPreview.invalidDecisions > 0 && (
+                <Alert severity="error">
+                  <Typography variant="subtitle2" gutterBottom>
+                    ⚠️ Warning: {pushAllPreview.invalidDecisions} application(s) have no decision or decisions other than "Yes" or "No"
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 2 }}>
+                    All applications must have a clear "Yes" or "No" decision before proceeding. 
+                    "Yes" decisions will advance to the next round with acceptance emails, "No" decisions will receive rejection emails.
+                  </Typography>
+                  
+                  {/* List of candidates with invalid decisions */}
+                  <Stack spacing={1}>
+                    {pushAllPreview.invalidDecisionCandidates?.map((candidate) => {
+                      const currentDecision = candidate.approved;
+                      let decisionStatus = 'No decision';
+                      let decisionType = 'none';
+                      
+                      if (currentDecision === true) {
+                        decisionStatus = 'Yes';
+                        decisionType = 'yes';
+                      } else if (currentDecision === false) {
+                        decisionStatus = 'No';
+                        decisionType = 'no';
+                      } else if (currentDecision === null) {
+                        // Check if there's a comment indicating an intermediate decision
+                        const latestComment = candidate.comments?.[0]?.content || '';
+                        if (latestComment.includes('Maybe - Yes')) {
+                          decisionStatus = 'Maybe - Yes (needs final decision)';
+                          decisionType = 'intermediate';
+                        } else if (latestComment.includes('Maybe - No')) {
+                          decisionStatus = 'Maybe - No (needs final decision)';
+                          decisionType = 'intermediate';
+                        } else {
+                          decisionStatus = 'No decision';
+                          decisionType = 'none';
+                        }
+                      }
+                      
+                      return (
+                        <Box key={candidate.id} sx={{ p: 1, border: '1px solid', borderColor: 'error.main', borderRadius: 1, bgcolor: 'error.light' }}>
+                          <Typography variant="body2" fontWeight="bold" gutterBottom>
+                            {candidate.firstName} {candidate.lastName} - {candidate.email}
+                          </Typography>
+                          <Typography variant="caption" display="block" sx={{ mb: 1 }}>
+                            Current decision: <strong>{decisionStatus}</strong>
+                          </Typography>
+                          <Stack direction="row" spacing={1}>
+                            <Button
+                              size="small"
+                              variant="contained"
+                              color="success"
+                              onClick={() => fixInvalidDecision(candidate.id, 'yes')}
+                              sx={{ textTransform: 'none' }}
+                            >
+                              Set to Yes
+                            </Button>
+                            <Button
+                              size="small"
+                              variant="contained"
+                              color="error"
+                              onClick={() => fixInvalidDecision(candidate.id, 'no')}
+                              sx={{ textTransform: 'none' }}
+                            >
+                              Set to No
+                            </Button>
+                          </Stack>
+                        </Box>
+                      );
+                    })}
+                  </Stack>
+                </Alert>
+              )}
+              
               <Typography variant="body2">
-                Approved candidates to advance: <strong>{pushAllPreview.totalApproved}</strong>
+                Candidates to process: <strong>{candidates.filter(c => inlineDecisions[c.id] === 'yes' || inlineDecisions[c.id] === 'no').length}</strong>
               </Typography>
               <TextField
-                label="Type PUSH to confirm"
+                label="Type PROCESS to confirm"
                 value={pushAllConfirmText}
                 onChange={(e) => setPushAllConfirmText(e.target.value)}
-                placeholder="PUSH"
+                placeholder="PROCESS"
                 fullWidth
               />
               <FormControlLabel
                 control={<Checkbox checked={pushAllAcknowledge} onChange={(e) => setPushAllAcknowledge(e.target.checked)} />}
-                label="I understand this will advance all approved candidates"
+                label="I understand this will send emails and advance candidates to the next round"
               />
             </Stack>
           </DialogContent>
@@ -1004,9 +1608,9 @@ export default function Staging() {
               onClick={confirmPushAll}
               variant="contained"
               color="error"
-              disabled={pushAllLoading || pushAllConfirmText !== 'PUSH' || !pushAllAcknowledge}
+              disabled={pushAllLoading || pushAllConfirmText !== 'PROCESS' || !pushAllAcknowledge || pushAllPreview.invalidDecisions > 0}
             >
-              {pushAllLoading ? 'Pushing…' : 'Confirm Push All'}
+              {pushAllLoading ? 'Processing…' : 'Process All Decisions'}
             </Button>
           </DialogActions>
         </Dialog>

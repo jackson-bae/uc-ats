@@ -310,6 +310,265 @@ router.post('/advance-round', async (req, res) => {
   }
 });
 
+// Process decisions with emails and round advancement
+router.post('/process-decisions', async (req, res) => {
+  try {
+    console.log('Starting decision processing...');
+    
+    const active = await prisma.recruitingCycle.findFirst({ where: { isActive: true } });
+    if (!active) {
+      return res.status(400).json({ error: 'No active recruiting cycle' });
+    }
+
+    console.log('Active cycle:', active.name);
+
+    // Get all applications for the current cycle with candidate information
+    const applications = await prisma.application.findMany({
+      where: {
+        cycleId: active.id
+      },
+      include: {
+        candidate: true // Just include the candidate, no need for nested user
+      }
+    });
+
+    console.log('Applications to process:', applications.length);
+    console.log('Sample application:', applications[0]);
+
+    if (applications.length === 0) {
+      return res.status(400).json({ error: 'No applications found for the current cycle.' });
+    }
+
+    // Import email functions
+    let sendAcceptanceEmail, sendRejectionEmail;
+    try {
+      const emailModule = await import('../services/emailNotifications.js');
+      sendAcceptanceEmail = emailModule.sendAcceptanceEmail;
+      sendRejectionEmail = emailModule.sendRejectionEmail;
+      console.log('Email services imported successfully');
+      
+      // Verify the functions exist
+      if (typeof sendAcceptanceEmail !== 'function' || typeof sendRejectionEmail !== 'function') {
+        throw new Error('Email service functions not found');
+      }
+    } catch (importError) {
+      console.error('Failed to import email services:', importError);
+      return res.status(500).json({ 
+        error: 'Failed to import email services', 
+        details: importError.message 
+      });
+    }
+
+    const results = {
+      accepted: [],
+      rejected: [],
+      errors: [],
+      emailsSent: 0,
+      emailsFailed: 0
+    };
+
+    // Process each application
+    for (const application of applications) {
+      try {
+        if (!application.candidate) {
+          results.errors.push({
+            applicationId: application.id,
+            candidateName: `${application.firstName} ${application.lastName}`,
+            error: 'No candidate associated with application'
+          });
+          continue;
+        }
+
+        console.log(`Processing application ${application.id} for candidate ${application.candidate.id}: ${application.firstName} ${application.lastName}`);
+        
+        // Get the decision from the database (approved field)
+        let decision = null;
+        if (application.approved === true) {
+          decision = 'yes';
+        } else if (application.approved === false) {
+          decision = 'no';
+        }
+        // Note: approved === null means no decision or intermediate decision (maybe_yes/maybe_no)
+        
+        console.log(`Application ${application.id}: decision = ${decision} (approved = ${application.approved})`);
+        
+        if (!decision) {
+          // Check if there's a comment indicating an intermediate decision
+          const latestComment = await prisma.comment.findFirst({
+            where: { applicationId: application.id },
+            orderBy: { createdAt: 'desc' }
+          });
+          
+          let errorMessage = 'No decision provided (approved field is null)';
+          if (latestComment && latestComment.content.includes('Maybe -')) {
+            errorMessage = 'Intermediate decision provided (Maybe - Yes/No) - needs final decision';
+          }
+          
+          results.errors.push({
+            applicationId: application.id,
+            candidateId: application.candidate.id,
+            candidateName: `${application.firstName} ${application.lastName}`,
+            error: errorMessage
+          });
+          continue;
+        }
+
+        if (decision === 'yes') {
+          // Accept candidate - advance to coffee chat round
+          console.log(`Updating application ${application.id} to coffee chat round`);
+          
+          const updatedApp = await prisma.application.update({
+            where: { id: application.id },
+            data: {
+              status: 'UNDER_REVIEW', // This represents coffee chat round
+              currentRound: '2', // Coffee chat round
+              approved: true
+            }
+          });
+          
+          console.log(`Application ${application.id} updated successfully:`, {
+            id: updatedApp.id,
+            status: updatedApp.status,
+            currentRound: updatedApp.currentRound,
+            approved: updatedApp.approved
+          });
+
+          // Send acceptance email
+          let emailResult;
+          try {
+            emailResult = await sendAcceptanceEmail(
+              application.email, // Use application email
+              `${application.firstName} ${application.lastName}`,
+              active.name
+            );
+            console.log(`Acceptance email result for ${application.email}:`, emailResult);
+          } catch (emailError) {
+            console.error(`Error sending acceptance email to ${application.email}:`, emailError);
+            emailResult = { success: false, error: emailError.message };
+          }
+
+          if (emailResult.success) {
+            results.emailsSent++;
+            results.accepted.push({
+              applicationId: application.id,
+              candidateId: application.candidate.id,
+              candidateName: `${application.firstName} ${application.lastName}`,
+              email: application.email,
+              emailSent: true
+            });
+          } else {
+            results.emailsFailed++;
+            results.accepted.push({
+              applicationId: application.id,
+              candidateId: application.candidate.id,
+              candidateName: `${application.firstName} ${application.lastName}`,
+              email: application.email,
+              emailSent: false,
+              emailError: emailResult.error
+            });
+          }
+
+        } else if (decision === 'no') {
+          // Reject candidate
+          await prisma.application.update({
+            where: { id: application.id },
+            data: {
+              status: 'REJECTED',
+              currentRound: '1', // Resume review round (final)
+              approved: false
+            }
+          });
+
+          // Send rejection email
+          const emailResult = await sendRejectionEmail(
+            application.email, // Use application email
+            `${application.firstName} ${application.lastName}`,
+            active.name
+          );
+
+          console.log(`Rejection email result for ${application.email}:`, emailResult);
+
+          if (emailResult.success) {
+            results.emailsSent++;
+            results.rejected.push({
+              applicationId: application.id,
+              candidateId: application.candidate.id,
+              candidateName: `${application.firstName} ${application.lastName}`,
+              email: application.email,
+              emailSent: true
+            });
+          } else {
+            results.emailsFailed++;
+            results.rejected.push({
+              applicationId: application.id,
+              candidateId: application.candidate.id,
+              candidateName: `${application.firstName} ${application.lastName}`,
+              email: application.email,
+              emailSent: false,
+              emailError: emailResult.error
+            });
+          }
+
+        } else {
+          // Invalid decision
+          results.errors.push({
+            applicationId: application.id,
+            candidateId: application.candidate.id,
+            candidateName: `${application.firstName} ${application.lastName}`,
+            error: `Invalid decision: ${decision}`
+          });
+        }
+
+      } catch (error) {
+        console.error(`Error processing application ${application.id}:`, error);
+        results.errors.push({
+          applicationId: application.id,
+          candidateId: application.candidate?.id,
+          candidateName: application.candidate ? `${application.firstName} ${application.lastName}` : 'Unknown',
+          error: error.message
+        });
+      }
+    }
+
+    console.log('Decision processing completed:', results);
+    console.log('Summary:', {
+      totalApplications: applications.length,
+      accepted: results.accepted.length,
+      rejected: results.rejected.length,
+      errors: results.errors.length,
+      emailsSent: results.emailsSent,
+      emailsFailed: results.emailsFailed
+    });
+
+    res.json({
+      message: 'Decision processing completed',
+      results,
+      summary: {
+        totalApplications: applications.length,
+        accepted: results.accepted.length,
+        rejected: results.rejected.length,
+        errors: results.errors.length,
+        emailsSent: results.emailsSent,
+        emailsFailed: results.emailsFailed
+      }
+    });
+
+  } catch (error) {
+    console.error('[POST /api/admin/process-decisions]', error);
+    
+    // Ensure we always return valid JSON with detailed error information
+    const errorResponse = {
+      error: 'Failed to process decisions',
+      details: error.message || 'Unknown error occurred',
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+      timestamp: new Date().toISOString()
+    };
+    
+    console.error('Sending error response:', errorResponse);
+    res.status(500).json(errorResponse);
+  }
+});
+
 // Approval status of a specific candidate
 router.post('/candidates/:id/approve', async (req, res) => {
   const { id } = req.params;
@@ -1238,6 +1497,37 @@ router.post('/test-email-notifications', async (req, res) => {
   }
 });
 
+// Test email service
+router.post('/test-email', async (req, res) => {
+  try {
+    const { sendAcceptanceEmail, sendRejectionEmail } = await import('../services/emailNotifications.js');
+    
+    // Test acceptance email
+    const acceptanceResult = await sendAcceptanceEmail(
+      'test@example.com',
+      'Test Candidate',
+      'Test Cycle 2025'
+    );
+    
+    // Test rejection email
+    const rejectionResult = await sendRejectionEmail(
+      'test@example.com',
+      'Test Candidate',
+      'Test Cycle 2025'
+    );
+    
+    res.json({
+      message: 'Email test completed',
+      acceptance: acceptanceResult,
+      rejection: rejectionResult
+    });
+    
+  } catch (error) {
+    console.error('[POST /api/admin/test-email]', error);
+    res.status(500).json({ error: 'Failed to test email service', details: error.message });
+  }
+});
+
 // Staging endpoints
 
 // Get staging candidates with comprehensive data
@@ -1253,6 +1543,32 @@ router.get('/staging/candidates', async (req, res) => {
       include: {
         candidate: {
           include: {
+            assignedGroup: {
+              select: {
+                id: true,
+                memberOneUser: {
+                  select: {
+                    id: true,
+                    fullName: true,
+                    email: true
+                  }
+                },
+                memberTwoUser: {
+                  select: {
+                    id: true,
+                    fullName: true,
+                    email: true
+                  }
+                },
+                memberThreeUser: {
+                  select: {
+                    id: true,
+                    fullName: true,
+                    email: true
+                  }
+                }
+              }
+            },
             eventAttendance: {
               include: {
                 event: true
@@ -1319,11 +1635,33 @@ router.get('/staging/candidates', async (req, res) => {
         attendance[att.event.eventName] = true;
       });
 
-      // Determine current round based on status
-      let currentRound = 1; // Resume Review
-      if (app.status === 'UNDER_REVIEW') currentRound = 2; // First Interview
-      else if (app.status === 'ACCEPTED') currentRound = 4; // Final Decision
-      else if (app.status === 'REJECTED') currentRound = 4; // Final Decision
+      // Use the actual currentRound from the database, fallback to status-based calculation
+      let currentRound = app.currentRound ? parseInt(app.currentRound) : 1; // Default to Resume Review
+      if (!app.currentRound) {
+        // Fallback logic for legacy applications without currentRound
+        if (app.status === 'UNDER_REVIEW') currentRound = 2; // First Interview
+        else if (app.status === 'ACCEPTED') currentRound = 4; // Final Decision
+        else if (app.status === 'REJECTED') currentRound = 4; // Final Decision
+      }
+
+      // Build review team information
+      let reviewTeam = null;
+      if (app.candidate.assignedGroup) {
+        const members = [
+          app.candidate.assignedGroup.memberOneUser,
+          app.candidate.assignedGroup.memberTwoUser,
+          app.candidate.assignedGroup.memberThreeUser
+        ].filter(Boolean);
+
+        reviewTeam = {
+          id: app.candidate.assignedGroup.id,
+          name: members.length > 0 
+            ? `Team ${app.candidate.assignedGroup.id.slice(-4)} (${members.map(m => m.fullName.split(' ')[0]).join(', ')})`
+            : `Team ${app.candidate.assignedGroup.id.slice(-4)}`,
+          members: members,
+          memberCount: members.length
+        };
+      }
 
       return {
         id: app.id,
@@ -1344,6 +1682,7 @@ router.get('/staging/candidates', async (req, res) => {
         gender: app.gender,
         phoneNumber: app.phoneNumber,
         attendance,
+        reviewTeam,
         scores: {
           resume: parseFloat(avgResume.toFixed(1)),
           coverLetter: parseFloat(avgCoverLetter.toFixed(1)),
@@ -1453,6 +1792,70 @@ router.get('/interview-rounds', async (req, res) => {
   }
 });
 
+// Get review teams for filtering
+router.get('/review-teams', async (req, res) => {
+  try {
+    const active = await prisma.recruitingCycle.findFirst({ where: { isActive: true } });
+    if (!active) {
+      return res.json([]);
+    }
+
+    const reviewTeams = await prisma.groups.findMany({
+      where: { cycleId: active.id },
+      select: {
+        id: true,
+        memberOneUser: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true
+          }
+        },
+        memberTwoUser: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true
+          }
+        },
+        memberThreeUser: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true
+          }
+        }
+      },
+      orderBy: { createdAt: 'asc' }
+    });
+
+    // Transform to include team name and member count
+    const transformedTeams = reviewTeams.map(team => {
+      const members = [
+        team.memberOneUser,
+        team.memberTwoUser,
+        team.memberThreeUser
+      ].filter(Boolean);
+
+      const teamName = members.length > 0 
+        ? `Team ${team.id.slice(-4)} (${members.map(m => m.fullName.split(' ')[0]).join(', ')})`
+        : `Team ${team.id.slice(-4)}`;
+
+      return {
+        id: team.id,
+        name: teamName,
+        members: members,
+        memberCount: members.length
+      };
+    });
+
+    res.json(transformedTeams);
+  } catch (error) {
+    console.error('[GET /api/admin/review-teams]', error);
+    res.status(500).json({ error: 'Failed to fetch review teams' });
+  }
+});
+
 // Advance candidate to next round
 router.post('/staging/candidates/:id/advance-round', async (req, res) => {
   try {
@@ -1475,6 +1878,155 @@ router.post('/staging/candidates/:id/advance-round', async (req, res) => {
   } catch (error) {
     console.error('[POST /api/admin/staging/candidates/:id/advance-round]', error);
     res.status(500).json({ error: 'Failed to advance candidate' });
+  }
+});
+
+// Save individual decision
+router.post('/save-decision', async (req, res) => {
+  try {
+    const { candidateId, decision, phase } = req.body;
+    
+    console.log('Saving decision:', { candidateId, decision, phase });
+    
+    if (!candidateId || !decision) {
+      return res.status(400).json({ error: 'Missing required fields: candidateId and decision' });
+    }
+
+    // Find the application for this candidate in the active cycle
+    const active = await prisma.recruitingCycle.findFirst({ where: { isActive: true } });
+    if (!active) {
+      return res.status(400).json({ error: 'No active recruiting cycle' });
+    }
+
+    // Find the application - the candidateId parameter is actually the application ID
+    const application = await prisma.application.findFirst({
+      where: {
+        id: candidateId, // Use the ID directly as it's the application ID
+        cycleId: active.id
+      }
+    });
+
+    if (!application) {
+      return res.status(404).json({ error: 'Application not found for this ID and cycle' });
+    }
+
+    console.log('Found application:', application.id, 'for candidate:', application.candidateId);
+
+    // Save the decision based on the value
+    let updateData = {};
+    
+    // Get user ID if available (from authentication middleware)
+    const userId = req.user?.id || 'system';
+    
+    console.log('Processing decision:', decision, 'for application:', application.id);
+    
+    if (decision === 'yes') {
+      updateData = {
+        approved: true,
+        // Store the decision in a comment for tracking
+        comments: {
+          create: {
+            content: `${phase === 'coffee' ? 'Coffee Chat' : 'Resume Review'} decision: Yes - Advanced to next round`,
+            userId: userId
+          }
+        }
+      };
+    } else if (decision === 'no') {
+      updateData = {
+        approved: false,
+        comments: {
+          create: {
+            content: `${phase === 'coffee' ? 'Coffee Chat' : 'Resume Review'} decision: No - Not advanced`,
+            userId: userId
+          }
+        }
+      };
+    } else if (decision === 'maybe_yes') {
+      updateData = {
+        approved: null, // Keep as null for intermediate decision
+        comments: {
+          create: {
+            content: `${phase === 'coffee' ? 'Coffee Chat' : 'Resume Review'} decision: Maybe - Yes (needs final decision)`,
+            userId: userId
+          }
+        }
+      };
+    } else if (decision === 'maybe_no') {
+      updateData = {
+        approved: null, // Keep as null for intermediate decision
+        comments: {
+          create: {
+            content: `${phase === 'coffee' ? 'Coffee Chat' : 'Resume Review'} decision: Maybe - No (needs final decision)`,
+            userId: userId
+          }
+        }
+      };
+    }
+
+    console.log('Update data:', updateData);
+
+    // Update the application
+    console.log('Updating application with data:', updateData);
+    
+    const updatedApplication = await prisma.application.update({
+      where: { id: application.id },
+      data: updateData
+    });
+
+    console.log('Decision saved successfully for application:', updatedApplication.id);
+    console.log('Updated application data:', {
+      id: updatedApplication.id,
+      approved: updatedApplication.approved,
+      status: updatedApplication.status
+    });
+
+    res.json({
+      success: true,
+      message: 'Decision saved successfully',
+      application: updatedApplication
+    });
+
+  } catch (error) {
+    console.error('[POST /api/admin/save-decision]', error);
+    res.status(500).json({ error: 'Failed to save decision', details: error.message });
+  }
+});
+
+// Get existing decisions for the active cycle
+router.get('/existing-decisions', async (req, res) => {
+  try {
+    const active = await prisma.recruitingCycle.findFirst({ where: { isActive: true } });
+    if (!active) {
+      return res.json({ decisions: {} });
+    }
+
+    // Get all applications for the current cycle
+    const applications = await prisma.application.findMany({
+      where: {
+        cycleId: active.id
+      },
+      select: {
+        id: true,
+        candidateId: true,
+        approved: true
+      }
+    });
+
+    // Convert to decisions object using application ID as key (matches frontend usage)
+    const decisions = {};
+    applications.forEach(app => {
+      if (app.approved === true) {
+        decisions[app.id] = 'yes'; // Use application ID as key
+      } else if (app.approved === false) {
+        decisions[app.id] = 'no'; // Use application ID as key
+      }
+      // Note: approved === null means no decision yet
+    });
+
+    res.json({ decisions });
+  } catch (error) {
+    console.error('[GET /api/admin/existing-decisions]', error);
+    res.status(500).json({ error: 'Failed to fetch existing decisions', details: error.message });
   }
 });
 
