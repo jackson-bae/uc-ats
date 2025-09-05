@@ -4,8 +4,7 @@ import {
   ArrowLeftIcon,
   CheckIcon,
   UserIcon,
-  DocumentTextIcon,
-  StarIcon
+  DocumentTextIcon
 } from '@heroicons/react/24/outline';
 import apiClient from '../utils/api';
 import '../styles/InterviewInterface.css';
@@ -22,15 +21,13 @@ export default function InterviewInterface() {
   const [evaluations, setEvaluations] = useState({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [autoSaveTimeouts, setAutoSaveTimeouts] = useState({});
+  const [saveStatus, setSaveStatus] = useState({});
+  const [groupSelectionOpen, setGroupSelectionOpen] = useState(false);
+  const [groupSearchTerm, setGroupSearchTerm] = useState('');
+  const [selectedGroups, setSelectedGroups] = useState([]);
+  const [interviewData, setInterviewData] = useState({});
 
-  // Default rubric categories
-  const rubricCategories = [
-    { id: 'communication', name: 'Communication', description: 'Clarity, articulation, and professional communication' },
-    { id: 'problem_solving', name: 'Problem Solving', description: 'Analytical thinking and approach to challenges' },
-    { id: 'cultural_fit', name: 'Cultural Fit', description: 'Alignment with company values and team dynamics' },
-    { id: 'technical_skills', name: 'Technical Skills', description: 'Relevant technical knowledge and abilities' },
-    { id: 'leadership', name: 'Leadership', description: 'Leadership potential and initiative' }
-  ];
 
   const decisionOptions = [
     { value: 'YES', label: 'Yes', color: 'green' },
@@ -45,13 +42,18 @@ export default function InterviewInterface() {
       try {
         setLoading(true);
         console.log('Loading interview data for:', { interviewId, groupIds });
+        console.log('URL search params:', searchParams.toString());
+        console.log('Parsed groupIds:', groupIds);
         
         // Check if we have required parameters
         if (!interviewId) {
           throw new Error('No interview ID provided');
         }
         if (!groupIds || groupIds.length === 0) {
-          throw new Error('No group IDs provided');
+          console.warn('No group IDs provided, will show empty applications list');
+          setApplications([]);
+          setLoading(false);
+          return;
         }
         
         // Load current user first to check authentication
@@ -68,11 +70,19 @@ export default function InterviewInterface() {
         
         // Load applications for selected groups
         console.log('Loading applications for groups:', groupIds);
-        const applicationsRes = await apiClient.get(`/admin/interviews/${interviewId}/applications?groupIds=${groupIds.join(',')}`);
-        console.log('Applications loaded:', applicationsRes);
-        setApplications(applicationsRes);
+        console.log('API URL:', `/admin/interviews/${interviewId}/applications?groupIds=${groupIds.join(',')}`);
+        try {
+          const applicationsRes = await apiClient.get(`/admin/interviews/${interviewId}/applications?groupIds=${groupIds.join(',')}`);
+          console.log('Applications loaded:', applicationsRes);
+          console.log('Applications count:', applicationsRes?.length || 0);
+          setApplications(applicationsRes);
+        } catch (appError) {
+          console.error('Failed to load applications:', appError);
+          console.error('Applications error details:', appError.response?.data || appError.message);
+          setApplications([]);
+        }
         
-        // Load existing evaluations
+        // Load existing evaluations for the current user across all applications in this interview
         console.log('Loading existing evaluations...');
         const evaluationsRes = await apiClient.get(`/admin/interviews/${interviewId}/evaluations`);
         console.log('Evaluations loaded:', evaluationsRes);
@@ -81,6 +91,11 @@ export default function InterviewInterface() {
           evaluationsMap[`${evaluation.applicationId}_${evaluation.evaluatorId}`] = evaluation;
         });
         setEvaluations(evaluationsMap);
+
+        // Load interview data for group selection
+        console.log('Loading interview data...');
+        const interviewDataRes = await apiClient.get(`/admin/interviews/${interviewId}`);
+        setInterviewData(interviewDataRes);
         
       } catch (error) {
         console.error('Failed to load interview data:', error);
@@ -112,8 +127,7 @@ export default function InterviewInterface() {
     const key = `${applicationId}_${currentUser?.id}`;
     return evaluations[key] || {
       notes: '',
-      decision: null,
-      rubricScores: {}
+      decision: null
     };
   };
 
@@ -130,30 +144,74 @@ export default function InterviewInterface() {
 
   const updateNotes = (applicationId, notes) => {
     updateEvaluation(applicationId, { notes });
+    scheduleAutoSave(applicationId);
   };
 
   const updateDecision = (applicationId, decision) => {
     updateEvaluation(applicationId, { decision });
+    scheduleAutoSave(applicationId);
   };
 
-  const updateRubricScore = (applicationId, category, score) => {
-    const currentEval = getEvaluation(applicationId);
-    updateEvaluation(applicationId, {
-      rubricScores: {
-        ...currentEval.rubricScores,
-        [category]: score
-      }
-    });
+  const scheduleAutoSave = (applicationId) => {
+    // Clear existing timeout for this application
+    if (autoSaveTimeouts[applicationId]) {
+      clearTimeout(autoSaveTimeouts[applicationId]);
+    }
+
+    // Set new timeout for auto-save (2 seconds after last change)
+    const timeoutId = setTimeout(() => {
+      autoSaveEvaluation(applicationId);
+    }, 2000);
+
+    setAutoSaveTimeouts(prev => ({
+      ...prev,
+      [applicationId]: timeoutId
+    }));
   };
+
+  const autoSaveEvaluation = async (applicationId) => {
+    try {
+      const evaluation = getEvaluation(applicationId);
+      const { rubricScores, ...evaluationData } = evaluation;
+      
+      await apiClient.post(`/admin/interviews/${interviewId}/evaluations`, {
+        applicationId,
+        ...evaluationData
+      });
+      
+      setSaveStatus(prev => ({
+        ...prev,
+        [applicationId]: { type: 'success', message: 'Auto-saved', timestamp: Date.now() }
+      }));
+
+      // Clear the success message after 3 seconds
+      setTimeout(() => {
+        setSaveStatus(prev => {
+          const newStatus = { ...prev };
+          delete newStatus[applicationId];
+          return newStatus;
+        });
+      }, 3000);
+    } catch (error) {
+      console.error('Auto-save failed:', error);
+      setSaveStatus(prev => ({
+        ...prev,
+        [applicationId]: { type: 'error', message: 'Auto-save failed', timestamp: Date.now() }
+      }));
+    }
+  };
+
 
   const saveEvaluation = async (applicationId) => {
     try {
       setSaving(true);
       const evaluation = getEvaluation(applicationId);
+      // Remove rubricScores from the evaluation data since we're not using them anymore
+      const { rubricScores, ...evaluationData } = evaluation;
       
       await apiClient.post(`/admin/interviews/${interviewId}/evaluations`, {
         applicationId,
-        ...evaluation
+        ...evaluationData
       });
       
       alert('Evaluation saved successfully');
@@ -170,9 +228,11 @@ export default function InterviewInterface() {
       setSaving(true);
       const promises = applications.map(app => {
         const evaluation = getEvaluation(app.id);
+        // Remove rubricScores from the evaluation data since we're not using them anymore
+        const { rubricScores, ...evaluationData } = evaluation;
         return apiClient.post(`/admin/interviews/${interviewId}/evaluations`, {
           applicationId: app.id,
-          ...evaluation
+          ...evaluationData
         });
       });
       
@@ -184,6 +244,58 @@ export default function InterviewInterface() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleInterviewNextGroup = () => {
+    setGroupSelectionOpen(true);
+    setSelectedGroups([]);
+    setGroupSearchTerm('');
+  };
+
+  const handleGroupToggle = (groupId) => {
+    setSelectedGroups(prev => {
+      if (prev.includes(groupId)) {
+        return prev.filter(id => id !== groupId);
+      } else if (prev.length < 3) {
+        return [...prev, groupId];
+      }
+      return prev;
+    });
+  };
+
+  const handleStartWithSelectedGroups = () => {
+    if (selectedGroups.length === 0) return;
+    
+    const newGroupIds = selectedGroups.join(',');
+    navigate(`/admin/interview-interface?interviewId=${interviewId}&groupIds=${newGroupIds}`);
+  };
+
+  const handleCloseGroupSelection = () => {
+    setGroupSelectionOpen(false);
+    setSelectedGroups([]);
+    setGroupSearchTerm('');
+  };
+
+  const hasGroupBeenEvaluated = (groupId) => {
+    // Check if any evaluations exist for applications in this group by looking at the evaluations data
+    const group = interviewData?.applicationGroups?.find(g => g.id === groupId);
+    if (!group || !group.applicationIds) {
+      console.log(`Group ${groupId} not found or has no applications`);
+      return false;
+    }
+    
+    // Check if any applications in this group have evaluations from the current user
+    const hasEvaluations = group.applicationIds.some(appId => {
+      const key = `${appId}_${currentUser?.id}`;
+      const hasEval = evaluations[key] && (evaluations[key].notes || evaluations[key].decision);
+      if (hasEval) {
+        console.log(`Found evaluation for application ${appId} in group ${groupId}`);
+      }
+      return hasEval;
+    });
+    
+    console.log(`Group ${groupId} (${group.name}) evaluation status:`, hasEvaluations);
+    return hasEvaluations;
   };
 
   if (loading) {
@@ -232,6 +344,12 @@ export default function InterviewInterface() {
         
         <div className="header-actions">
           <button 
+            className="btn-secondary"
+            onClick={handleInterviewNextGroup}
+          >
+            Select Groups
+          </button>
+          <button 
             className="btn-primary"
             onClick={saveAllEvaluations}
             disabled={saving}
@@ -262,14 +380,21 @@ export default function InterviewInterface() {
                     </p>
                   </div>
                 </div>
-                <button 
-                  className="save-btn"
-                  onClick={() => saveEvaluation(application.id)}
-                  disabled={saving}
-                >
-                  <CheckIcon className="btn-icon" />
-                  Save
-                </button>
+                <div className="save-section">
+                  {saveStatus[application.id] && (
+                    <div className={`save-status ${saveStatus[application.id].type}`}>
+                      {saveStatus[application.id].message}
+                    </div>
+                  )}
+                  <button 
+                    className="save-btn"
+                    onClick={() => saveEvaluation(application.id)}
+                    disabled={saving}
+                  >
+                    <CheckIcon className="btn-icon" />
+                    Save
+                  </button>
+                </div>
               </div>
 
               {/* Notes Section */}
@@ -287,34 +412,6 @@ export default function InterviewInterface() {
                 />
               </div>
 
-              {/* Rubric Section */}
-              <div className="evaluation-section">
-                <h4 className="section-title">
-                  <StarIcon className="section-icon" />
-                  Evaluation Rubric
-                </h4>
-                <div className="rubric-grid">
-                  {rubricCategories.map(category => (
-                    <div key={category.id} className="rubric-item">
-                      <div className="rubric-header">
-                        <h5>{category.name}</h5>
-                        <p className="rubric-description">{category.description}</p>
-                      </div>
-                      <div className="score-selector">
-                        {[1, 2, 3, 4, 5].map(score => (
-                          <button
-                            key={score}
-                            className={`score-btn ${evaluation.rubricScores?.[category.id] === score ? 'selected' : ''}`}
-                            onClick={() => updateRubricScore(application.id, category.id, score)}
-                          >
-                            {score}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
 
               {/* Decision Section */}
               <div className="evaluation-section">
@@ -340,6 +437,99 @@ export default function InterviewInterface() {
           );
         })}
       </div>
+
+      {/* Group Selection Modal */}
+      {groupSelectionOpen && (
+        <div className="modal-overlay">
+          <div className="modal-content group-selection-modal">
+            <div className="modal-header">
+              <h3>Select Application Groups</h3>
+              <div className="selection-info">
+                {selectedGroups.length}/3 groups selected
+              </div>
+              <button className="icon-btn" onClick={handleCloseGroupSelection}>
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="search-section">
+                <input
+                  type="text"
+                  placeholder="Search application groups..."
+                  value={groupSearchTerm}
+                  onChange={(e) => setGroupSearchTerm(e.target.value)}
+                  className="group-search-input"
+                />
+              </div>
+              
+              <div className="groups-selection-list">
+                {(() => {
+                  const data = interviewData || { applicationGroups: [] };
+                  const applicationGroups = data.applicationGroups || [];
+                  console.log('Available groups for selection:', applicationGroups);
+                  const filteredGroups = applicationGroups.filter(group =>
+                    group.name.toLowerCase().includes(groupSearchTerm.toLowerCase())
+                  );
+                  console.log('Filtered groups:', filteredGroups);
+                  
+                  return filteredGroups.length === 0 ? (
+                    <div className="no-groups-message">
+                      {groupSearchTerm ? 'No groups match your search' : 'No application groups available'}
+                    </div>
+                  ) : (
+                    filteredGroups.map(group => {
+                      const isSelected = selectedGroups.includes(group.id);
+                      const isDisabled = !isSelected && selectedGroups.length >= 3;
+                      const isEvaluated = hasGroupBeenEvaluated(group.id);
+                      
+                      return (
+                        <div 
+                          key={group.id} 
+                          className={`group-selection-item ${isSelected ? 'selected' : ''} ${isDisabled ? 'disabled' : ''} ${isEvaluated ? 'evaluated' : ''}`}
+                          onClick={() => !isDisabled && handleGroupToggle(group.id)}
+                        >
+                          <div className="group-checkbox">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => !isDisabled && handleGroupToggle(group.id)}
+                              disabled={isDisabled}
+                            />
+                            <span className="checkmark"></span>
+                          </div>
+                          <div className="group-info">
+                            <div className="group-header">
+                              <h4 className="group-name">{group.name}</h4>
+                              {isEvaluated && (
+                                <span className="evaluation-badge">Evaluated</span>
+                              )}
+                            </div>
+                            <p className="group-count">
+                              {group.applicationIds?.length || 0} applications
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })
+                  );
+                })()}
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn-secondary" onClick={handleCloseGroupSelection}>
+                Cancel
+              </button>
+              <button 
+                className="btn-primary" 
+                onClick={handleStartWithSelectedGroups}
+                disabled={selectedGroups.length === 0}
+              >
+                {selectedGroups.length === 0 ? 'Select Groups' : `Review Groups (${selectedGroups.length})`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

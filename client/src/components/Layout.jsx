@@ -43,7 +43,6 @@ const Layout = ({ children }) => {
       { name: 'Document Grading', href: '/admin-document-grading', icon: DocumentTextIcon },
       { name: 'Review Teams', href: '/review-teams', icon: UserGroupIcon },
       { name: 'Cycle Management', href: '/cycles', icon: ClipboardDocumentListIcon },
-      { name: 'Interviews', href: '/interviews', icon: UserGroupIcon2 },
       { name: 'Assigned Interviews', href: '/admin/assigned-interviews', icon: UserGroupIcon2 },
       { name: 'Interview Prep', href: '/interview-prep', icon: ClipboardDocumentListIcon },
       { name: 'Event Management', href: '/events', icon: CalendarDaysIcon },

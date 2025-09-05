@@ -1805,7 +1805,7 @@
 .group-search-input:focus {
   outline: none;
   border-color: var(--border-focus);
-  box-shadow: 0 0 0 3px var(--focus-ring);
+  box-shadow: var(--shadow-focus);
 }
 
 .groups-selection-list {
@@ -1835,8 +1835,8 @@
 }
 
 .group-selection-item.selected {
-  background-color: var(--primary-color-light);
-  border-left: 3px solid var(--primary-color);
+  background-color: var(--hover-overlay);
+  border-left: 3px solid var(--primary-blue);
 }
 
 .group-selection-item.disabled {
@@ -1861,6 +1861,7 @@
   width: 100%;
   height: 100%;
   margin: 0;
+  z-index: 1;
 }
 
 .group-checkbox .checkmark {
@@ -1871,11 +1872,12 @@
   background-color: var(--bg-primary);
   transition: all 0.2s ease;
   position: relative;
+  display: block;
 }
 
 .group-checkbox input[type="checkbox"]:checked + .checkmark {
-  background-color: var(--primary-color);
-  border-color: var(--primary-color);
+  background-color: var(--primary-blue);
+  border-color: var(--primary-blue);
 }
 
 .group-checkbox input[type="checkbox"]:checked + .checkmark::after {

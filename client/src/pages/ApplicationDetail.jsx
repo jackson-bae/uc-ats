@@ -1009,34 +1009,6 @@ export default function ApplicationDetail() {
                   </div>
                 )}
                 
-                {/* Rubric Scores */}
-                {evaluation.rubricScores && evaluation.rubricScores.length > 0 && (
-                  <div>
-                    <div style={{ fontWeight: '600', color: '#374151', marginBottom: '8px', fontSize: '0.875rem' }}>
-                      Rubric Scores:
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '8px' }}>
-                      {evaluation.rubricScores.map((score) => (
-                        <div 
-                          key={score.id}
-                          style={{ 
-                            backgroundColor: '#f3f4f6', 
-                            padding: '8px', 
-                            borderRadius: '4px',
-                            textAlign: 'center'
-                          }}
-                        >
-                          <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '2px' }}>
-                            {score.category.replace(/_/g, ' ')}
-                          </div>
-                          <div style={{ fontSize: '1rem', fontWeight: '600', color: '#374151' }}>
-                            {score.score}/5
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
             ))}
           </div>

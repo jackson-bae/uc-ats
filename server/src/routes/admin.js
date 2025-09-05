@@ -2273,4 +2273,51 @@ router.get('/applications/:id/interview-evaluations', async (req, res) => {
   }
 });
 
+// Get evaluation summaries for multiple applications
+router.post('/applications/evaluation-summaries', async (req, res) => {
+  try {
+    const { applicationIds } = req.body;
+    
+    if (!applicationIds || !Array.isArray(applicationIds)) {
+      return res.status(400).json({ error: 'applicationIds array is required' });
+    }
+    
+    const summaries = {};
+    
+    // Fetch evaluations for all applications
+    const evaluations = await prisma.interviewEvaluation.findMany({
+      where: { 
+        applicationId: { in: applicationIds }
+      },
+      select: {
+        id: true,
+        applicationId: true,
+        decision: true,
+        createdAt: true,
+        interview: {
+          select: {
+            interviewType: true
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+    
+    // Group evaluations by application ID
+    evaluations.forEach(evaluation => {
+      if (!summaries[evaluation.applicationId]) {
+        summaries[evaluation.applicationId] = {
+          evaluations: []
+        };
+      }
+      summaries[evaluation.applicationId].evaluations.push(evaluation);
+    });
+    
+    res.json(summaries);
+  } catch (error) {
+    console.error('[POST /api/admin/applications/evaluation-summaries]', error);
+    res.status(500).json({ error: 'Failed to fetch evaluation summaries', details: error.message });
+  }
+});
+
 export default router;
