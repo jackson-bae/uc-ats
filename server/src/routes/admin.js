@@ -744,11 +744,31 @@ router.put('/profile', async (req, res) => {
 });
 
 router.get('/profile', async (req, res) => {
-  const { email } = req.query;
-
   try {
-    const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) return res.status(404).json({ error: 'User not found' });
+    // Get current user from authentication middleware
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    const user = await prisma.user.findUnique({ 
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        fullName: true,
+        graduationClass: true,
+        role: true,
+        studentId: true,
+        profileImage: true,
+        createdAt: true
+      }
+    });
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
     res.json(user);
   } catch (error) {
     console.error('[GET /api/admin/profile]', error);
@@ -1068,7 +1088,14 @@ router.get('/interviews', async (req, res) => {
     });
     res.json(interviews);
   } catch (error) {
-    console.error('[GET /api/admin/interviews]', error);
+    console.error('[GET /api/admin/interviews]', {
+      message: error?.message,
+      code: error?.code,
+    });
+    // If the interviews table/columns do not exist yet, return an empty list
+    if (error?.code === 'P2021' || error?.code === 'P2022') {
+      return res.json([]);
+    }
     res.status(500).json({ error: 'Failed to fetch interviews' });
   }
 });
@@ -1076,11 +1103,23 @@ router.get('/interviews', async (req, res) => {
 // Create new interview
 router.post('/interviews', async (req, res) => {
   try {
-    const { name, type, startDate, endDate, location, maxCandidates, description, cycleId } = req.body;
-    
+    const {
+      title,
+      interviewType,
+      startDate,
+      endDate,
+      location,
+      maxCandidates,
+      description,
+      cycleId,
+      dresscode,
+      deliberationsStart,
+      deliberationsEnd
+    } = req.body;
+
     // Validate required fields
-    if (!name || !type || !startDate || !endDate || !cycleId) {
-      return res.status(400).json({ error: 'Interview name, type, start date, end date, and cycle ID are required' });
+    if (!title || !interviewType || !startDate || !endDate || !cycleId) {
+      return res.status(400).json({ error: 'Interview title, interviewType, start date, end date, and cycle ID are required' });
     }
 
     // Validate that the cycle exists
@@ -1091,26 +1130,49 @@ router.post('/interviews', async (req, res) => {
     if (!cycle) {
       return res.status(400).json({ error: 'Invalid recruiting cycle' });
     }
-    
+
+    const createdBy = req.user?.id;
+    if (!createdBy) {
+      return res.status(401).json({ error: 'Authenticated user required' });
+    }
+    // Ensure creator exists (avoid FK violation P2003)
+    const creator = await prisma.user.findUnique({ where: { id: createdBy } });
+    if (!creator) {
+      return res.status(400).json({ error: 'Creator user not found' });
+    }
+
     const interview = await prisma.interview.create({
       data: {
-        name,
-        type,
+        title,
+        interviewType,
         startDate: new Date(startDate),
         endDate: new Date(endDate),
         location,
-        maxCandidates,
-        description,
-        cycleId
+        maxCandidates: maxCandidates ?? null,
+        description: typeof description === 'object' ? JSON.stringify(description) : (description ?? null),
+        cycleId,
+        createdBy,
+        dresscode: dresscode ?? null,
+        deliberationsStart: deliberationsStart ? new Date(deliberationsStart) : null,
+        deliberationsEnd: deliberationsEnd ? new Date(deliberationsEnd) : null
       },
       include: {
         cycle: true
       }
     });
-    
+
     res.json(interview);
   } catch (error) {
-    console.error('[POST /api/admin/interviews]', error);
+    console.error('[POST /api/admin/interviews]', {
+      message: error?.message,
+      code: error?.code,
+    });
+    if (error?.code === 'P2003') {
+      return res.status(400).json({ error: 'Invalid reference: cycleId or createdBy does not exist' });
+    }
+    if (error?.code === 'P2021' || error?.code === 'P2022') {
+      return res.status(400).json({ error: 'Interview schema not found. Run migrations to create interview tables.' });
+    }
     res.status(500).json({ error: 'Failed to create interview' });
   }
 });
@@ -1220,51 +1282,6 @@ router.post('/interviews/:id/start', async (req, res) => {
   }
 });
 
-// Add evaluation
-router.post('/interviews/:id/evaluations', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { candidateId, interviewerId, scores, comments } = req.body;
-    
-    const interview = await prisma.interview.findUnique({
-      where: { id }
-    });
-
-    if (!interview) {
-      return res.status(404).json({ error: 'Interview not found' });
-    }
-    
-    // Calculate overall score
-    const scoreValues = Object.values(scores);
-    const overallScore = scoreValues.reduce((sum, score) => sum + score, 0) / scoreValues.length;
-    
-    // Create evaluation based on interview type
-    let evaluationData = {
-      score: overallScore,
-      feedback: comments,
-      evaluatorId: interviewerId
-    };
-    
-    // Determine which evaluation model to use based on interview type
-    if (interview.type === 'COFFEE_CHAT') {
-      evaluationData.coffeeChatId = candidateId; // This would need to be adjusted based on your schema
-    } else if (interview.type === 'ROUND_ONE') {
-      evaluationData.roundOneId = candidateId;
-    } else if (interview.type === 'ROUND_TWO') {
-      evaluationData.roundTwoId = candidateId;
-    }
-    
-    const evaluation = await prisma.evaluation.create({
-      data: evaluationData
-    });
-    
-    res.json(evaluation);
-  } catch (error) {
-    console.error('[POST /api/admin/interviews/:id/evaluations]', error);
-    res.status(500).json({ error: 'Failed to create evaluation' });
-  }
-});
-
 // Get all applications for admin document grading
 router.get('/applications', async (req, res) => {
   try {
@@ -1277,18 +1294,21 @@ router.get('/applications', async (req, res) => {
       return res.json([]);
     }
 
-    // Get all candidates with their latest applications
-    const candidates = await prisma.candidate.findMany({
+    // Get all applications for the active cycle directly
+    const applications = await prisma.application.findMany({
+      where: {
+        cycleId: activeCycle.id
+      },
       include: {
-        applications: {
-          where: {
-            cycleId: activeCycle.id
-          },
-          orderBy: {
-            submittedAt: 'desc'
-          },
-          take: 1
+        candidate: {
+          select: {
+            id: true,
+            assignedGroupId: true
+          }
         }
+      },
+      orderBy: {
+        submittedAt: 'desc'
       }
     });
 
@@ -1309,7 +1329,7 @@ router.get('/applications', async (req, res) => {
     const resumeScores = await prisma.resumeScore.findMany({
       where: {
         candidateId: {
-          in: candidates.map(c => c.id)
+          in: applications.map(app => app.candidateId)
         }
       },
       select: {
@@ -1322,7 +1342,7 @@ router.get('/applications', async (req, res) => {
     const coverLetterScores = await prisma.coverLetterScore.findMany({
       where: {
         candidateId: {
-          in: candidates.map(c => c.id)
+          in: applications.map(app => app.candidateId)
         }
       },
       select: {
@@ -1335,7 +1355,7 @@ router.get('/applications', async (req, res) => {
     const videoScores = await prisma.videoScore.findMany({
       where: {
         candidateId: {
-          in: candidates.map(c => c.id)
+          in: applications.map(app => app.candidateId)
         }
       },
       select: {
@@ -1377,45 +1397,43 @@ router.get('/applications', async (req, res) => {
     };
 
     // Transform the data
-    const applications = [];
+    const transformedApplications = [];
     
-    candidates.forEach(candidate => {
-      const latestApplication = candidate.applications[0];
-      if (latestApplication) {
-        const resumeStatus = checkTeamCompletion(candidate.id, candidate.assignedGroupId, resumeScores, 'resume');
-        const coverLetterStatus = checkTeamCompletion(candidate.id, candidate.assignedGroupId, coverLetterScores, 'coverLetter');
-        const videoStatus = checkTeamCompletion(candidate.id, candidate.assignedGroupId, videoScores, 'video');
-        
-        applications.push({
-          id: latestApplication.id,
-          candidateId: candidate.id,
-          name: `${latestApplication.firstName} ${latestApplication.lastName}`,
-          major: latestApplication.major1 || 'N/A',
-          year: latestApplication.graduationYear || 'N/A',
-          gpa: latestApplication.cumulativeGpa?.toString() || 'N/A',
-          status: latestApplication.status || 'SUBMITTED',
-          email: latestApplication.email,
-          submittedAt: latestApplication.submittedAt,
-          gender: latestApplication.gender || 'N/A',
-          isFirstGeneration: latestApplication.isFirstGeneration,
-          isTransferStudent: latestApplication.isTransferStudent,
-          resumeUrl: latestApplication.resumeUrl,
-          coverLetterUrl: latestApplication.coverLetterUrl,
-          videoUrl: latestApplication.videoUrl,
-          hasResumeScore: resumeStatus.completed,
-          hasCoverLetterScore: coverLetterStatus.completed,
-          hasVideoScore: videoStatus.completed,
-          resumeMissingGrades: resumeStatus.missingGrades,
-          coverLetterMissingGrades: coverLetterStatus.missingGrades,
-          videoMissingGrades: videoStatus.missingGrades,
-          resumeTotalMembers: resumeStatus.totalMembers,
-          coverLetterTotalMembers: coverLetterStatus.totalMembers,
-          videoTotalMembers: videoStatus.totalMembers
-        });
-      }
+    applications.forEach(app => {
+      const resumeStatus = checkTeamCompletion(app.candidateId, app.candidate.assignedGroupId, resumeScores, 'resume');
+      const coverLetterStatus = checkTeamCompletion(app.candidateId, app.candidate.assignedGroupId, coverLetterScores, 'coverLetter');
+      const videoStatus = checkTeamCompletion(app.candidateId, app.candidate.assignedGroupId, videoScores, 'video');
+      
+      transformedApplications.push({
+        id: app.id,
+        candidateId: app.candidateId,
+        name: `${app.firstName} ${app.lastName}`,
+        major: app.major1 || 'N/A',
+        year: app.graduationYear || 'N/A',
+        gpa: app.cumulativeGpa?.toString() || 'N/A',
+        status: app.status || 'SUBMITTED',
+        approved: app.approved, // Add approved field for decision status
+        email: app.email,
+        submittedAt: app.submittedAt,
+        gender: app.gender || 'N/A',
+        isFirstGeneration: app.isFirstGeneration,
+        isTransferStudent: app.isTransferStudent,
+        resumeUrl: app.resumeUrl,
+        coverLetterUrl: app.coverLetterUrl,
+        videoUrl: app.videoUrl,
+        hasResumeScore: resumeStatus.completed,
+        hasCoverLetterScore: coverLetterStatus.completed,
+        hasVideoScore: videoStatus.completed,
+        resumeMissingGrades: resumeStatus.missingGrades,
+        coverLetterMissingGrades: coverLetterStatus.missingGrades,
+        videoMissingGrades: videoStatus.missingGrades,
+        resumeTotalMembers: resumeStatus.totalMembers,
+        coverLetterTotalMembers: coverLetterStatus.totalMembers,
+        videoTotalMembers: videoStatus.totalMembers
+      });
     });
 
-    res.json(applications);
+    res.json(transformedApplications);
   } catch (error) {
     console.error('Error fetching admin applications:', error);
     res.status(500).json({ error: 'Failed to fetch applications', details: error.message });
@@ -2027,6 +2045,231 @@ router.get('/existing-decisions', async (req, res) => {
   } catch (error) {
     console.error('[GET /api/admin/existing-decisions]', error);
     res.status(500).json({ error: 'Failed to fetch existing decisions', details: error.message });
+  }
+});
+
+// Get applications for interview groups
+router.get('/interviews/:id/applications', async (req, res) => {
+  try {
+    const { id: interviewId } = req.params;
+    const { groupIds } = req.query;
+    
+    if (!groupIds) {
+      return res.status(400).json({ error: 'Group IDs are required' });
+    }
+    
+    const groupIdArray = groupIds.split(',');
+    
+    // Get interview configuration
+    const interview = await prisma.interview.findUnique({
+      where: { id: interviewId }
+    });
+    
+    if (!interview) {
+      return res.status(404).json({ error: 'Interview not found' });
+    }
+    
+    // Parse interview configuration
+    let config = {};
+    try {
+      config = typeof interview.description === 'string' 
+        ? JSON.parse(interview.description) 
+        : interview.description || {};
+    } catch (e) {
+      console.warn('Failed to parse interview description:', e);
+    }
+    
+    // Get applications from selected groups
+    const applicationIds = new Set();
+    config.applicationGroups?.forEach(group => {
+      if (groupIdArray.includes(group.id)) {
+        group.applicationIds?.forEach(appId => applicationIds.add(appId));
+      }
+    });
+    
+    if (applicationIds.size === 0) {
+      return res.json([]);
+    }
+    
+    // Fetch applications
+    const applications = await prisma.application.findMany({
+      where: {
+        id: { in: Array.from(applicationIds) }
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        major1: true,
+        graduationYear: true,
+        resumeUrl: true,
+        coverLetterUrl: true,
+        videoUrl: true
+      }
+    });
+    
+    // Transform applications to include name field
+    const transformedApplications = applications.map(app => ({
+      ...app,
+      name: `${app.firstName} ${app.lastName}`,
+      major: app.major1,
+      year: app.graduationYear
+    }));
+    
+    res.json(transformedApplications);
+  } catch (error) {
+    console.error('[GET /api/admin/interviews/:id/applications]', error);
+    res.status(500).json({ error: 'Failed to fetch applications', details: error.message });
+  }
+});
+
+// Get interview evaluations
+router.get('/interviews/:id/evaluations', async (req, res) => {
+  try {
+    const { id: interviewId } = req.params;
+    
+    const evaluations = await prisma.interviewEvaluation.findMany({
+      where: { interviewId },
+      include: {
+        rubricScores: true
+      }
+    });
+    
+    res.json(evaluations);
+  } catch (error) {
+    console.error('[GET /api/admin/interviews/:id/evaluations]', error);
+    res.status(500).json({ error: 'Failed to fetch evaluations', details: error.message });
+  }
+});
+
+// Create or update interview evaluation
+router.post('/interviews/:id/evaluations', async (req, res) => {
+  try {
+    const { id: interviewId } = req.params;
+    const { applicationId, notes, decision, rubricScores } = req.body;
+    const evaluatorId = req.user.id;
+    
+    console.log('Creating evaluation:', { interviewId, applicationId, evaluatorId, decision, rubricScores });
+    
+    // Validate required fields
+    if (!applicationId) {
+      return res.status(400).json({ error: 'Application ID is required' });
+    }
+    
+    // Check if evaluation already exists
+    const existingEvaluation = await prisma.interviewEvaluation.findFirst({
+      where: {
+        interviewId,
+        applicationId,
+        evaluatorId
+      },
+      include: {
+        rubricScores: true
+      }
+    });
+    
+    if (existingEvaluation) {
+      // Update existing evaluation
+      const updatedEvaluation = await prisma.interviewEvaluation.update({
+        where: { id: existingEvaluation.id },
+        data: {
+          notes,
+          decision
+        }
+      });
+      
+      // Update rubric scores
+      if (rubricScores) {
+        for (const [category, score] of Object.entries(rubricScores)) {
+          await prisma.interviewRubricScore.upsert({
+            where: {
+              evaluationId_category: {
+                evaluationId: existingEvaluation.id,
+                category
+              }
+            },
+            update: { score },
+            create: {
+              evaluationId: existingEvaluation.id,
+              category,
+              score
+            }
+          });
+        }
+      }
+      
+      res.json(updatedEvaluation);
+    } else {
+      // Create new evaluation
+      const newEvaluation = await prisma.interviewEvaluation.create({
+        data: {
+          interviewId,
+          applicationId,
+          evaluatorId,
+          notes,
+          decision
+        }
+      });
+      
+      // Create rubric scores
+      if (rubricScores) {
+        for (const [category, score] of Object.entries(rubricScores)) {
+          await prisma.interviewRubricScore.create({
+            data: {
+              evaluationId: newEvaluation.id,
+              category,
+              score
+            }
+          });
+        }
+      }
+      
+      res.json(newEvaluation);
+    }
+  } catch (error) {
+    console.error('[POST /api/admin/interviews/:id/evaluations]', error);
+    console.error('Request body:', req.body);
+    console.error('User ID:', req.user?.id);
+    res.status(500).json({ error: 'Failed to save evaluation', details: error.message });
+  }
+});
+
+// Get interview evaluations for a specific application
+router.get('/applications/:id/interview-evaluations', async (req, res) => {
+  try {
+    const { id: applicationId } = req.params;
+    
+    const evaluations = await prisma.interviewEvaluation.findMany({
+      where: { applicationId },
+      include: {
+        interview: {
+          select: {
+            id: true,
+            title: true,
+            interviewType: true,
+            startDate: true,
+            endDate: true
+          }
+        },
+        evaluator: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true
+          }
+        },
+        rubricScores: {
+          orderBy: { category: 'asc' }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+    
+    res.json(evaluations);
+  } catch (error) {
+    console.error('[GET /api/admin/applications/:id/interview-evaluations]', error);
+    res.status(500).json({ error: 'Failed to fetch interview evaluations', details: error.message });
   }
 });
 

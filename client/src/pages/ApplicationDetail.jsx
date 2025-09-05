@@ -47,6 +47,10 @@ export default function ApplicationDetail() {
   const [eventData, setEventData] = useState({ events: [], totalPoints: 0 });
   const [eventLoading, setEventLoading] = useState(true);
 
+  // Interview evaluations
+  const [interviewEvaluations, setInterviewEvaluations] = useState([]);
+  const [evaluationsLoading, setEvaluationsLoading] = useState(false);
+
   const resetGrades = async () => {
     try {
       // Fetch the most recent grades for this application and user
@@ -166,6 +170,20 @@ export default function ApplicationDetail() {
     }
   };
 
+  const fetchInterviewEvaluations = async () => {
+    try {
+      setEvaluationsLoading(true);
+      const evaluations = await apiClient.get(`/admin/applications/${id}/interview-evaluations`);
+      setInterviewEvaluations(evaluations);
+      console.log('Fetched interview evaluations:', evaluations);
+    } catch (e) {
+      console.error('Error fetching interview evaluations:', e);
+      setInterviewEvaluations([]);
+    } finally {
+      setEvaluationsLoading(false);
+    }
+  };
+
   // Toggle N/A for a grade type
   const toggleNa = (type) => {
     const newState = !isNa[type];
@@ -242,6 +260,9 @@ export default function ApplicationDetail() {
         
         // Load event data
         await fetchEventData();
+        
+        // Load interview evaluations
+        await fetchInterviewEvaluations();
         
       } catch (err) {
         console.error('Error loading data:', err);
@@ -901,6 +922,126 @@ export default function ApplicationDetail() {
               </div>
             ))}
           </div>
+        )}
+      </div>
+
+      {/* Interview Evaluations Section */}
+      <div className="info-section" style={{ marginTop: '2rem' }}>
+        <h2 className="section-title">Interview Evaluations</h2>
+        {evaluationsLoading ? (
+          <div className="empty-state">Loading interview evaluations...</div>
+        ) : interviewEvaluations.length > 0 ? (
+          <div className="interview-evaluations-list">
+            {interviewEvaluations.map((evaluation) => (
+              <div 
+                key={evaluation.id} 
+                className="interview-evaluation-item"
+                style={{
+                  padding: '16px',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '8px',
+                  marginBottom: '12px',
+                  backgroundColor: '#f9fafb'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: '600', color: '#374151', fontSize: '1.1rem' }}>
+                      {evaluation.interview.title}
+                    </div>
+                    <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '2px' }}>
+                      {evaluation.interview.interviewType.replace(/_/g, ' ')} • 
+                      Evaluated by {evaluation.evaluator.fullName}
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '2px' }}>
+                      {new Date(evaluation.createdAt).toLocaleDateString()}
+                    </div>
+                  </div>
+                  {evaluation.decision && (
+                    <div 
+                      style={{
+                        padding: '4px 8px',
+                        borderRadius: '4px',
+                        fontSize: '0.75rem',
+                        fontWeight: '600',
+                        backgroundColor: 
+                          evaluation.decision === 'YES' ? '#dcfce7' :
+                          evaluation.decision === 'MAYBE_YES' ? '#dcfce7' :
+                          evaluation.decision === 'UNSURE' ? '#fef3c7' :
+                          evaluation.decision === 'MAYBE_NO' ? '#fee2e2' :
+                          '#fee2e2',
+                        color: 
+                          evaluation.decision === 'YES' ? '#166534' :
+                          evaluation.decision === 'MAYBE_YES' ? '#166534' :
+                          evaluation.decision === 'UNSURE' ? '#92400e' :
+                          evaluation.decision === 'MAYBE_NO' ? '#991b1b' :
+                          '#991b1b',
+                        border: '1px solid',
+                        borderColor: 
+                          evaluation.decision === 'YES' ? '#bbf7d0' :
+                          evaluation.decision === 'MAYBE_YES' ? '#bbf7d0' :
+                          evaluation.decision === 'UNSURE' ? '#fde68a' :
+                          evaluation.decision === 'MAYBE_NO' ? '#fecaca' :
+                          '#fecaca'
+                      }}
+                    >
+                      {evaluation.decision.replace(/_/g, ' ')}
+                    </div>
+                  )}
+                </div>
+                
+                {/* Notes */}
+                {evaluation.notes && (
+                  <div style={{ marginBottom: '12px' }}>
+                    <div style={{ fontWeight: '600', color: '#374151', marginBottom: '4px', fontSize: '0.875rem' }}>
+                      Notes:
+                    </div>
+                    <div style={{ 
+                      backgroundColor: '#f3f4f6', 
+                      padding: '8px', 
+                      borderRadius: '4px',
+                      whiteSpace: 'pre-wrap',
+                      fontSize: '0.875rem',
+                      color: '#374151'
+                    }}>
+                      {evaluation.notes}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Rubric Scores */}
+                {evaluation.rubricScores && evaluation.rubricScores.length > 0 && (
+                  <div>
+                    <div style={{ fontWeight: '600', color: '#374151', marginBottom: '8px', fontSize: '0.875rem' }}>
+                      Rubric Scores:
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '8px' }}>
+                      {evaluation.rubricScores.map((score) => (
+                        <div 
+                          key={score.id}
+                          style={{ 
+                            backgroundColor: '#f3f4f6', 
+                            padding: '8px', 
+                            borderRadius: '4px',
+                            textAlign: 'center'
+                          }}
+                        >
+                          <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '2px' }}>
+                            {score.category.replace(/_/g, ' ')}
+                          </div>
+                          <div style={{ fontSize: '1rem', fontWeight: '600', color: '#374151' }}>
+                            {score.score}/5
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="empty-state">No interview evaluations found for this application.</div>
         )}
       </div>
 

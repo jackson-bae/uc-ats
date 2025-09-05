@@ -32,6 +32,7 @@ model User {
   createdInterviews  Interview[]         @relation("InterviewCreator")
   interviewAssignments InterviewAssignment[] @relation("InterviewAssignment")
   completedActionItems InterviewActionItem[] @relation("InterviewActionItemCompletion")
+  interviewEvaluations InterviewEvaluation[] @relation("InterviewEvaluator")
 
   @@map("users")
 }
@@ -92,6 +93,7 @@ model Application {
   candidate         Candidate?        @relation(fields: [candidateId], references: [id])
   cycle             RecruitingCycle?  @relation(fields: [cycleId], references: [id])
   comments          Comment[]
+  interviewEvaluations InterviewEvaluation[]
 
   @@map("applications")
 }
@@ -398,6 +400,7 @@ model Interview {
   creator              User                  @relation("InterviewCreator", fields: [createdBy], references: [id])
   assignments          InterviewAssignment[]
   actionItems          InterviewActionItem[]
+  evaluations          InterviewEvaluation[]
   
   @@map("interviews")
 }
@@ -459,4 +462,49 @@ enum InterviewerRole {
   INTERVIEWER
   OBSERVER
   DELIBERATOR
+}
+
+enum InterviewDecision {
+  YES
+  MAYBE_YES
+  UNSURE
+  MAYBE_NO
+  NO
+}
+
+// Interview evaluation models
+model InterviewEvaluation {
+  id            String            @id @default(uuid())
+  interviewId   String
+  applicationId String
+  evaluatorId   String
+  notes         String?
+  decision      InterviewDecision?
+  rubricScores  InterviewRubricScore[]
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  
+  // Relations
+  interview     Interview         @relation(fields: [interviewId], references: [id])
+  application   Application       @relation(fields: [applicationId], references: [id])
+  evaluator     User              @relation("InterviewEvaluator", fields: [evaluatorId], references: [id])
+  
+  @@unique([interviewId, applicationId, evaluatorId])
+  @@map("interview_evaluations")
+}
+
+model InterviewRubricScore {
+  id              String            @id @default(uuid())
+  evaluationId    String
+  category        String            // e.g., "Communication", "Problem Solving", "Cultural Fit"
+  score           Int               // 1-5 scale
+  comments        String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  
+  // Relations
+  evaluation      InterviewEvaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+  
+  @@unique([evaluationId, category])
+  @@map("interview_rubric_scores")
 }

@@ -18,6 +18,7 @@ import DocumentGrading from './pages/DocumentGrading';
 import AdminDocumentGrading from './pages/AdminDocumentGrading';
 import AssignedInterviews from './pages/AssignedInterviews';
 import AdminAssignedInterviews from './pages/AdminAssignedInterviews';
+import InterviewInterface from './pages/InterviewInterface';
 import Candidates from './pages/Candidates';
 import Staging from './pages/Staging';
 import RecruitmentResources from './pages/RecruitmentResources';
@@ -205,6 +206,15 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute>
             <AdminAssignedInterviews />
+          </ProtectedRoute>
+        }
+      />
+      
+      <Route
+        path="/admin/interview-interface"
+        element={
+          <ProtectedRoute>
+            <InterviewInterface />
           </ProtectedRoute>
         }
       />
