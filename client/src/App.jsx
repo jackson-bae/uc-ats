@@ -30,7 +30,6 @@ import CandidateEvents from './pages/CandidateEvents';
 import MemberEvents from './pages/MemberEvents';
 import CandidateApplications from './pages/CandidateApplications';
 import InterviewPreparation from './pages/InterviewPreparation';
-import Interviews from './pages/Interviews';
 import InterviewDetail from './pages/InterviewDetail';
 import './styles/variables.css';
 // Protected Route wrapper for admin/member users
@@ -183,14 +182,6 @@ const AppRoutes = () => {
         }
       />
       
-      <Route
-        path="/interviews"
-        element={
-          <ProtectedRoute>
-            <Interviews />
-          </ProtectedRoute>
-        }
-      />
       
       <Route
         path="/interviews/:id"

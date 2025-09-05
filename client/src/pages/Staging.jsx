@@ -158,6 +158,10 @@ const stagingAPI = {
       decision, 
       phase 
     });
+  },
+
+  async fetchEvaluationSummaries(applicationIds) {
+    return await apiClient.post('/admin/applications/evaluation-summaries', { applicationIds });
   }
 };
 
@@ -482,6 +486,7 @@ export default function Staging() {
   const [interviewEvaluations, setInterviewEvaluations] = useState([]);
   const [evaluationsLoading, setEvaluationsLoading] = useState(false);
   const [docPreview, setDocPreview] = useState({ open: false, src: '', kind: 'pdf', title: '' });
+  const [evaluationSummaries, setEvaluationSummaries] = useState({});
 
   // Decision state
   const [currentDecision, setCurrentDecision] = useState({
@@ -568,6 +573,16 @@ export default function Staging() {
     fetchData();
   }, []);
 
+  // Fetch evaluation summaries when coffee chat tab is active
+  useEffect(() => {
+    if (currentTab === 1 && adminApplications.length > 0) {
+      const coffeeChatApps = adminApplications.filter(app => app.status === 'UNDER_REVIEW');
+      if (coffeeChatApps.length > 0) {
+        fetchCoffeeChatEvaluations(coffeeChatApps);
+      }
+    }
+  }, [currentTab, adminApplications]);
+
   const fetchCandidates = async () => {
     try {
       const [data, adminApplicationsData, eventsData, reviewTeamsData] = await Promise.all([
@@ -620,6 +635,37 @@ export default function Staging() {
         message: 'Error loading candidates',
         severity: 'error'
       });
+    }
+  };
+
+  // Function to calculate ranking score based on evaluation decisions
+  const calculateRankingScore = (evaluations) => {
+    if (!evaluations || evaluations.length === 0) return 0;
+    
+    // Scoring system: YES=4, MAYBE_YES=3, UNSURE=2, MAYBE_NO=1, NO=0
+    const decisionScores = {
+      'YES': 4,
+      'MAYBE_YES': 3,
+      'UNSURE': 2,
+      'MAYBE_NO': 1,
+      'NO': 0
+    };
+    
+    const totalScore = evaluations.reduce((sum, evaluation) => {
+      return sum + (decisionScores[evaluation.decision] || 0);
+    }, 0);
+    
+    return totalScore / evaluations.length; // Average score
+  };
+
+  // Function to fetch evaluation summaries for coffee chat applications
+  const fetchCoffeeChatEvaluations = async (applications) => {
+    try {
+      const applicationIds = applications.map(app => app.id);
+      const summaries = await stagingAPI.fetchEvaluationSummaries(applicationIds);
+      setEvaluationSummaries(summaries);
+    } catch (error) {
+      console.error('Error fetching evaluation summaries:', error);
     }
   };
 
@@ -1314,9 +1360,9 @@ Members: ${candidate.reviewTeam.members.map(m => m.fullName).join(', ')}`}
               <Table>
                 <TableHead>
                   <TableRow>
+                    <TableCell>Rank</TableCell>
                     <TableCell>Application</TableCell>
-                    <TableCell>Current Round</TableCell>
-                    <TableCell>Grading Status</TableCell>
+                    <TableCell>Evaluation Summary</TableCell>
                     <TableCell>Decisions</TableCell>
                   </TableRow>
                 </TableHead>
@@ -1331,7 +1377,15 @@ Members: ${candidate.reviewTeam.members.map(m => m.fullName).join(', ')}`}
                     console.log('Filtered apps length:', filteredApps.length);
                     console.log('Applications with approved=true:', adminApplications.filter(app => app.approved === true).map(app => ({ id: app.id, approved: app.approved, status: app.status })));
                     console.log('All applications with their approved field:', adminApplications.map(app => ({ id: app.id, approved: app.approved, status: app.status, name: app.name })));
-                    return filteredApps.map((application) => {
+                    
+                    // Sort applications by ranking score (highest first)
+                    const sortedApps = filteredApps.sort((a, b) => {
+                      const scoreA = calculateRankingScore(evaluationSummaries[a.id]?.evaluations || []);
+                      const scoreB = calculateRankingScore(evaluationSummaries[b.id]?.evaluations || []);
+                      return scoreB - scoreA; // Descending order (highest score first)
+                    });
+                    
+                    return sortedApps.map((application, index) => {
                       console.log('Coffee Chats application:', application); // Debug log
                       
                       // For coffee chat round: reset "Yes" decisions to "not decided", keep "No" decisions
@@ -1359,7 +1413,40 @@ Members: ${candidate.reviewTeam.members.map(m => m.fullName).join(', ')}`}
                       console.log('Final displayDecision for app:', application.id, '=', displayDecision);
                       
                       return (
-                        <TableRow key={application.id}>
+                        <TableRow key={application.id} hover sx={{ cursor: 'pointer' }} onClick={async () => {
+                          try {
+                            setAppModalLoading(true);
+                            setEvaluationsLoading(true);
+                            
+                            // Load application data and interview evaluations in parallel
+                            const [appData, evaluationsData] = await Promise.all([
+                              apiClient.get(`/applications/${application.id}`),
+                              apiClient.get(`/admin/applications/${application.id}/interview-evaluations`)
+                            ]);
+                            
+                            setAppModal(appData);
+                            setInterviewEvaluations(evaluationsData);
+                            setAppModalOpen(true);
+                          } catch (e) {
+                            console.error('Failed to load application', e);
+                            setSnackbar({ open: true, message: 'Failed to load application', severity: 'error' });
+                          } finally {
+                            setAppModalLoading(false);
+                            setEvaluationsLoading(false);
+                          }
+                        }}>
+                          <TableCell>
+                            <Box display="flex" alignItems="center" gap={1}>
+                              <Typography variant="h6" fontWeight="bold" color="primary">
+                                #{index + 1}
+                              </Typography>
+                              <Box>
+                                <Typography variant="caption" color="text.secondary">
+                                  Score: {calculateRankingScore(evaluationSummaries[application.id]?.evaluations || []).toFixed(1)}
+                                </Typography>
+                              </Box>
+                            </Box>
+                          </TableCell>
                           <TableCell>
                             <Box>
                               <Typography variant="subtitle2" fontWeight="bold">
@@ -1374,28 +1461,55 @@ Members: ${candidate.reviewTeam.members.map(m => m.fullName).join(', ')}`}
                             </Box>
                           </TableCell>
                           <TableCell>
-                            <Typography variant="body2" fontWeight="bold">
-                              Round 2
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              Coffee Chats
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Box>
-                              <Typography variant="caption" display="block">
-                                Resume: {application.hasResumeScore ? '✅' : '❌'} 
-                                {application.hasResumeScore ? 'Complete' : `${application.resumeMissingGrades}/${application.resumeTotalMembers} grades`}
-                              </Typography>
-                              <Typography variant="caption" display="block">
-                                Cover Letter: {application.hasCoverLetterScore ? '✅' : '❌'}
-                                {application.hasCoverLetterScore ? 'Complete' : `${application.coverLetterMissingGrades}/${application.coverLetterTotalMembers} grades`}
-                              </Typography>
-                              <Typography variant="caption" display="block">
-                                Video: {application.hasVideoScore ? '✅' : '❌'}
-                                {application.hasVideoScore ? 'Complete' : `${application.videoMissingGrades}/${application.videoTotalMembers} grades`}
-                              </Typography>
-                            </Box>
+                            {(() => {
+                              const evaluations = evaluationSummaries[application.id]?.evaluations || [];
+                              if (evaluations.length === 0) {
+                                return (
+                                  <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                                    No evaluations yet
+                                  </Typography>
+                                );
+                              }
+                              
+                              // Count each decision type
+                              const counts = evaluations.reduce((acc, evaluation) => {
+                                acc[evaluation.decision] = (acc[evaluation.decision] || 0) + 1;
+                                return acc;
+                              }, {});
+                              
+                              return (
+                                <Box>
+                                  <Typography variant="caption" display="block">
+                                    Total: {evaluations.length} evaluation{evaluations.length !== 1 ? 's' : ''}
+                                  </Typography>
+                                  {counts.YES > 0 && (
+                                    <Typography variant="caption" display="block" color="success.main">
+                                      YES: {counts.YES}
+                                    </Typography>
+                                  )}
+                                  {counts.MAYBE_YES > 0 && (
+                                    <Typography variant="caption" display="block" color="success.main">
+                                      Maybe-Yes: {counts.MAYBE_YES}
+                                    </Typography>
+                                  )}
+                                  {counts.UNSURE > 0 && (
+                                    <Typography variant="caption" display="block" color="warning.main">
+                                      Unsure: {counts.UNSURE}
+                                    </Typography>
+                                  )}
+                                  {counts.MAYBE_NO > 0 && (
+                                    <Typography variant="caption" display="block" color="error.main">
+                                      Maybe-No: {counts.MAYBE_NO}
+                                    </Typography>
+                                  )}
+                                  {counts.NO > 0 && (
+                                    <Typography variant="caption" display="block" color="error.main">
+                                      NO: {counts.NO}
+                                    </Typography>
+                                  )}
+                                </Box>
+                              );
+                            })()}
                           </TableCell>
                           <TableCell>
                             <Box>
@@ -1577,31 +1691,6 @@ Members: ${candidate.reviewTeam.members.map(m => m.fullName).join(', ')}`}
                             </Box>
                           )}
                           
-                          {/* Rubric Scores */}
-                          {evaluation.rubricScores && evaluation.rubricScores.length > 0 && (
-                            <Box>
-                              <Typography variant="subtitle2" gutterBottom>Rubric Scores:</Typography>
-                              <Grid container spacing={1}>
-                                {evaluation.rubricScores.map((score) => (
-                                  <Grid item xs={6} sm={4} key={score.id}>
-                                    <Box sx={{ 
-                                      backgroundColor: 'grey.50', 
-                                      p: 1, 
-                                      borderRadius: 1,
-                                      textAlign: 'center'
-                                    }}>
-                                      <Typography variant="caption" color="text.secondary">
-                                        {score.category.replace(/_/g, ' ')}
-                                      </Typography>
-                                      <Typography variant="h6" fontWeight="bold">
-                                        {score.score}/5
-                                      </Typography>
-                                    </Box>
-                                  </Grid>
-                                ))}
-                              </Grid>
-                            </Box>
-                          )}
                         </CardContent>
                       </Card>
                     ))}
