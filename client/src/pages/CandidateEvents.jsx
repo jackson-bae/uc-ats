@@ -65,6 +65,50 @@ export default function CandidateEvents() {
     }
   };
 
+  const handleAddToCalendar = (event) => {
+    try {
+      const startDate = new Date(event.eventStartDate);
+      const endDate = event.eventEndDate ? new Date(event.eventEndDate) : new Date(startDate.getTime() + 2 * 60 * 60 * 1000);
+
+      const formatDateForGoogle = (date) => {
+        return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+      };
+
+      const startTime = formatDateForGoogle(startDate);
+      const endTime = formatDateForGoogle(endDate);
+
+      const eventTitle = event.eventName;
+      const timeString = startDate.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      });
+      const dateString = startDate.toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+
+      const eventDescription = `${event.description || 'Join us for this exciting UConsulting event!'}\n\nEvent Details:\nDate: ${dateString}\nTime: ${timeString}\nLocation: ${event.eventLocation || 'Location TBD'}`;
+      const eventLocation = event.eventLocation || 'Location TBD';
+
+      const googleCalendarUrl = new URL('https://calendar.google.com/calendar/render');
+      googleCalendarUrl.searchParams.set('action', 'TEMPLATE');
+      googleCalendarUrl.searchParams.set('text', eventTitle);
+      googleCalendarUrl.searchParams.set('dates', `${startTime}/${endTime}`);
+      googleCalendarUrl.searchParams.set('details', eventDescription);
+      googleCalendarUrl.searchParams.set('location', eventLocation);
+      googleCalendarUrl.searchParams.set('sf', 'true');
+      googleCalendarUrl.searchParams.set('output', 'xml');
+
+      window.open(googleCalendarUrl.toString(), '_blank');
+    } catch (error) {
+      console.error('Error adding to calendar:', error);
+      alert('Failed to open calendar. Please try again.');
+    }
+  };
+
   if (loading) {
     return (
       <div className="candidate-events-container">
@@ -90,9 +134,7 @@ export default function CandidateEvents() {
             Join us to learn more about UConsulting and network with members
           </p>
         </div>
-        <div className="social-media-prompt">
-          <span>Follow us on:</span>
-        </div>
+        
       </div>
 
       <div className="events-list">
@@ -119,13 +161,25 @@ export default function CandidateEvents() {
               </div>
               
               <div className="event-action">
-                <button 
-                  className={`rsvp-button ${event.hasAttended ? 'attended' : event.hasRsvpd ? 'rsvpd' : ''}`}
-                  onClick={() => handleRSVP(event)}
-                  disabled={event.hasAttended || event.hasRsvpd}
-                >
-                  {event.hasAttended ? 'Attended' : event.hasRsvpd ? 'RSVP\'d' : 'RSVP'}
-                </button>
+                <div className="event-buttons">
+                  <button 
+                    className={`rsvp-button ${event.hasAttended ? 'attended' : event.hasRsvpd ? 'rsvpd' : ''}`}
+                    onClick={() => handleRSVP(event)}
+                    disabled={event.hasAttended || event.hasRsvpd}
+                  >
+                    {event.hasAttended ? 'Attended' : event.hasRsvpd ? 'RSVP\'d' : 'RSVP'}
+                  </button>
+                  <button 
+                    className="calendar-button"
+                    onClick={() => handleAddToCalendar(event)}
+                    title="Add to Google Calendar"
+                  >
+                    <svg className="google-calendar-icon" viewBox="0 0 24 24" width="16" height="16">
+                      <path fill="#4285F4" d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/>
+                    </svg>
+                    Add to Calendar
+                  </button>
+                </div>
               </div>
             </div>
           );

@@ -13,3 +13,4 @@ ADD COLUMN IF NOT EXISTS market_sizing_notes TEXT,
 ADD COLUMN IF NOT EXISTS additional_notes TEXT;
 
 
+

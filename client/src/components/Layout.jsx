@@ -35,7 +35,7 @@ const Layout = ({ children }) => {
       { name: 'Document Grading', href: '/document-grading', icon: DocumentTextIcon },
       { name: 'Events', href: '/events', icon: CalendarDaysIcon },
       { name: 'Assigned Interviews', href: '/assigned-interviews', icon: UserGroupIcon2 },
-      { name: 'Candidates', href: '/candidates', icon: UserGroupIcon },
+      { name: 'Applications', href: '/candidates', icon: DocumentTextIcon },
       { name: 'Recruitment Resources and Timeline', href: '/recruitment-resources', icon: ClipboardDocumentListIcon },
     ] : user?.role === 'ADMIN' ? [
       { name: 'Applications', href: '/application-list', icon: DocumentTextIcon },

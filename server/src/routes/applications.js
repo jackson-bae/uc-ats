@@ -745,15 +745,50 @@ router.get('/:id/grades/average', requireAuth, async (req, res) => {
     
     // Calculate overall average if at least one grade exists
     const allGradeValues = [...resumeGrades, ...videoGrades, ...coverLetterGrades];
-    const overallAverage = allGradeValues.length > 0 ? 
+    let overallAverage = allGradeValues.length > 0 ? 
       (allGradeValues.reduce((a, b) => a + b, 0) / allGradeValues.length) : 0;
+
+    // Check if candidate has a referral and add 5 points bonus
+    const application = await prisma.application.findUnique({
+      where: { id: applicationId },
+      select: { candidateId: true }
+    });
+
+    let referralBonus = 0;
+    let eventPointsContribution = 0;
+    
+    if (application && application.candidateId) {
+      // Check for referral
+      const referral = await prisma.referral.findFirst({
+        where: { candidateId: application.candidateId }
+      });
+      if (referral) {
+        referralBonus = 5;
+        overallAverage += referralBonus;
+      }
+
+      // Calculate event points contribution (raw points, not scaled)
+      const eventAttendance = await prisma.eventAttendance.findMany({
+        where: { candidateId: application.candidateId },
+        include: { event: true }
+      });
+
+      const totalEventPoints = eventAttendance.reduce((sum, attendance) => {
+        return sum + (attendance.event.points || 0);
+      }, 0);
+
+      eventPointsContribution = totalEventPoints;
+      overallAverage += eventPointsContribution;
+    }
 
     const averages = {
       resume: parseFloat(avgResume.toFixed(2)),
       video: parseFloat(avgVideo.toFixed(2)),
       cover_letter: parseFloat(avgCoverLetter.toFixed(2)),
       total: parseFloat(overallAverage.toFixed(2)),
-      count: grades.length
+      count: grades.length,
+      referralBonus: referralBonus,
+      eventPointsContribution: parseFloat(eventPointsContribution.toFixed(2))
     };
 
     res.json(averages);
@@ -879,6 +914,111 @@ router.get('/:id/events', requireAuth, async (req, res) => {
       error: 'Failed to fetch events for application',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
+  }
+});
+
+// Referral endpoints
+
+// Get referral for an application
+router.get('/:id/referral', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Get the application to find the candidate ID
+    const application = await prisma.application.findUnique({
+      where: { id },
+      select: { candidateId: true }
+    });
+
+    if (!application || !application.candidateId) {
+      return res.status(404).json({ error: 'Application not found' });
+    }
+
+    // Get referral for this candidate
+    const referral = await prisma.referral.findFirst({
+      where: { candidateId: application.candidateId }
+    });
+
+    res.json(referral);
+  } catch (error) {
+    console.error('Error fetching referral:', error);
+    res.status(500).json({ error: 'Failed to fetch referral' });
+  }
+});
+
+// Add referral for an application
+router.post('/:id/referral', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { referrerName, relationship } = req.body;
+
+    if (!referrerName || !relationship) {
+      return res.status(400).json({ error: 'Referrer name and relationship are required' });
+    }
+
+    // Get the application to find the candidate ID
+    const application = await prisma.application.findUnique({
+      where: { id },
+      select: { candidateId: true }
+    });
+
+    if (!application || !application.candidateId) {
+      return res.status(404).json({ error: 'Application not found' });
+    }
+
+    // Check if referral already exists for this candidate
+    const existingReferral = await prisma.referral.findFirst({
+      where: { candidateId: application.candidateId }
+    });
+
+    if (existingReferral) {
+      return res.status(400).json({ error: 'This application already has a referral' });
+    }
+
+    // Create the referral
+    const referral = await prisma.referral.create({
+      data: {
+        referrerName,
+        relationship,
+        candidateId: application.candidateId
+      }
+    });
+
+    res.json(referral);
+  } catch (error) {
+    console.error('Error creating referral:', error);
+    res.status(500).json({ error: 'Failed to create referral' });
+  }
+});
+
+// Remove referral for an application
+router.delete('/:id/referral', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Get the application to find the candidate ID
+    const application = await prisma.application.findUnique({
+      where: { id },
+      select: { candidateId: true }
+    });
+
+    if (!application || !application.candidateId) {
+      return res.status(404).json({ error: 'Application not found' });
+    }
+
+    // Delete the referral
+    const deletedReferral = await prisma.referral.deleteMany({
+      where: { candidateId: application.candidateId }
+    });
+
+    if (deletedReferral.count === 0) {
+      return res.status(404).json({ error: 'No referral found for this application' });
+    }
+
+    res.json({ message: 'Referral removed successfully' });
+  } catch (error) {
+    console.error('Error removing referral:', error);
+    res.status(500).json({ error: 'Failed to remove referral' });
   }
 });
 

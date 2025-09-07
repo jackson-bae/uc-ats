@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeftIcon, DocumentIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, DocumentIcon, ChatBubbleLeftRightIcon, ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
 import apiClient from '../utils/api';
 import AuthenticatedImage from '../components/AuthenticatedImage';
 import AuthenticatedFileLink from '../components/AuthenticatedFileLink';
@@ -13,17 +13,7 @@ export default function ApplicationDetail() {
   const [application, setApplication] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [resumeGrade, setResumeGrade] = useState(0); // Start at 0
-  const [videoGrade, setVideoGrade] = useState(0); // Start at 0
-  const [coverLetterGrade, setCoverLetterGrade] = useState(0); // Start at 0
-  const [isNa, setIsNa] = useState({
-    resume: false,
-    video: false,
-    cover_letter: false
-  });
   const [currentUserId, setCurrentUserId] = useState(null); // Store current user ID
-  const [isSaving, setIsSaving] = useState(false); // Loading state for save operation
-  const [saveStatus, setSaveStatus] = useState({ type: '', message: '' }); // Save status message
   const [averageGrades, setAverageGrades] = useState({
     resume: 0,
     video: 0,
@@ -32,8 +22,10 @@ export default function ApplicationDetail() {
     count: 0
   }); // Store average grades
 
-  // Resume scores
+  // Document scores
   const [resumeScores, setResumeScores] = useState([]);
+  const [coverLetterScores, setCoverLetterScores] = useState([]);
+  const [videoScores, setVideoScores] = useState([]);
   const [selectedScore, setSelectedScore] = useState(null);
   const [scoreModalOpen, setScoreModalOpen] = useState(false);
 
@@ -42,6 +34,15 @@ export default function ApplicationDetail() {
   const [newComment, setNewComment] = useState('');
   const [commentError, setCommentError] = useState('');
   const [preview, setPreview] = useState({ open: false, src: '', kind: 'pdf', title: '' });
+  const [isCommentsMinimized, setIsCommentsMinimized] = useState(false);
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+  const commentsEndRef = useRef(null);
+
+  // Referral state
+  const [referral, setReferral] = useState(null);
+  const [isReferralModalOpen, setIsReferralModalOpen] = useState(false);
+  const [referralForm, setReferralForm] = useState({ referrerName: '', relationship: '' });
+  const [isSubmittingReferral, setIsSubmittingReferral] = useState(false);
 
   // Event attendance
   const [eventData, setEventData] = useState({ events: [], totalPoints: 0 });
@@ -51,63 +52,6 @@ export default function ApplicationDetail() {
   const [interviewEvaluations, setInterviewEvaluations] = useState([]);
   const [evaluationsLoading, setEvaluationsLoading] = useState(false);
 
-  const resetGrades = async () => {
-    try {
-      // Fetch the most recent grades for this application and user
-      const grades = await apiClient.get(`/applications/${id}/grades/latest`);
-      
-      if (grades) {
-        console.log('Loading previous grades for this application:', {
-          resume_grade: grades.resume,
-          video_grade: grades.video,
-          cover_letter_grade: grades.cover_letter,
-          submitted_at: grades.createdAt
-        });
-        
-        // Set the sliders to the retrieved grades
-        setResumeGrade(parseInt(grades.resume) || 0);
-        setVideoGrade(parseInt(grades.video) || 0);
-        setCoverLetterGrade(parseInt(grades.cover_letter) || 0);
-        
-        // Show success message
-        setSaveStatus({ 
-          type: 'info', 
-          message: 'Loaded previous grades' 
-        });
-        
-        // Clear the message after 2 seconds
-        setTimeout(() => {
-          setSaveStatus({ type: '', message: '' });
-        }, 2000);
-      } else {
-        console.log('No previous grades found for this application and user');
-        // Reset to 0 if no grades found
-        setResumeGrade(0);
-        setVideoGrade(0);
-        setCoverLetterGrade(0);
-        
-        setSaveStatus({ 
-          type: 'info', 
-          message: 'No previous grades found' 
-        });
-        
-        setTimeout(() => {
-          setSaveStatus({ type: '', message: '' });
-        }, 2000);
-      }
-    } catch (error) {
-      console.error('Error fetching previous grades:', error);
-      // Reset to 0 on error
-      setResumeGrade(0);
-      setVideoGrade(0);
-      setCoverLetterGrade(0);
-      
-      setSaveStatus({ 
-        type: 'error', 
-        message: 'Error loading previous grades' 
-      });
-    }
-  };
 
   // Function to fetch and store average grades for the current application
   const logAverageGrades = async () => {
@@ -139,9 +83,126 @@ export default function ApplicationDetail() {
     try {
       const list = await apiClient.get(`/applications/${id}/comments`);
       setComments(list);
+      // Scroll to bottom after comments are loaded
+      setTimeout(() => {
+        if (commentsEndRef.current) {
+          commentsEndRef.current.scrollIntoView({ behavior: 'smooth' });
+        }
+      }, 100);
     } catch (e) {
       console.error('Error fetching comments:', e);
     }
+  };
+
+  const scrollToBottom = () => {
+    if (commentsEndRef.current) {
+      commentsEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  // Referral functions
+  const fetchReferral = async () => {
+    try {
+      const referralData = await apiClient.get(`/applications/${id}/referral`);
+      setReferral(referralData);
+    } catch (e) {
+      if (e.response?.status !== 404) {
+        console.error('Error fetching referral:', e);
+      }
+      setReferral(null);
+    }
+  };
+
+  const addReferral = async () => {
+    if (!referralForm.referrerName.trim() || !referralForm.relationship.trim()) {
+      return;
+    }
+
+    setIsSubmittingReferral(true);
+    try {
+      const newReferral = await apiClient.post(`/applications/${id}/referral`, referralForm);
+      setReferral(newReferral);
+      setIsReferralModalOpen(false);
+      setReferralForm({ referrerName: '', relationship: '' });
+      // Refresh average grades to show the bonus
+      await logAverageGrades();
+    } catch (e) {
+      console.error('Error adding referral:', e);
+      alert(e.response?.data?.error || 'Failed to add referral');
+    } finally {
+      setIsSubmittingReferral(false);
+    }
+  };
+
+  const removeReferral = async () => {
+    if (!confirm('Are you sure you want to remove this referral?')) {
+      return;
+    }
+
+    try {
+      await apiClient.delete(`/applications/${id}/referral`);
+      setReferral(null);
+      // Refresh average grades to remove the bonus
+      await logAverageGrades();
+    } catch (e) {
+      console.error('Error removing referral:', e);
+      alert(e.response?.data?.error || 'Failed to remove referral');
+    }
+  };
+
+  // Calculate average scores from the actual score arrays
+  const calculateAverageScore = (scores) => {
+    if (!scores || scores.length === 0) return 0;
+    const validScores = scores.map(score => parseFloat(score.overallScore)).filter(score => !isNaN(score));
+    if (validScores.length === 0) return 0;
+    const total = validScores.reduce((sum, score) => sum + score, 0);
+    return total / validScores.length;
+  };
+
+  // Get calculated averages for display
+  const getCalculatedAverages = () => {
+    const resumeAvg = calculateAverageScore(resumeScores);
+    const videoAvg = calculateAverageScore(videoScores);
+    const coverLetterAvg = calculateAverageScore(coverLetterScores);
+    
+    // Calculate overall average only from document types that have scores
+    const averages = [];
+    if (resumeScores.length > 0) averages.push(resumeAvg);
+    if (videoScores.length > 0) averages.push(videoAvg);
+    if (coverLetterScores.length > 0) averages.push(coverLetterAvg);
+    
+    let overallAvg = averages.length > 0 ? averages.reduce((sum, avg) => sum + avg, 0) / averages.length : 0;
+    
+    // Add referral bonus if referral exists
+    const referralBonus = referral ? 5 : 0;
+    overallAvg += referralBonus;
+    
+    // Add event points directly (raw points, not scaled)
+    const eventPointsContribution = eventData.totalPoints || 0;
+    overallAvg += eventPointsContribution;
+    
+    const result = {
+      resume: resumeAvg,
+      video: videoAvg,
+      cover_letter: coverLetterAvg,
+      total: overallAvg,
+      count: resumeScores.length + videoScores.length + coverLetterScores.length,
+      referralBonus: referralBonus,
+      eventPointsContribution: eventPointsContribution
+    };
+    
+    // Debug logging
+    console.log('Calculated averages:', {
+      resume: { avg: resumeAvg, count: resumeScores.length },
+      video: { avg: videoAvg, count: videoScores.length },
+      cover_letter: { avg: coverLetterAvg, count: coverLetterScores.length },
+      overall: overallAvg,
+      referralBonus: referralBonus,
+      eventPointsContribution: eventPointsContribution,
+      totalCount: result.count
+    });
+    
+    return result;
   };
 
   const fetchResumeScores = async (candidateId) => {
@@ -155,6 +216,34 @@ export default function ApplicationDetail() {
       console.log('Fetched resume scores:', scores);
     } catch (e) {
       console.error('Error fetching resume scores:', e);
+    }
+  };
+
+  const fetchCoverLetterScores = async (candidateId) => {
+    try {
+      if (!candidateId) {
+        console.log('No candidateId provided for fetchCoverLetterScores');
+        return;
+      }
+      const scores = await apiClient.get(`/review-teams/cover-letter-scores/${candidateId}`);
+      setCoverLetterScores(scores);
+      console.log('Fetched cover letter scores:', scores);
+    } catch (e) {
+      console.error('Error fetching cover letter scores:', e);
+    }
+  };
+
+  const fetchVideoScores = async (candidateId) => {
+    try {
+      if (!candidateId) {
+        console.log('No candidateId provided for fetchVideoScores');
+        return;
+      }
+      const scores = await apiClient.get(`/review-teams/video-scores/${candidateId}`);
+      setVideoScores(scores);
+      console.log('Fetched video scores:', scores);
+    } catch (e) {
+      console.error('Error fetching video scores:', e);
     }
   };
 
@@ -184,50 +273,7 @@ export default function ApplicationDetail() {
     }
   };
 
-  // Toggle N/A for a grade type
-  const toggleNa = (type) => {
-    const newState = !isNa[type];
-    setIsNa(prev => ({
-      ...prev,
-      [type]: newState
-    }));
-    
-    // Reset the grade to 0 when marking as N/A
-    if (newState) {
-      if (type === 'resume') setResumeGrade(0);
-      if (type === 'video') setVideoGrade(0);
-      if (type === 'cover_letter') setCoverLetterGrade(0);
-    }
-  };
 
-  // Function to load grades for the current application and user
-  const loadGrades = async () => {
-    try {
-      const grades = await apiClient.get(`/applications/${id}/grades/latest`);
-      if (grades) {
-        console.log('Loading previous grades for this application:', {
-          resume_grade: grades.resume,
-          video_grade: grades.video,
-          cover_letter_grade: grades.cover_letter,
-          submitted_at: grades.createdAt
-        });
-        
-        // Set the sliders to the retrieved grades
-        setResumeGrade(parseInt(grades.resume) || 0);
-        setVideoGrade(parseInt(grades.video) || 0);
-        setCoverLetterGrade(parseInt(grades.cover_letter) || 0);
-        
-        // Set N/A states based on null values
-        setIsNa({
-          resume: grades.resume === null,
-          video: grades.video === null,
-          cover_letter: grades.cover_letter === null
-        });
-      }
-    } catch (error) {
-      console.error('Error loading grades on page load:', error);
-    }
-  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -244,25 +290,25 @@ export default function ApplicationDetail() {
         setCurrentUserId(userData.userId);
         console.log('Current User ID:', userData.userId);
         
-        // Load grades after we have the user ID
-        if (userData.userId) {
-          await loadGrades();
-        }
-        
         // Log average grades
         await logAverageGrades();
 
         // Load comments
         await fetchComments();
         
-        // Load resume scores
+        // Load document scores
         await fetchResumeScores(appData.candidateId);
+        await fetchCoverLetterScores(appData.candidateId);
+        await fetchVideoScores(appData.candidateId);
         
         // Load event data
         await fetchEventData();
         
         // Load interview evaluations
         await fetchInterviewEvaluations();
+        
+        // Load referral data
+        await fetchReferral();
         
       } catch (err) {
         console.error('Error loading data:', err);
@@ -274,6 +320,13 @@ export default function ApplicationDetail() {
 
     fetchData();
   }, [id]);
+
+  // Auto-scroll to bottom when comments change
+  useEffect(() => {
+    if (comments.length > 0 && !isCommentsMinimized) {
+      setTimeout(scrollToBottom, 100);
+    }
+  }, [comments, isCommentsMinimized]);
 
   if (loading) {
     return (
@@ -328,55 +381,85 @@ export default function ApplicationDetail() {
               </div>
               
               <div className="average-grades-container">
-                <div className="average-grade">
-                  <span className="average-grade-label">Resume</span>
-                  <div>
-                    <span className="average-grade-value">{averageGrades.resume.toFixed(1)}</span>
-                    <span className="average-grade-total">/ 10</span>
-                  </div>
-                </div>
-                
-                <div className="average-grade">
-                  <span className="average-grade-label">Video</span>
-                  <div>
-                    <span className="average-grade-value">{averageGrades.video.toFixed(1)}</span>
-                    <span className="average-grade-total">/ 10</span>
-                  </div>
-                </div>
-                
-                <div className="average-grade">
-                  <span className="average-grade-label">Cover Letter</span>
-                  <div>
-                    <span className="average-grade-value">{averageGrades.cover_letter.toFixed(1)}</span>
-                    <span className="average-grade-total">/ 10</span>
-                  </div>
-                </div>
-                
-                <div className="average-grade" style={{ backgroundColor: '#f0f9ff', borderColor: '#bae6fd' }}>
-                  <span className="average-grade-label">Overall</span>
-                  <div>
-                    <span className="average-grade-value" style={{ color: '#0369a1' }}>{averageGrades.total.toFixed(1)}</span>
-                    <span className="average-grade-total">/ 10</span>
-                  </div>
-                  {averageGrades.count > 0 && (
-                    <div className="average-grade-count">
-                      from {averageGrades.count} {averageGrades.count === 1 ? 'review' : 'reviews'}
-                    </div>
-                  )}
-                </div>
-                
-                <div className="average-grade" style={{ backgroundColor: '#f0f9ff', borderColor: '#bae6fd' }}>
-                  <span className="average-grade-label">Event Points</span>
-                  <div>
-                    <span className="average-grade-value" style={{ color: '#0369a1' }}>{eventData.totalPoints}</span>
-                    <span className="average-grade-total">pts</span>
-                  </div>
-                  <div className="average-grade-count">
-                    {eventData.events.filter(e => e.attendanceStatus === 'Attended').length} attended
-                  </div>
-                </div>
+                {(() => {
+                  const calculatedAverages = getCalculatedAverages();
+                  return (
+                    <>
+                      <div className="average-grade">
+                        <span className="average-grade-label">Resume</span>
+                        <div>
+                          <span className="average-grade-value">{calculatedAverages.resume.toFixed(1)}</span>
+                          <span className="average-grade-total">/ 10</span>
+                        </div>
+                        {resumeScores.length > 0 && (
+                          <div className="average-grade-count">
+                            from {resumeScores.length} {resumeScores.length === 1 ? 'review' : 'reviews'}
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="average-grade">
+                        <span className="average-grade-label">Video</span>
+                        <div>
+                          <span className="average-grade-value">{calculatedAverages.video.toFixed(1)}</span>
+                          <span className="average-grade-total">/ 10</span>
+                        </div>
+                        {videoScores.length > 0 && (
+                          <div className="average-grade-count">
+                            from {videoScores.length} {videoScores.length === 1 ? 'review' : 'reviews'}
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="average-grade">
+                        <span className="average-grade-label">Cover Letter</span>
+                        <div>
+                          <span className="average-grade-value">{calculatedAverages.cover_letter.toFixed(1)}</span>
+                          <span className="average-grade-total">/ 10</span>
+                        </div>
+                        {coverLetterScores.length > 0 && (
+                          <div className="average-grade-count">
+                            from {coverLetterScores.length} {coverLetterScores.length === 1 ? 'review' : 'reviews'}
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="average-grade">
+                        <span className="average-grade-label">Event Points</span>
+                        <div>
+                          <span className="average-grade-value">{eventData.totalPoints}</span>
+                          <span className="average-grade-total">pts</span>
+                        </div>
+                        <div className="average-grade-count">
+                          {eventData.events.filter(e => e.attendanceStatus === 'Attended').length} attended
+                        </div>
+                      </div>
+                      
+                      <div className="average-grade" style={{ backgroundColor: '#f0f9ff', borderColor: '#bae6fd' }}>
+                        <span className="average-grade-label">Overall</span>
+                        <div>
+                          <span className="average-grade-value" style={{ color: '#0369a1' }}>{calculatedAverages.total.toFixed(1)}</span>
+                          <span className="average-grade-total">/ 10</span>
+                        </div>
+                        {calculatedAverages.count > 0 && (
+                          <div className="average-grade-count">
+                            from {calculatedAverages.count} {calculatedAverages.count === 1 ? 'review' : 'reviews'}
+                          </div>
+                        )}
+                        {(calculatedAverages.referralBonus > 0 || calculatedAverages.eventPointsContribution > 0) && (
+                          <div className="average-grade-count" style={{ color: '#059669', fontWeight: '600' }}>
+                            {calculatedAverages.referralBonus > 0 && `+${calculatedAverages.referralBonus} referral`}
+                            {calculatedAverages.referralBonus > 0 && calculatedAverages.eventPointsContribution > 0 && ' + '}
+                            {calculatedAverages.eventPointsContribution > 0 && `+${Math.floor(calculatedAverages.eventPointsContribution / 5)} events`}
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
             </div>
+            
             <div className={`status-badge ${application.status.toLowerCase()}`}>
               {application.status.replace('_', ' ')}
             </div>
@@ -622,307 +705,467 @@ export default function ApplicationDetail() {
             )}
           </div>
           
-          {/* Grading Panel */}
-          <div className="grading-panel">
-            <h3 className="grading-title">Grade Application</h3>
-            <div className="grading-content">
-              <div className="grading-item">
-                <div className="grading-header">
-                  <label className="grading-label">Resume</label>
-                  <span className="grade-value">{resumeGrade}/10</span>
-                  <button 
-                    className={`na-button ${isNa.resume ? 'active' : ''}`}
-                    onClick={() => toggleNa('resume')}
-                    data-active={isNa.resume}
-                  >
-                    {isNa.resume ? 'N/A ✓' : 'N/A'}
-                  </button>
-                </div>
-                <div className="slider-container">
-                  <input
-                    type="range"
-                    min="1"
-                    max="10"
-                    value={isNa.resume ? 0 : resumeGrade}
-                    onChange={(e) => setResumeGrade(parseInt(e.target.value))}
-                    className="grade-slider"
-                    disabled={isNa.resume}
-                  />
-                  <div className="slider-ticks">
-                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((tick) => (
-                      <span key={`resume-${tick}`} className="tick"></span>
-                    ))}
-                  </div>
-                </div>
+
+          {/* Comments Chatbox */}
+          <div className="info-section" style={{ 
+            border: '1px solid #e5e7eb', 
+            borderRadius: '12px', 
+            overflow: 'hidden',
+            backgroundColor: '#fafafa'
+          }}>
+            {/* Chatbox Header */}
+            <div 
+              style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'space-between',
+                padding: '16px 20px',
+                backgroundColor: '#f8fafc',
+                borderBottom: '1px solid #e5e7eb',
+                cursor: 'pointer'
+              }}
+              onClick={() => setIsCommentsMinimized(!isCommentsMinimized)}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <ChatBubbleLeftRightIcon style={{ width: '20px', height: '20px', color: '#6b7280' }} />
+                <h2 style={{ 
+                  margin: 0, 
+                  fontSize: '1.125rem', 
+                  fontWeight: '600', 
+                  color: '#374151' 
+                }}>
+                  Comments ({comments.length})
+                </h2>
               </div>
-              <div className="grading-item">
-                <div className="grading-header">
-                  <label className="grading-label">Video</label>
-                  <span className="grade-value">{videoGrade}/10</span>
-                  <button 
-                    className={`na-button ${isNa.video ? 'active' : ''}`}
-                    onClick={() => toggleNa('video')}
-                    data-active={isNa.video}
-                  >
-                    {isNa.video ? 'N/A ✓' : 'N/A'}
-                  </button>
-                </div>
-                <div className="slider-container">
-                  <input
-                    type="range"
-                    min="1"
-                    max="10"
-                    value={isNa.video ? 0 : videoGrade}
-                    onChange={(e) => setVideoGrade(parseInt(e.target.value))}
-                    className="grade-slider"
-                    disabled={isNa.video}
-                  />
-                  <div className="slider-ticks">
-                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((tick) => (
-                      <span key={`video-${tick}`} className="tick"></span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              <div className="grading-item">
-                <div className="grading-header">
-                  <label className="grading-label">Cover Letter</label>
-                  <span className="grade-value">{coverLetterGrade}/10</span>
-                  <button 
-                    className={`na-button ${isNa.cover_letter ? 'active' : ''}`}
-                    onClick={() => toggleNa('cover_letter')}
-                    data-active={isNa.cover_letter}
-                  >
-                    {isNa.cover_letter ? 'N/A ✓' : 'N/A'}
-                  </button>
-                </div>
-                <div className="slider-container">
-                  <input
-                    type="range"
-                    min="1"
-                    max="10"
-                    value={isNa.cover_letter ? 0 : coverLetterGrade}
-                    onChange={(e) => setCoverLetterGrade(parseInt(e.target.value))}
-                    className="grade-slider"
-                    disabled={isNa.cover_letter}
-                  />
-                  <div className="slider-ticks">
-                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((tick) => (
-                      <span key={`letter-${tick}`} className="tick"></span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              <div className="grading-actions">
-                <button 
-                  className="grading-button save-button"
-                  onClick={async () => {
-                    if (!currentUserId) {
-                      setSaveStatus({ type: 'error', message: 'You must be logged in to save grades' });
-                      return;
-                    }
-
-                    // Validate that at least one grade is provided and valid
-                    const hasValidGrade = 
-                      (!isNa.resume && resumeGrade >= 1) ||
-                      (!isNa.video && videoGrade >= 1) ||
-                      (!isNa.cover_letter && coverLetterGrade >= 1);
-
-                    if (!hasValidGrade) {
-                      setSaveStatus({ 
-                        type: 'error', 
-                        message: 'Please provide at least one grade or mark all as N/A' 
-                      });
-                      return;
-                    }
-
-                    // Validate individual grades that are not N/A
-                    if (!isNa.resume && (resumeGrade < 1 || resumeGrade > 10)) {
-                      setSaveStatus({ type: 'error', message: 'Resume grade must be between 1 and 10' });
-                      return;
-                    }
-                    if (!isNa.video && (videoGrade < 1 || videoGrade > 10)) {
-                      setSaveStatus({ type: 'error', message: 'Video grade must be between 1 and 10' });
-                      return;
-                    }
-                    if (!isNa.cover_letter && (coverLetterGrade < 1 || coverLetterGrade > 10)) {
-                      setSaveStatus({ type: 'error', message: 'Cover letter grade must be between 1 and 10' });
-                      return;
-                    }
-
-                    try {
-                      setIsSaving(true);
-                      
-                      // Prepare the data to send, only including non-N/A grades
-                      const gradeData = {};
-                      
-                      // Only include grades that are not marked as N/A and have a valid value
-                      if (!isNa.resume && resumeGrade >= 1) {
-                        gradeData.resume_grade = parseInt(resumeGrade);
-                      } else if (isNa.resume) {
-                        gradeData.resume_grade = null;
-                      }
-                      
-                      if (!isNa.video && videoGrade >= 1) {
-                        gradeData.video_grade = parseInt(videoGrade);
-                      } else if (isNa.video) {
-                        gradeData.video_grade = null;
-                      }
-                      
-                      if (!isNa.cover_letter && coverLetterGrade >= 1) {
-                        gradeData.cover_letter_grade = parseInt(coverLetterGrade);
-                      } else if (isNa.cover_letter) {
-                        gradeData.cover_letter_grade = null;
-                      }
-                      
-                      // Send the data to the API
-                      await apiClient.post(`/applications/${id}/grades`, gradeData);
-                      
-                      // Refresh the average grades display
-                      await logAverageGrades();
-                      
-                      setSaveStatus({ 
-                        type: 'success', 
-                        message: 'Grades saved successfully!' 
-                      });
-                      
-                      // Clear success message after 3 seconds
-                      setTimeout(() => {
-                        setSaveStatus({ type: '', message: '' });
-                      }, 3000);
-                    } catch (error) {
-                      console.error('Error saving grades:', error);
-                      const errorMessage = error.response?.data?.error || 'Failed to save grades. Please try again.';
-                      setSaveStatus({ 
-                        type: 'error', 
-                        message: errorMessage 
-                      });
-                    } finally {
-                      setIsSaving(false);
-                    }
-                  }}
-                >
-                  {isSaving ? 'Saving...' : 'Save Grades'}
-                </button>
-                <button 
-                  className="grading-button reset-button"
-                  onClick={resetGrades}
-                >
-                  Reset
-                </button>
-                {saveStatus.message && (
-                  <div className={`save-status ${saveStatus.type}`}>
-                    {saveStatus.message}
-                  </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {comments.length > 0 && (
+                  <span style={{ 
+                    fontSize: '0.75rem', 
+                    color: '#6b7280',
+                    backgroundColor: '#e5e7eb',
+                    padding: '2px 8px',
+                    borderRadius: '12px'
+                  }}>
+                    {comments.length} message{comments.length !== 1 ? 's' : ''}
+                  </span>
+                )}
+                {isCommentsMinimized ? (
+                  <ChevronDownIcon style={{ width: '20px', height: '20px', color: '#6b7280' }} />
+                ) : (
+                  <ChevronUpIcon style={{ width: '20px', height: '20px', color: '#6b7280' }} />
                 )}
               </div>
             </div>
-          </div>
 
-          {/* Comments */}
-          <div className="info-section">
-            <h2 className="section-title">Comments</h2>
-            <div style={{ marginBottom: '1rem' }}>
-              <textarea
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                placeholder="Leave a comment for the team..."
-                style={{ width: '100%', minHeight: '80px', padding: '8px' }}
-              />
-              {commentError && (
-                <div style={{ color: 'red', marginTop: '4px' }}>{commentError}</div>
-              )}
-              <button
-                className="grading-button save-button"
-                onClick={async () => {
-                  setCommentError('');
-                  const content = newComment.trim();
-                  if (!content) {
-                    setCommentError('Please enter a comment');
-                    return;
-                  }
-                  try {
-                    await apiClient.post(`/applications/${id}/comments`, { content });
-                    setNewComment('');
-                    await fetchComments();
-                  } catch (e) {
-                    console.error('Failed to post comment', e);
-                    setCommentError('Failed to post comment');
-                  }
-                }}
-                style={{ marginTop: '8px' }}
-              >
-                Add Comment
-              </button>
-            </div>
-
-            {comments.length === 0 ? (
-              <div className="empty-state">No comments yet.</div>
-            ) : (
-              <div className="comments-list">
-                {comments.map((c) => (
-                  <div key={c.id} className="comment-item" style={{ padding: '10px 0', borderBottom: '1px solid #eee' }}>
-                    <div style={{ fontSize: '0.85rem', color: '#6b7280' }}>
-                      {c.user?.fullName || c.user?.email || 'Unknown'} • {new Date(c.createdAt).toLocaleString()}
+            {/* Chatbox Content */}
+            {!isCommentsMinimized && (
+              <div style={{ display: 'flex', flexDirection: 'column', height: '400px' }}>
+                {/* Messages Area */}
+                <div style={{ 
+                  flex: 1, 
+                  overflowY: 'auto', 
+                  padding: '16px 20px',
+                  backgroundColor: '#ffffff'
+                }}>
+                  {comments.length === 0 ? (
+                    <div style={{ 
+                      textAlign: 'center', 
+                      color: '#6b7280', 
+                      padding: '40px 20px',
+                      fontStyle: 'italic'
+                    }}>
+                      No comments yet. Start the conversation!
                     </div>
-                    <div style={{ whiteSpace: 'pre-wrap' }}>{c.content}</div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {comments.map((c) => (
+                        <div 
+                          key={c.id} 
+                          style={{ 
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'flex-start',
+                            padding: '12px 16px',
+                            backgroundColor: '#f8fafc',
+                            borderRadius: '12px',
+                            border: '1px solid #e5e7eb',
+                            maxWidth: '80%',
+                            alignSelf: 'flex-start'
+                          }}
+                        >
+                          <div style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: '8px',
+                            marginBottom: '6px'
+                          }}>
+                            <div style={{ 
+                              width: '8px', 
+                              height: '8px', 
+                              borderRadius: '50%', 
+                              backgroundColor: '#10b981' 
+                            }} />
+                            <span style={{ 
+                              fontSize: '0.875rem', 
+                              fontWeight: '600',
+                              color: '#374151' 
+                            }}>
+                              {c.user?.fullName || c.user?.email || 'Unknown'}
+                            </span>
+                            <span style={{ 
+                              fontSize: '0.75rem', 
+                              color: '#6b7280' 
+                            }}>
+                              {new Date(c.createdAt).toLocaleString()}
+                            </span>
+                          </div>
+                          <div style={{ 
+                            whiteSpace: 'pre-wrap', 
+                            fontSize: '0.875rem',
+                            color: '#374151',
+                            lineHeight: '1.5'
+                          }}>
+                            {c.content}
+                          </div>
+                        </div>
+                      ))}
+                      <div ref={commentsEndRef} />
+                    </div>
+                  )}
+                </div>
+
+                {/* Input Area */}
+                <div style={{ 
+                  padding: '16px 20px', 
+                  borderTop: '1px solid #e5e7eb',
+                  backgroundColor: '#f8fafc'
+                }}>
+                  {commentError && (
+                    <div style={{ 
+                      color: '#dc2626', 
+                      fontSize: '0.875rem',
+                      marginBottom: '8px',
+                      padding: '8px 12px',
+                      backgroundColor: '#fef2f2',
+                      border: '1px solid #fecaca',
+                      borderRadius: '6px'
+                    }}>
+                      {commentError}
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end' }}>
+                    <textarea
+                      value={newComment}
+                      onChange={(e) => setNewComment(e.target.value)}
+                      placeholder="Type your comment here..."
+                      style={{ 
+                        flex: 1,
+                        minHeight: '40px',
+                        maxHeight: '120px',
+                        padding: '10px 12px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '8px',
+                        fontSize: '0.875rem',
+                        resize: 'vertical',
+                        fontFamily: 'inherit',
+                        outline: 'none',
+                        transition: 'border-color 0.2s'
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                          e.preventDefault();
+                          if (newComment.trim() && !isSubmittingComment) {
+                            // Trigger submit
+                            const submitEvent = new Event('click');
+                            e.target.nextElementSibling.dispatchEvent(submitEvent);
+                          }
+                        }
+                      }}
+                    />
+                    <button
+                      onClick={async () => {
+                        setCommentError('');
+                        const content = newComment.trim();
+                        if (!content) {
+                          setCommentError('Please enter a comment');
+                          return;
+                        }
+                        setIsSubmittingComment(true);
+                        try {
+                          await apiClient.post(`/applications/${id}/comments`, { content });
+                          setNewComment('');
+                          await fetchComments();
+                          // Auto-scroll to bottom after new comment
+                          setTimeout(scrollToBottom, 200);
+                        } catch (e) {
+                          console.error('Failed to post comment', e);
+                          setCommentError('Failed to post comment');
+                        } finally {
+                          setIsSubmittingComment(false);
+                        }
+                      }}
+                      disabled={isSubmittingComment || !newComment.trim()}
+                      style={{ 
+                        padding: '10px 16px',
+                        backgroundColor: isSubmittingComment || !newComment.trim() ? '#9ca3af' : '#3b82f6',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '8px',
+                        fontSize: '0.875rem',
+                        fontWeight: '500',
+                        cursor: isSubmittingComment || !newComment.trim() ? 'not-allowed' : 'pointer',
+                        transition: 'background-color 0.2s',
+                        minWidth: '80px'
+                      }}
+                    >
+                      {isSubmittingComment ? 'Posting...' : 'Send'}
+                    </button>
                   </div>
-                ))}
+                  <div style={{ 
+                    fontSize: '0.75rem', 
+                    color: '#6b7280', 
+                    marginTop: '6px',
+                    textAlign: 'center'
+                  }}>
+                    Press Ctrl+Enter to send
+                  </div>
+                </div>
               </div>
             )}
           </div>
         </div>
       </div>
 
-      {/* Resume Scores Section */}
+      {/* Referral Section */}
       <div className="info-section" style={{ marginTop: '2rem' }}>
-        <h2 className="section-title">Resume Scores</h2>
-        {resumeScores.length === 0 ? (
-          <div className="empty-state">No resume scores yet.</div>
-        ) : (
-          <div className="resume-scores-list">
-            {resumeScores.map((score) => (
-              <div 
-                key={score.id} 
-                className="resume-score-item"
+        <h2 className="section-title">Referral</h2>
+        <div style={{ 
+          padding: '1rem', 
+          backgroundColor: '#f0fdf4', 
+          borderRadius: '8px', 
+          border: '1px solid #bbf7d0' 
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+            <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: '600', color: '#374151' }}>
+              Referral Information
+            </h3>
+            {!referral && (
+              <button
+                onClick={() => setIsReferralModalOpen(true)}
                 style={{
-                  padding: '12px',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '8px',
-                  marginBottom: '8px',
-                  cursor: 'pointer',
-                  backgroundColor: '#f9fafb',
-                  transition: 'background-color 0.2s'
-                }}
-                onMouseEnter={(e) => e.target.style.backgroundColor = '#f3f4f6'}
-                onMouseLeave={(e) => e.target.style.backgroundColor = '#f9fafb'}
-                onClick={() => {
-                  setSelectedScore(score);
-                  setScoreModalOpen(true);
+                  padding: '8px 16px',
+                  backgroundColor: '#3b82f6',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  cursor: 'pointer'
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <div style={{ fontWeight: '600', color: '#374151' }}>
-                      {score.evaluator?.fullName || score.evaluator?.email || 'Unknown Evaluator'}
+                Add Referral
+              </button>
+            )}
+          </div>
+          
+          {referral ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <div style={{ fontWeight: '600', color: '#374151', marginBottom: '4px' }}>
+                  {referral.referrerName}
+                </div>
+                <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '4px' }}>
+                  {referral.relationship}
+                </div>
+                <div style={{ fontSize: '0.75rem', color: '#9ca3af' }}>
+                  Added {new Date(referral.createdAt).toLocaleDateString()}
+                </div>
+              </div>
+              <button
+                onClick={removeReferral}
+                style={{
+                  padding: '6px 12px',
+                  backgroundColor: '#dc2626',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '0.875rem',
+                  cursor: 'pointer'
+                }}
+              >
+                Remove
+              </button>
+            </div>
+          ) : (
+            <div style={{ color: '#6b7280', fontSize: '0.875rem', fontStyle: 'italic' }}>
+              No referral added yet. Adding a referral will automatically add 5 points to the overall score.
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Document Scores Section */}
+      <div className="info-section" style={{ marginTop: '2rem' }}>
+        <h2 className="section-title">Document Scores</h2>
+        
+        {/* Resume Scores */}
+        <div style={{ marginBottom: '2rem' }}>
+          <h3 style={{ fontSize: '1.125rem', fontWeight: '600', color: '#374151', marginBottom: '1rem' }}>
+            Resume Scores ({resumeScores.length})
+          </h3>
+          {resumeScores.length === 0 ? (
+            <div className="empty-state">No resume scores yet.</div>
+          ) : (
+            <div className="resume-scores-list">
+              {resumeScores.map((score) => (
+                <div 
+                  key={score.id} 
+                  className="resume-score-item"
+                  style={{
+                    padding: '12px',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '8px',
+                    marginBottom: '8px',
+                    cursor: 'pointer',
+                    backgroundColor: '#f9fafb',
+                    transition: 'background-color 0.2s'
+                  }}
+                  onMouseEnter={(e) => e.target.style.backgroundColor = '#f3f4f6'}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = '#f9fafb'}
+                  onClick={() => {
+                    setSelectedScore({...score, documentType: 'Resume'});
+                    setScoreModalOpen(true);
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontWeight: '600', color: '#374151' }}>
+                        {score.evaluator?.fullName || score.evaluator?.email || 'Unknown Evaluator'}
+                      </div>
+                      <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '2px' }}>
+                        {new Date(score.createdAt).toLocaleDateString()} at {new Date(score.createdAt).toLocaleTimeString()}
+                      </div>
                     </div>
-                    <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '2px' }}>
-                      {new Date(score.createdAt).toLocaleDateString()} at {new Date(score.createdAt).toLocaleTimeString()}
-                    </div>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '1.125rem', fontWeight: '600', color: '#059669' }}>
-                      {score.overallScore}/10
-                    </div>
-                    <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                      Overall Score
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: '1.125rem', fontWeight: '600', color: '#059669' }}>
+                        {score.overallScore}/10
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                        Overall Score
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Cover Letter Scores */}
+        <div style={{ marginBottom: '2rem' }}>
+          <h3 style={{ fontSize: '1.125rem', fontWeight: '600', color: '#374151', marginBottom: '1rem' }}>
+            Cover Letter Scores ({coverLetterScores.length})
+          </h3>
+          {coverLetterScores.length === 0 ? (
+            <div className="empty-state">No cover letter scores yet.</div>
+          ) : (
+            <div className="resume-scores-list">
+              {coverLetterScores.map((score) => (
+                <div 
+                  key={score.id} 
+                  className="resume-score-item"
+                  style={{
+                    padding: '12px',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '8px',
+                    marginBottom: '8px',
+                    cursor: 'pointer',
+                    backgroundColor: '#f9fafb',
+                    transition: 'background-color 0.2s'
+                  }}
+                  onMouseEnter={(e) => e.target.style.backgroundColor = '#f3f4f6'}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = '#f9fafb'}
+                  onClick={() => {
+                    setSelectedScore({...score, documentType: 'Cover Letter'});
+                    setScoreModalOpen(true);
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontWeight: '600', color: '#374151' }}>
+                        {score.evaluator?.fullName || score.evaluator?.email || 'Unknown Evaluator'}
+                      </div>
+                      <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '2px' }}>
+                        {new Date(score.createdAt).toLocaleDateString()} at {new Date(score.createdAt).toLocaleTimeString()}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: '1.125rem', fontWeight: '600', color: '#059669' }}>
+                        {score.overallScore}/10
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                        Overall Score
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Video Scores */}
+        <div style={{ marginBottom: '2rem' }}>
+          <h3 style={{ fontSize: '1.125rem', fontWeight: '600', color: '#374151', marginBottom: '1rem' }}>
+            Video Scores ({videoScores.length})
+          </h3>
+          {videoScores.length === 0 ? (
+            <div className="empty-state">No video scores yet.</div>
+          ) : (
+            <div className="resume-scores-list">
+              {videoScores.map((score) => (
+                <div 
+                  key={score.id} 
+                  className="resume-score-item"
+                  style={{
+                    padding: '12px',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '8px',
+                    marginBottom: '8px',
+                    cursor: 'pointer',
+                    backgroundColor: '#f9fafb',
+                    transition: 'background-color 0.2s'
+                  }}
+                  onMouseEnter={(e) => e.target.style.backgroundColor = '#f3f4f6'}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = '#f9fafb'}
+                  onClick={() => {
+                    setSelectedScore({...score, documentType: 'Video'});
+                    setScoreModalOpen(true);
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontWeight: '600', color: '#374151' }}>
+                        {score.evaluator?.fullName || score.evaluator?.email || 'Unknown Evaluator'}
+                      </div>
+                      <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '2px' }}>
+                        {new Date(score.createdAt).toLocaleDateString()} at {new Date(score.createdAt).toLocaleTimeString()}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: '1.125rem', fontWeight: '600', color: '#059669' }}>
+                        {score.overallScore}/10
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                        Overall Score
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Interview Evaluations Section */}
@@ -1045,7 +1288,7 @@ export default function ApplicationDetail() {
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '600' }}>
-                Resume Score Details
+                {selectedScore?.documentType || 'Document'} Score Details
               </h3>
               <button 
                 onClick={() => setScoreModalOpen(false)}
@@ -1151,6 +1394,134 @@ export default function ApplicationDetail() {
           title={preview.title}
           onClose={() => setPreview({ open: false, src: '', kind: 'pdf', title: '' })}
         />
+      )}
+
+      {/* Referral Modal */}
+      {isReferralModalOpen && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            padding: '24px',
+            borderRadius: '12px',
+            width: '90%',
+            maxWidth: '500px',
+            maxHeight: '90vh',
+            overflow: 'auto'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '600' }}>
+                Add Referral
+              </h3>
+              <button
+                onClick={() => setIsReferralModalOpen(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '1.5rem',
+                  cursor: 'pointer',
+                  color: '#6b7280'
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', color: '#374151' }}>
+                Referrer Name *
+              </label>
+              <input
+                type="text"
+                value={referralForm.referrerName}
+                onChange={(e) => setReferralForm(prev => ({ ...prev, referrerName: e.target.value }))}
+                placeholder="Enter referrer's name"
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '0.875rem'
+                }}
+              />
+            </div>
+
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', color: '#374151' }}>
+                Relationship *
+              </label>
+              <input
+                type="text"
+                value={referralForm.relationship}
+                onChange={(e) => setReferralForm(prev => ({ ...prev, relationship: e.target.value }))}
+                placeholder="e.g., Former colleague, Professor, Friend"
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '0.875rem'
+                }}
+              />
+            </div>
+
+            <div style={{ 
+              padding: '12px', 
+              backgroundColor: '#f0f9ff', 
+              borderRadius: '6px', 
+              marginBottom: '20px',
+              border: '1px solid #bae6fd'
+            }}>
+              <div style={{ fontSize: '0.875rem', color: '#0369a1' }}>
+                <strong>Note:</strong> Adding a referral will automatically add 5 points to the overall score.
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setIsReferralModalOpen(false)}
+                style={{
+                  padding: '10px 16px',
+                  backgroundColor: '#f3f4f6',
+                  color: '#374151',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={addReferral}
+                disabled={isSubmittingReferral || !referralForm.referrerName.trim() || !referralForm.relationship.trim()}
+                style={{
+                  padding: '10px 16px',
+                  backgroundColor: isSubmittingReferral || !referralForm.referrerName.trim() || !referralForm.relationship.trim() ? '#9ca3af' : '#3b82f6',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  cursor: isSubmittingReferral || !referralForm.referrerName.trim() || !referralForm.relationship.trim() ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {isSubmittingReferral ? 'Adding...' : 'Add Referral'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

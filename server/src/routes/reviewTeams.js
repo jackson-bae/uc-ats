@@ -750,6 +750,7 @@ router.get('/member-applications/:memberId', requireAuth, async (req, res) => {
           status: latestApplication.status || 'SUBMITTED',
           email: latestApplication.email,
           submittedAt: latestApplication.submittedAt,
+          headshotUrl: latestApplication.headshotUrl,
           gender: latestApplication.gender || 'N/A',
           isFirstGeneration: latestApplication.isFirstGeneration,
           isTransferStudent: latestApplication.isTransferStudent,

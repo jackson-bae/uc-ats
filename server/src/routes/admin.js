@@ -26,22 +26,40 @@ router.get('/stats', async (req, res) => {
         where: {
           cycleId: active.id,
           status: { in: ['SUBMITTED', 'UNDER_REVIEW', 'WAITLISTED'] }
+        },
+        select: {
+          currentRound: true,
+          status: true
         }
       })
     ]);
 
     const totalGrades = resumeGrades + coverLetterGrades + videoGrades;
 
-    const statusCounts = candidates.reduce((acc, candidate) => {
-      acc[candidate.status] = (acc[candidate.status] || 0) + 1;
+    // Calculate current stage based on currentRound field instead of status
+    const roundCounts = candidates.reduce((acc, candidate) => {
+      const round = candidate.currentRound || '1'; // Default to round 1 if no currentRound
+      acc[round] = (acc[round] || 0) + 1;
       return acc;
     }, {});
 
-    const currentRound = Object.keys(statusCounts).length > 0 
-      ? Object.keys(statusCounts).reduce((a, b) =>
-          statusCounts[a] > statusCounts[b] ? a : b
-        )
-      : 'SUBMITTED';
+    // Determine the current stage based on the most common round
+    let currentRound = 'SUBMITTED';
+    if (Object.keys(roundCounts).length > 0) {
+      const mostCommonRound = Object.keys(roundCounts).reduce((a, b) =>
+        roundCounts[a] > roundCounts[b] ? a : b
+      );
+      
+      // Map round numbers to stage names
+      const roundToStage = {
+        '1': 'RESUME_REVIEW',
+        '2': 'COFFEE_CHAT',
+        '3': 'FIRST_ROUND',
+        '4': 'FINAL_ROUND'
+      };
+      
+      currentRound = roundToStage[mostCommonRound] || 'RESUME_REVIEW';
+    }
 
     res.json({ totalApplicants, tasks: totalGrades, candidates: candidates.length, currentRound });
   } catch (error) {
@@ -1881,7 +1899,7 @@ router.get('/staging/candidates', async (req, res) => {
       orderBy: { submittedAt: 'desc' }
     });
 
-    const stagingCandidates = applications.map(app => {
+    const stagingCandidates = await Promise.all(applications.map(async app => {
       // Calculate average scores
       const resumeScores = app.candidate.resumeScores.map(s => s.overallScore);
       const coverLetterScores = app.candidate.coverLetterScores.map(s => s.overallScore);
@@ -1894,9 +1912,29 @@ router.get('/staging/candidates', async (req, res) => {
       const avgVideo = videoScores.length > 0 ? 
         videoScores.reduce((a, b) => a + b, 0) / videoScores.length : 0;
 
-      const overallScore = [avgResume, avgCoverLetter, avgVideo]
+      let overallScore = [avgResume, avgCoverLetter, avgVideo]
         .filter(score => score > 0)
         .reduce((a, b) => a + b, 0) / 3;
+
+      // Add referral bonus if candidate has a referral
+      const referral = await prisma.referral.findFirst({
+        where: { candidateId: app.candidateId }
+      });
+      if (referral) {
+        overallScore += 5;
+      }
+
+      // Add event points contribution (raw points, not scaled)
+      const eventAttendance = await prisma.eventAttendance.findMany({
+        where: { candidateId: app.candidateId },
+        include: { event: true }
+      });
+
+      const totalEventPoints = eventAttendance.reduce((sum, attendance) => {
+        return sum + (attendance.event.points || 0);
+      }, 0);
+
+      overallScore += totalEventPoints;
 
       // Build attendance object
       const attendance = {};
@@ -1968,7 +2006,7 @@ router.get('/staging/candidates', async (req, res) => {
         },
         notes: ''
       };
-    });
+    }));
 
     res.json(stagingCandidates);
   } catch (error) {
