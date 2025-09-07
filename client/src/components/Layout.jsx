@@ -13,7 +13,8 @@ import {
   UserIcon,
   Cog6ToothIcon,
   CalendarDaysIcon,
-  UserGroupIcon as UserGroupIcon2
+  UserGroupIcon as UserGroupIcon2,
+  ChatBubbleLeftRightIcon
 } from '@heroicons/react/24/outline';
 import UConsultingLogo from './UConsultingLogo';
 import '../styles/Layout.css';
@@ -36,6 +37,7 @@ const Layout = ({ children }) => {
       { name: 'Events', href: '/events', icon: CalendarDaysIcon },
       { name: 'Assigned Interviews', href: '/assigned-interviews', icon: UserGroupIcon2 },
       { name: 'Applications', href: '/candidates', icon: DocumentTextIcon },
+      { name: 'Get to Know UC', href: '/member/meeting-slots', icon: ChatBubbleLeftRightIcon },
       { name: 'Recruitment Resources and Timeline', href: '/recruitment-resources', icon: ClipboardDocumentListIcon },
     ] : user?.role === 'ADMIN' ? [
       { name: 'Applications', href: '/application-list', icon: DocumentTextIcon },
@@ -45,6 +47,7 @@ const Layout = ({ children }) => {
       { name: 'Assigned Interviews', href: '/admin/assigned-interviews', icon: UserGroupIcon2 },
       { name: 'Interview Prep', href: '/interview-prep', icon: ClipboardDocumentListIcon },
       { name: 'Event Management', href: '/events', icon: CalendarDaysIcon },
+      { name: 'Get to Know UC', href: '/member/meeting-slots', icon: ChatBubbleLeftRightIcon },
       { name: 'Staging', href: '/staging', icon: UserGroupIcon },
       { name: 'User Management', href: '/user-management', icon: UserIcon },
     ] : [

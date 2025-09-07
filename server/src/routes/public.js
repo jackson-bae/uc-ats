@@ -1,7 +1,116 @@
 import express from 'express';
 import prisma from '../prismaClient.js';
+import { sendMeetingSignupConfirmation } from '../services/emailNotifications.js';
 
 const router = express.Router();
+
+// Public: list available meeting slots with remaining capacity and signups
+router.get('/meeting-slots', async (req, res) => {
+  try {
+    const slots = await prisma.meetingSlot.findMany({
+      orderBy: { startTime: 'asc' },
+      include: {
+        member: {
+          select: { id: true, fullName: true, email: true }
+        },
+        signups: {
+          select: { id: true }
+        }
+      }
+    });
+
+    const formatted = slots.map(slot => ({
+      id: slot.id,
+      memberName: slot.member?.fullName || 'Member',
+      memberEmail: slot.member?.email || null,
+      location: slot.location,
+      startTime: slot.startTime,
+      endTime: slot.endTime,
+      capacity: slot.capacity,
+      taken: slot.signups.length,
+      remaining: Math.max(0, slot.capacity - slot.signups.length)
+    }));
+
+    res.json(formatted);
+  } catch (error) {
+    console.error('[GET /api/meeting-slots]', error);
+    res.status(500).json({ error: 'Failed to fetch meeting slots' });
+  }
+});
+
+// Public: sign up for a meeting slot
+router.post('/meeting-slots/:id/signup', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { fullName, email, studentId } = req.body || {};
+
+    if (!fullName || !email || !studentId) {
+      return res.status(400).json({ error: 'Name, email, and student ID are required' });
+    }
+
+    // Check if user has already signed up for any meeting slot
+    const existingSignup = await prisma.meetingSignup.findFirst({
+      where: { email },
+      include: { slot: true }
+    });
+
+    if (existingSignup) {
+      return res.status(400).json({ 
+        error: `You have already signed up for a meeting on ${new Date(existingSignup.slot.startTime).toLocaleDateString()}. You can only sign up for one meeting slot.` 
+      });
+    }
+
+    const slot = await prisma.meetingSlot.findUnique({
+      where: { id },
+      include: { 
+        signups: true,
+        member: {
+          select: { fullName: true }
+        }
+      }
+    });
+
+    if (!slot) {
+      return res.status(404).json({ error: 'Slot not found' });
+    }
+
+    if (slot.signups.length >= slot.capacity) {
+      return res.status(400).json({ error: 'This time slot is full' });
+    }
+
+    const signup = await prisma.meetingSignup.create({
+      data: {
+        slotId: id,
+        fullName,
+        email,
+        studentId
+      }
+    });
+
+    // Send confirmation email
+    try {
+      await sendMeetingSignupConfirmation(
+        email,
+        fullName,
+        slot.member?.fullName || 'UC Consulting Member',
+        slot.location,
+        slot.startTime,
+        slot.endTime
+      );
+    } catch (emailError) {
+      console.error('Failed to send confirmation email:', emailError);
+      // Don't fail the signup if email fails, just log the error
+    }
+
+    res.json({ success: true, signup });
+  } catch (error) {
+    if (error?.code === 'P2002') {
+      return res.status(400).json({ error: 'You are already signed up for this slot' });
+    }
+    console.error('[POST /api/meeting-slots/:id/signup]', error);
+    res.status(500).json({ error: 'Failed to create signup' });
+  }
+});
 
 // Get all active events for candidates with RSVP status
 router.get('/events', async (req, res) => {

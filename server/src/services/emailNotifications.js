@@ -610,3 +610,101 @@ export const sendFinalRejectionEmail = async (candidateEmail, candidateName, cur
     return { success: false, error: error.message };
   }
 };
+
+// Meeting Signup specific email templates
+
+// Create meeting signup confirmation email template
+const createMeetingSignupConfirmationEmail = (candidateName, memberName, location, startTime, endTime) => {
+  const formatDateTime = (date) => {
+    return new Date(date).toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const formatTime = (date) => {
+    return new Date(date).toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  return {
+    subject: `Meeting Confirmation - Get to Know UC`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background-color: #007bff; padding: 20px; text-align: center; color: white;">
+          <h2 style="color: white; margin: 0;">UC Consulting ATS</h2>
+        </div>
+        
+        <div style="padding: 30px 20px;">
+          <h3 style="color: #333; margin-bottom: 20px;">☕ Meeting Confirmation - Get to Know UC</h3>
+          
+          <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+            Dear ${candidateName},
+          </p>
+          
+          <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+            Thank you for signing up to meet with a UC Consulting member! We're excited to get to know you better.
+          </p>
+          
+          <div style="background-color: #cce7ff; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #007bff;">
+            <h4 style="color: #004085; margin: 0 0 15px 0;">Meeting Details</h4>
+            <p style="color: #004085; margin: 8px 0;"><strong>Member:</strong> ${memberName}</p>
+            <p style="color: #004085; margin: 8px 0;"><strong>Date & Time:</strong> ${formatDateTime(startTime)}</p>
+            <p style="color: #004085; margin: 8px 0;"><strong>Duration:</strong> ${formatTime(startTime)} - ${formatTime(endTime)}</p>
+            <p style="color: #004085; margin: 8px 0;"><strong>Location:</strong> ${location}</p>
+          </div>
+          
+          <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h4 style="color: #333; margin: 0 0 15px 0;">What to Expect</h4>
+            <p style="color: #666; margin: 8px 0;">• This is a casual 1:2 meeting to learn more about UC Consulting</p>
+            <p style="color: #666; margin: 8px 0;">• Feel free to ask questions about our organization, projects, and culture</p>
+            <p style="color: #666; margin: 8px 0;">• This is a great opportunity to connect with current members</p>
+            <p style="color: #666; margin: 8px 0;">• No preparation required - just come ready to chat!</p>
+          </div>
+          
+          <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+            If you need to cancel or reschedule, please contact us at <strong>uconsultingla@gmail.com</strong> as soon as possible.
+          </p>
+          
+          <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+            We look forward to meeting you!
+          </p>
+          
+          <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+            Best regards,<br>
+            UC Consulting Team
+          </p>
+        </div>
+        
+        <div style="background-color: #f8f9fa; padding: 20px; text-align: center; color: #666; font-size: 12px;">
+          <p style="margin: 0;">This is an automated message. Please do not reply to this email.</p>
+        </div>
+      </div>
+    `
+  };
+};
+
+// Send meeting signup confirmation email
+export const sendMeetingSignupConfirmation = async (candidateEmail, candidateName, memberName, location, startTime, endTime) => {
+  try {
+    const emailContent = createMeetingSignupConfirmationEmail(candidateName, memberName, location, startTime, endTime);
+    const result = await sendEmail(candidateEmail, emailContent.subject, emailContent.html);
+    
+    if (result.success) {
+      console.log(`Meeting signup confirmation email sent to ${candidateEmail} for meeting with ${memberName}`);
+    } else {
+      console.error(`Failed to send meeting signup confirmation email to ${candidateEmail}:`, result.error);
+    }
+    
+    return result;
+  } catch (error) {
+    console.error('Error in sendMeetingSignupConfirmation:', error);
+    return { success: false, error: error.message };
+  }
+};

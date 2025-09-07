@@ -657,7 +657,28 @@ router.get('/member-applications/:memberId', requireAuth, async (req, res) => {
         id: true,
         memberOne: true,
         memberTwo: true,
-        memberThree: true
+        memberThree: true,
+        memberOneUser: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true
+          }
+        },
+        memberTwoUser: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true
+          }
+        },
+        memberThreeUser: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true
+          }
+        }
       }
     });
 
@@ -706,17 +727,30 @@ router.get('/member-applications/:memberId', requireAuth, async (req, res) => {
 
     const coverLetterScores = await prisma.coverLetterScore.findMany({
       where: {
+        evaluatorId: evaluatorId,
         candidateId: {
           in: candidates.map(c => c.id)
         }
       },
       select: {
-        candidateId: true,
-        overallScore: true
+        candidateId: true
       }
     });
 
     const videoScores = await prisma.videoScore.findMany({
+      where: {
+        evaluatorId: evaluatorId,
+        candidateId: {
+          in: candidates.map(c => c.id)
+        }
+      },
+      select: {
+        candidateId: true
+      }
+    });
+
+    // Get ALL grading records for these candidates (not just current evaluator) for team completion calculation
+    const allResumeScores = await prisma.resumeScore.findMany({
       where: {
         candidateId: {
           in: candidates.map(c => c.id)
@@ -724,9 +758,92 @@ router.get('/member-applications/:memberId', requireAuth, async (req, res) => {
       },
       select: {
         candidateId: true,
-        overallScore: true
+        evaluatorId: true,
+        assignedGroupId: true
       }
     });
+
+    // Get flagged documents for these applications
+    const flaggedDocuments = await prisma.flaggedDocument.findMany({
+      where: {
+        applicationId: {
+          in: candidates.flatMap(c => c.applications.map(app => app.id))
+        },
+        isResolved: false
+      },
+      select: {
+        applicationId: true,
+        documentType: true,
+        reason: true,
+        message: true,
+        flaggedBy: true,
+        createdAt: true
+      }
+    });
+
+    const allCoverLetterScores = await prisma.coverLetterScore.findMany({
+      where: {
+        candidateId: {
+          in: candidates.map(c => c.id)
+        }
+      },
+      select: {
+        candidateId: true,
+        evaluatorId: true,
+        assignedGroupId: true
+      }
+    });
+
+    const allVideoScores = await prisma.videoScore.findMany({
+      where: {
+        candidateId: {
+          in: candidates.map(c => c.id)
+        }
+      },
+      select: {
+        candidateId: true,
+        evaluatorId: true,
+        assignedGroupId: true
+      }
+    });
+
+    // Helper function to check team completion and get missing grades count
+    const checkTeamCompletion = (candidateId, groupId, scores, scoreType) => {
+      if (!groupId) return { completed: false, missingGrades: 0, totalMembers: 0, teamMembers: [], completedEvaluators: [] };
+      
+      const group = memberGroups.find(g => g.id === groupId);
+      if (!group) return { completed: false, missingGrades: 0, totalMembers: 0, teamMembers: [], completedEvaluators: [] };
+      
+      // Get all assigned team members with user info (filter out null/undefined)
+      const teamMembers = [
+        group.memberOneUser,
+        group.memberTwoUser,
+        group.memberThreeUser
+      ].filter(Boolean);
+      
+      if (teamMembers.length === 0) return { completed: false, missingGrades: 0, totalMembers: 0, teamMembers: [], completedEvaluators: [] };
+      
+      // Get scores for this candidate and group
+      const candidateScores = scores.filter(score => 
+        score.candidateId === candidateId && score.assignedGroupId === groupId
+      );
+      
+      // Check if all team members have completed their scores
+      const completedEvaluators = candidateScores.map(score => score.evaluatorId);
+      const allMembersCompleted = teamMembers.every(member => 
+        completedEvaluators.includes(member.id)
+      );
+      
+      const missingGrades = teamMembers.length - completedEvaluators.length;
+      
+      return {
+        completed: allMembersCompleted,
+        missingGrades,
+        totalMembers: teamMembers.length,
+        teamMembers: teamMembers,
+        completedEvaluators: completedEvaluators
+      };
+    };
 
     // Transform the data
     const applications = [];
@@ -739,6 +856,22 @@ router.get('/member-applications/:memberId', requireAuth, async (req, res) => {
         const hasCoverLetterScore = coverLetterScores.some(score => score.candidateId === candidate.id);
         const hasVideoScore = videoScores.some(score => score.candidateId === candidate.id);
         
+        // Calculate team completion status
+        const resumeStatus = checkTeamCompletion(candidate.id, candidate.assignedGroupId, allResumeScores, 'resume');
+        const coverLetterStatus = checkTeamCompletion(candidate.id, candidate.assignedGroupId, allCoverLetterScores, 'coverLetter');
+        const videoStatus = checkTeamCompletion(candidate.id, candidate.assignedGroupId, allVideoScores, 'video');
+        
+        // Get flag information for this application
+        const resumeFlag = flaggedDocuments.find(flag => 
+          flag.applicationId === latestApplication.id && flag.documentType === 'resume'
+        );
+        const coverLetterFlag = flaggedDocuments.find(flag => 
+          flag.applicationId === latestApplication.id && flag.documentType === 'coverLetter'
+        );
+        const videoFlag = flaggedDocuments.find(flag => 
+          flag.applicationId === latestApplication.id && flag.documentType === 'video'
+        );
+
         applications.push({
           id: latestApplication.id,
           candidateId: candidate.id,
@@ -759,9 +892,23 @@ router.get('/member-applications/:memberId', requireAuth, async (req, res) => {
           videoUrl: latestApplication.videoUrl,
           groupId: group?.id,
           groupName: group ? `Team ${group.id.slice(-4)}` : 'Unknown Team',
-          hasResumeScore,
-          hasCoverLetterScore,
-          hasVideoScore
+          hasResumeScore: hasResumeScore, // Individual member's completion status
+          hasCoverLetterScore: hasCoverLetterScore, // Individual member's completion status
+          hasVideoScore: hasVideoScore, // Individual member's completion status
+          resumeMissingGrades: resumeStatus.missingGrades,
+          coverLetterMissingGrades: coverLetterStatus.missingGrades,
+          videoMissingGrades: videoStatus.missingGrades,
+          resumeTotalMembers: resumeStatus.totalMembers,
+          coverLetterTotalMembers: coverLetterStatus.totalMembers,
+          videoTotalMembers: videoStatus.totalMembers,
+          groupMembers: resumeStatus.teamMembers, // Team members info
+          resumeCompletedEvaluators: resumeStatus.completedEvaluators,
+          coverLetterCompletedEvaluators: coverLetterStatus.completedEvaluators,
+          videoCompletedEvaluators: videoStatus.completedEvaluators,
+          // Flag information
+          resumeFlagged: resumeFlag || null,
+          coverLetterFlagged: coverLetterFlag || null,
+          videoFlagged: videoFlag || null
         });
       }
     });

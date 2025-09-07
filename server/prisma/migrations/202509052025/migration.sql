@@ -552,3 +552,29 @@ ALTER TABLE "interview_evaluations" ADD CONSTRAINT "interview_evaluations_interv
 -- AddForeignKey
 ALTER TABLE "interview_rubric_scores" ADD CONSTRAINT "interview_rubric_scores_evaluationId_fkey" FOREIGN KEY ("evaluationId") REFERENCES "interview_evaluations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
+-- Custom: meeting slots and signups
+CREATE TABLE IF NOT EXISTS "meeting_slots" (
+  "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "memberId" TEXT NOT NULL,
+  "location" TEXT NOT NULL,
+  "startTime" TIMESTAMPTZ NOT NULL,
+  "endTime" TIMESTAMPTZ,
+  "capacity" INTEGER NOT NULL DEFAULT 2,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+  "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT fk_meeting_slots_member FOREIGN KEY ("memberId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS "meeting_signups" (
+  "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "slotId" UUID NOT NULL,
+  "fullName" TEXT NOT NULL,
+  "email" TEXT NOT NULL,
+  "studentId" TEXT,
+  "attended" BOOLEAN NOT NULL DEFAULT false,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT fk_meeting_signups_slot FOREIGN KEY ("slotId") REFERENCES "meeting_slots"("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS "meeting_signups_slot_email_unique" ON "meeting_signups"("slotId", "email");
+

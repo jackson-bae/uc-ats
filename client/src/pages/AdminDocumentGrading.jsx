@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useAuth } from '../context/AuthContext';
 import apiClient from '../utils/api';
-import ResumeGradingModal from '../components/ResumeGradingModal';
+import DocumentGradingModal from '../components/DocumentGradingModal';
+import FlagDocumentModal from '../components/FlagDocumentModal';
 import {
   Box,
   Typography,
@@ -39,6 +40,7 @@ import {
   CheckCircle as CheckCircleIcon,
   Schedule as ScheduleIcon
 } from '@mui/icons-material';
+import { Tooltip } from '@mui/material';
 import { Switch, FormControlLabel } from '@mui/material';
 
 // Tab Panel component
@@ -71,58 +73,72 @@ export default function AdminDocumentGrading() {
   const [error, setError] = useState(null);
   const [gradingModalOpen, setGradingModalOpen] = useState(false);
   const [selectedApplication, setSelectedApplication] = useState(null);
+  const [selectedDocumentType, setSelectedDocumentType] = useState('resume');
   const [gradeOnlyAssigned, setGradeOnlyAssigned] = useState(false);
+  const [flagModalOpen, setFlagModalOpen] = useState(false);
+  const [flaggingApplication, setFlaggingApplication] = useState(null);
+  const [flaggingDocumentType, setFlaggingDocumentType] = useState('resume');
+  const [flaggedDocuments, setFlaggedDocuments] = useState([]);
+  const [flaggedLoading, setFlaggedLoading] = useState(false);
+  const [resolvedDocuments, setResolvedDocuments] = useState([]);
+  const [resolvedLoading, setResolvedLoading] = useState(false);
 
   // Calculate progress data based on actual grading completion
   const calculateProgressData = () => {
     const totalApplications = applications.length;
     
-    const resumeGraded = applications.filter(app => app.hasResumeScore).length;
-    const coverLetterGraded = applications.filter(app => app.hasCoverLetterScore).length;
-    const videoGraded = applications.filter(app => app.hasVideoScore).length;
+    // Filter applications that have the required documents
+    const applicationsWithResume = applications.filter(app => app.resumeUrl);
+    const applicationsWithCoverLetter = applications.filter(app => app.coverLetterUrl);
+    const applicationsWithVideo = applications.filter(app => app.videoUrl);
+    
+    // Count completed gradings only for applications that have the documents
+    const resumeGraded = applicationsWithResume.filter(app => app.hasResumeScore).length;
+    const coverLetterGraded = applicationsWithCoverLetter.filter(app => app.hasCoverLetterScore).length;
+    const videoGraded = applicationsWithVideo.filter(app => app.hasVideoScore).length;
 
-    // Calculate total grades needed vs completed
-    const totalResumeGradesNeeded = applications.reduce((sum, app) => sum + (app.resumeTotalMembers || 0), 0);
-    const totalResumeGradesCompleted = applications.reduce((sum, app) => sum + ((app.resumeTotalMembers || 0) - (app.resumeMissingGrades || 0)), 0);
+    // Calculate total grades needed vs completed only for applications with documents
+    const totalResumeGradesNeeded = applicationsWithResume.reduce((sum, app) => sum + (app.resumeTotalMembers || 0), 0);
+    const totalResumeGradesCompleted = applicationsWithResume.reduce((sum, app) => sum + ((app.resumeTotalMembers || 0) - (app.resumeMissingGrades || 0)), 0);
     
-    const totalCoverLetterGradesNeeded = applications.reduce((sum, app) => sum + (app.coverLetterTotalMembers || 0), 0);
-    const totalCoverLetterGradesCompleted = applications.reduce((sum, app) => sum + ((app.coverLetterTotalMembers || 0) - (app.coverLetterMissingGrades || 0)), 0);
+    const totalCoverLetterGradesNeeded = applicationsWithCoverLetter.reduce((sum, app) => sum + (app.coverLetterTotalMembers || 0), 0);
+    const totalCoverLetterGradesCompleted = applicationsWithCoverLetter.reduce((sum, app) => sum + ((app.coverLetterTotalMembers || 0) - (app.coverLetterMissingGrades || 0)), 0);
     
-    const totalVideoGradesNeeded = applications.reduce((sum, app) => sum + (app.videoTotalMembers || 0), 0);
-    const totalVideoGradesCompleted = applications.reduce((sum, app) => sum + ((app.videoTotalMembers || 0) - (app.videoMissingGrades || 0)), 0);
+    const totalVideoGradesNeeded = applicationsWithVideo.reduce((sum, app) => sum + (app.videoTotalMembers || 0), 0);
+    const totalVideoGradesCompleted = applicationsWithVideo.reduce((sum, app) => sum + ((app.videoTotalMembers || 0) - (app.videoMissingGrades || 0)), 0);
 
     return [
       {
         title: 'Resume Completion',
         icon: <DocumentIcon />,
         completed: resumeGraded,
-        total: totalApplications,
+        total: applicationsWithResume.length,
         gradesCompleted: totalResumeGradesCompleted,
         gradesNeeded: totalResumeGradesNeeded,
         deadline: 'Oct 5th, EOD',
-        percentage: totalApplications > 0 ? Math.round((resumeGraded / totalApplications) * 100) : 0,
+        percentage: totalResumeGradesNeeded > 0 ? Math.round((totalResumeGradesCompleted / totalResumeGradesNeeded) * 100) : 0,
         color: 'success'
       },
       {
         title: 'Cover Letter Completion',
         icon: <EditIcon />,
         completed: coverLetterGraded,
-        total: totalApplications,
+        total: applicationsWithCoverLetter.length,
         gradesCompleted: totalCoverLetterGradesCompleted,
         gradesNeeded: totalCoverLetterGradesNeeded,
         deadline: 'Oct 5th, EOD',
-        percentage: totalApplications > 0 ? Math.round((coverLetterGraded / totalApplications) * 100) : 0,
+        percentage: totalCoverLetterGradesNeeded > 0 ? Math.round((totalCoverLetterGradesCompleted / totalCoverLetterGradesNeeded) * 100) : 0,
         color: 'success'
       },
       {
         title: 'Video Review Completion',
         icon: <VideoIcon />,
         completed: videoGraded,
-        total: totalApplications,
+        total: applicationsWithVideo.length,
         gradesCompleted: totalVideoGradesCompleted,
         gradesNeeded: totalVideoGradesNeeded,
         deadline: 'Oct 5th, EOD',
-        percentage: totalApplications > 0 ? Math.round((videoGraded / totalApplications) * 100) : 0,
+        percentage: totalVideoGradesNeeded > 0 ? Math.round((totalVideoGradesCompleted / totalVideoGradesNeeded) * 100) : 0,
         color: 'success'
       }
     ];
@@ -138,6 +154,15 @@ export default function AdminDocumentGrading() {
       fetchAllApplications();
     }
   }, [gradeOnlyAssigned]);
+
+  // Fetch flagged/resolved documents when respective tabs are selected
+  useEffect(() => {
+    if (tabValue === 3) { // Flagged tab
+      fetchFlaggedDocuments();
+    } else if (tabValue === 4) { // Resolved tab
+      fetchResolvedDocuments();
+    }
+  }, [tabValue]);
 
   // Filter and sort applications based on current filters
   const filteredApplications = applications.filter(app => {
@@ -227,8 +252,9 @@ export default function AdminDocumentGrading() {
     setTabValue(newValue);
   };
 
-  const handleGradeResume = (application) => {
+  const handleGradeDocument = (application, documentType) => {
     setSelectedApplication(application);
+    setSelectedDocumentType(documentType);
     setGradingModalOpen(true);
   };
 
@@ -240,6 +266,68 @@ export default function AdminDocumentGrading() {
       fetchMemberApplications();
     } else {
       fetchAllApplications();
+    }
+  };
+
+  const handleFlagDocument = (application, documentType) => {
+    setFlaggingApplication(application);
+    setFlaggingDocumentType(documentType);
+    setFlagModalOpen(true);
+  };
+
+  const handleCloseFlagModal = () => {
+    setFlagModalOpen(false);
+    setFlaggingApplication(null);
+    setFlaggingDocumentType('resume');
+    // Refresh flagged documents after flagging
+    fetchFlaggedDocuments();
+  };
+
+  const handleResolveFlag = async (flagId) => {
+    try {
+      await apiClient.patch(`/admin/flagged-documents/${flagId}/resolve`);
+      fetchFlaggedDocuments(); // Refresh the flagged list
+      if (tabValue === 4) {
+        fetchResolvedDocuments(); // Refresh the resolved list if on resolved tab
+      }
+    } catch (err) {
+      console.error('Error resolving flag:', err);
+    }
+  };
+
+  const handleUnresolveFlag = async (flagId) => {
+    try {
+      await apiClient.patch(`/admin/flagged-documents/${flagId}/unresolve`);
+      fetchFlaggedDocuments(); // Refresh the flagged list
+      if (tabValue === 4) {
+        fetchResolvedDocuments(); // Refresh the resolved list if on resolved tab
+      }
+    } catch (err) {
+      console.error('Error unresolving flag:', err);
+    }
+  };
+
+  const fetchFlaggedDocuments = async () => {
+    try {
+      setFlaggedLoading(true);
+      const response = await apiClient.get('/admin/flagged-documents?resolved=false');
+      setFlaggedDocuments(response);
+    } catch (err) {
+      console.error('Error fetching flagged documents:', err);
+    } finally {
+      setFlaggedLoading(false);
+    }
+  };
+
+  const fetchResolvedDocuments = async () => {
+    try {
+      setResolvedLoading(true);
+      const response = await apiClient.get('/admin/flagged-documents?resolved=true');
+      setResolvedDocuments(response);
+    } catch (err) {
+      console.error('Error fetching resolved documents:', err);
+    } finally {
+      setResolvedLoading(false);
     }
   };
 
@@ -278,7 +366,12 @@ export default function AdminDocumentGrading() {
       case 'completed':
         return 'Completed';
       case 'pending':
-        // Show missing grades information
+        // When in "Grade Only Assigned" mode, just show "Grade Now" since user only sees their assigned documents
+        if (gradeOnlyAssigned) {
+          return 'Grade Now';
+        }
+        
+        // Show missing grades information for admin view
         let missingGrades = 0;
         let totalMembers = 0;
         
@@ -306,6 +399,47 @@ export default function AdminDocumentGrading() {
       default:
         return 'Unknown';
     }
+  };
+
+  const getMissingMembersTooltip = (application, documentType) => {
+    if (gradeOnlyAssigned) return '';
+    
+    // Get the team members from the application data
+    const teamMembers = application.groupMembers || [];
+    if (teamMembers.length === 0) return 'No team information available';
+    
+    // Get completed evaluators for this document type
+    let completedEvaluators = [];
+    switch (documentType) {
+      case 'resume':
+        completedEvaluators = application.resumeCompletedEvaluators || [];
+        break;
+      case 'coverLetter':
+        completedEvaluators = application.coverLetterCompletedEvaluators || [];
+        break;
+      case 'video':
+        completedEvaluators = application.videoCompletedEvaluators || [];
+        break;
+    }
+    
+    // Find missing members
+    const missingMembers = teamMembers.filter(member => 
+      member && member.id && !completedEvaluators.includes(member.id)
+    );
+    
+    if (missingMembers.length === 0) {
+      return 'All team members have completed their grades';
+    }
+    
+    const missingNames = missingMembers.map(member => 
+      member.fullName || member.name || 'Unknown Member'
+    ).filter(Boolean);
+    
+    if (missingNames.length === 0) {
+      return 'Missing grades from team members (names unavailable)';
+    }
+    
+    return `Missing grades from: ${missingNames.join(', ')}`;
   };
 
   const getStatusColor = (status) => {
@@ -400,7 +534,7 @@ export default function AdminDocumentGrading() {
                     {item.title}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    {item.completed} / {item.total} Tasks Complete | {item.gradesCompleted} / {item.gradesNeeded} Grades | Deadline: {item.deadline}
+                    {item.gradesCompleted} / {item.gradesNeeded} Grades | Deadline: {item.deadline}
                   </Typography>
                 </Box>
                 <Typography variant="body2" sx={{ fontWeight: 600, color: 'success.main' }}>
@@ -563,6 +697,18 @@ export default function AdminDocumentGrading() {
               iconPosition="start"
               sx={{ textTransform: 'none', fontWeight: 600 }}
             />
+            <Tab
+              icon={<FlagIcon />}
+              label="Flagged"
+              iconPosition="start"
+              sx={{ textTransform: 'none', fontWeight: 600 }}
+            />
+            <Tab
+              icon={<CheckCircleIcon />}
+              label="Resolved"
+              iconPosition="start"
+              sx={{ textTransform: 'none', fontWeight: 600 }}
+            />
           </Tabs>
         </Box>
 
@@ -582,12 +728,188 @@ export default function AdminDocumentGrading() {
                 <TableRow>
                   <TableCell sx={{ fontWeight: 600 }}>Candidate</TableCell>
                   <TableCell sx={{ fontWeight: 600 }}>Document</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Flag</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>
+                    {tabValue === 3 || tabValue === 4 ? 'Flag Details' : 'Flag'}
+                  </TableCell>
                   <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {(() => {
+                  // Handle flagged documents tab
+                  if (tabValue === 3) {
+                    if (flaggedLoading) {
+                      return (
+                        <TableRow>
+                          <TableCell colSpan={4} sx={{ textAlign: 'center', py: 4 }}>
+                            <LinearProgress sx={{ width: '100%' }} />
+                          </TableCell>
+                        </TableRow>
+                      );
+                    }
+                    
+                    if (flaggedDocuments.length === 0) {
+                      return (
+                        <TableRow>
+                          <TableCell colSpan={4} sx={{ textAlign: 'center', py: 4 }}>
+                            <Typography color="text.secondary">
+                              No flagged documents found.
+                            </Typography>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    }
+
+                    return flaggedDocuments.map((flaggedDoc) => (
+                      <TableRow key={flaggedDoc.id} hover>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                            {flaggedDoc.application.firstName} {flaggedDoc.application.lastName}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {flaggedDoc.application.major1} • {flaggedDoc.application.graduationYear}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            startIcon={<DocumentIcon />}
+                            sx={{ textTransform: 'none' }}
+                            onClick={() => handleGradeDocument(flaggedDoc.application, flaggedDoc.documentType)}
+                          >
+                            {flaggedDoc.documentType === 'resume' ? 'Resume' : 
+                             flaggedDoc.documentType === 'coverLetter' ? 'Cover Letter' : 'Video'}
+                          </Button>
+                        </TableCell>
+                        <TableCell>
+                          <Box>
+                            <Typography variant="caption" color="error" sx={{ fontWeight: 600 }}>
+                              {flaggedDoc.reason}
+                            </Typography>
+                            {flaggedDoc.message && (
+                              <Typography variant="caption" color="text.secondary" display="block">
+                                {flaggedDoc.message}
+                              </Typography>
+                            )}
+                            <Typography variant="caption" color="text.secondary" display="block">
+                              Flagged by {flaggedDoc.flagger.fullName}
+                            </Typography>
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Chip
+                              label="Flagged"
+                              color="error"
+                              size="small"
+                              icon={<FlagIcon />}
+                              sx={{ fontWeight: 600 }}
+                            />
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              color="success"
+                              onClick={() => handleResolveFlag(flaggedDoc.id)}
+                              sx={{ minWidth: 'auto', px: 1 }}
+                            >
+                              Resolve
+                            </Button>
+                          </Box>
+                        </TableCell>
+                      </TableRow>
+                    ));
+                  }
+
+                  // Handle resolved documents tab
+                  if (tabValue === 4) {
+                    if (resolvedLoading) {
+                      return (
+                        <TableRow>
+                          <TableCell colSpan={4} sx={{ textAlign: 'center', py: 4 }}>
+                            <LinearProgress sx={{ width: '100%' }} />
+                          </TableCell>
+                        </TableRow>
+                      );
+                    }
+                    
+                    if (resolvedDocuments.length === 0) {
+                      return (
+                        <TableRow>
+                          <TableCell colSpan={4} sx={{ textAlign: 'center', py: 4 }}>
+                            <Typography color="text.secondary">
+                              No resolved documents found.
+                            </Typography>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    }
+
+                    return resolvedDocuments.map((resolvedDoc) => (
+                      <TableRow key={resolvedDoc.id} hover>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                            {resolvedDoc.application.firstName} {resolvedDoc.application.lastName}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {resolvedDoc.application.major1} • {resolvedDoc.application.graduationYear}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            startIcon={<DocumentIcon />}
+                            sx={{ textTransform: 'none' }}
+                            onClick={() => handleGradeDocument(resolvedDoc.application, resolvedDoc.documentType)}
+                          >
+                            {resolvedDoc.documentType === 'resume' ? 'Resume' : 
+                             resolvedDoc.documentType === 'coverLetter' ? 'Cover Letter' : 'Video'}
+                          </Button>
+                        </TableCell>
+                        <TableCell>
+                          <Box>
+                            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                              {resolvedDoc.reason}
+                            </Typography>
+                            {resolvedDoc.message && (
+                              <Typography variant="caption" color="text.secondary" display="block">
+                                {resolvedDoc.message}
+                              </Typography>
+                            )}
+                            <Typography variant="caption" color="text.secondary" display="block">
+                              Flagged by {resolvedDoc.flagger.fullName}
+                            </Typography>
+                            <Typography variant="caption" color="success.main" display="block">
+                              Resolved by {resolvedDoc.resolver?.fullName} on {new Date(resolvedDoc.resolvedAt).toLocaleDateString()}
+                            </Typography>
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Chip
+                              label="Resolved"
+                              color="success"
+                              size="small"
+                              icon={<CheckCircleIcon />}
+                              sx={{ fontWeight: 600 }}
+                            />
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              color="warning"
+                              onClick={() => handleUnresolveFlag(resolvedDoc.id)}
+                              sx={{ minWidth: 'auto', px: 1 }}
+                            >
+                              Unresolve
+                            </Button>
+                          </Box>
+                        </TableCell>
+                      </TableRow>
+                    ));
+                  }
+
+                  // Handle regular document tabs
                   const currentGradingData = generateGradingData(
                     tabValue === 0 ? 'resume' : tabValue === 1 ? 'coverLetter' : 'video'
                   );
@@ -621,24 +943,44 @@ export default function AdminDocumentGrading() {
                           startIcon={<DocumentIcon />}
                           sx={{ textTransform: 'none' }}
                           disabled={!row.hasDocument}
-                          onClick={() => row.hasDocument && handleGradeResume(row.application)}
+                          onClick={() => row.hasDocument && handleGradeDocument(row.application, tabValue === 0 ? 'resume' : tabValue === 1 ? 'coverLetter' : 'video')}
                         >
                           {row.document}
                         </Button>
                       </TableCell>
                       <TableCell>
-                        <IconButton size="small">
-                          <FlagOutlinedIcon />
-                        </IconButton>
+                        {(() => {
+                          const documentType = tabValue === 0 ? 'resume' : tabValue === 1 ? 'coverLetter' : 'video';
+                          const isFlagged = row.application[`${documentType}Flagged`];
+                          
+                          return (
+                            <Tooltip title={isFlagged ? `Flagged: ${isFlagged.reason}` : "Flag document for review"}>
+                              <IconButton 
+                                size="small"
+                                onClick={() => handleFlagDocument(row.application, documentType)}
+                                disabled={!row.hasDocument || isFlagged}
+                                color={isFlagged ? "error" : "default"}
+                              >
+                                {isFlagged ? <FlagIcon /> : <FlagOutlinedIcon />}
+                              </IconButton>
+                            </Tooltip>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell>
-                        <Chip
-                          label={getStatusText(row.status, row.application, tabValue === 0 ? 'resume' : tabValue === 1 ? 'coverLetter' : 'video')}
-                          color={getStatusColor(row.status)}
-                          size="small"
-                          icon={row.status === 'completed' ? <CheckCircleIcon /> : <ScheduleIcon />}
-                          sx={{ fontWeight: 600 }}
-                        />
+                        <Tooltip 
+                          title={getMissingMembersTooltip(row.application, tabValue === 0 ? 'resume' : tabValue === 1 ? 'coverLetter' : 'video')}
+                          placement="top"
+                          arrow
+                        >
+                          <Chip
+                            label={getStatusText(row.status, row.application, tabValue === 0 ? 'resume' : tabValue === 1 ? 'coverLetter' : 'video')}
+                            color={getStatusColor(row.status)}
+                            size="small"
+                            icon={row.status === 'completed' ? <CheckCircleIcon /> : <ScheduleIcon />}
+                            sx={{ fontWeight: 600, cursor: 'help' }}
+                          />
+                        </Tooltip>
                       </TableCell>
                     </TableRow>
                   ));
@@ -649,11 +991,20 @@ export default function AdminDocumentGrading() {
         )}
       </Paper>
 
-      {/* Resume Grading Modal */}
-      <ResumeGradingModal
+      {/* Document Grading Modal */}
+      <DocumentGradingModal
         open={gradingModalOpen}
         onClose={handleCloseGradingModal}
         application={selectedApplication}
+        documentType={selectedDocumentType}
+      />
+
+      {/* Flag Document Modal */}
+      <FlagDocumentModal
+        open={flagModalOpen}
+        onClose={handleCloseFlagModal}
+        application={flaggingApplication}
+        documentType={flaggingDocumentType}
       />
     </Box>
   );

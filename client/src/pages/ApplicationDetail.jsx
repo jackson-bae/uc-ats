@@ -660,6 +660,16 @@ export default function ApplicationDetail() {
                         <div style={{ flex: 1 }}>
                           <div className="event-name">
                             {event.eventName}
+                            {event.isMeeting && event.memberName && (
+                              <span style={{ 
+                                fontSize: '0.875rem', 
+                                fontWeight: '500', 
+                                color: '#0369a1',
+                                marginLeft: '8px'
+                              }}>
+                                with {event.memberName}
+                              </span>
+                            )}
                           </div>
                           <div className="event-details">
                             {new Date(event.eventStartDate).toLocaleDateString()} • {event.eventLocation || 'Location TBD'}

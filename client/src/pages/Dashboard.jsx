@@ -57,14 +57,29 @@ export default function Dashboard() {
   const load = async () => {
     try {
       setLoading(true);
-      const [s, c] = await Promise.all([
+      const [s, c] = await Promise.allSettled([
         apiClient.get('/admin/stats'),
         apiClient.get('/admin/cycles/active'),
       ]);
-      setStats(s);
-      setActiveCycle(c);
+      
+      // Handle stats result
+      if (s.status === 'fulfilled') {
+        setStats(s.value);
+      } else {
+        console.error('Failed to load stats:', s.reason);
+        setStats({ totalApplicants: 0, tasks: 0, candidates: 0, currentRound: 'SUBMITTED' });
+      }
+      
+      // Handle active cycle result
+      if (c.status === 'fulfilled') {
+        setActiveCycle(c.value);
+      } else {
+        console.error('Failed to load active cycle:', c.reason);
+        setActiveCycle(null);
+      }
     } catch (e) {
-      setError(e.message || 'Failed to load');
+      console.error('Error in load function:', e);
+      setError(e.message || 'Failed to load dashboard data');
     } finally {
       setLoading(false);
     }
@@ -74,6 +89,13 @@ export default function Dashboard() {
     try {
       setEventsLoading(true);
       const events = await apiClient.get('/admin/events');
+      
+      // Handle case where events might be null or undefined
+      if (!events || !Array.isArray(events)) {
+        console.warn('No events data received or invalid format');
+        setTimelineEvents([]);
+        return;
+      }
       
       const timelineEvents = events
         .sort((a, b) => new Date(a.eventStartDate) - new Date(b.eventStartDate))
@@ -100,7 +122,7 @@ export default function Dashboard() {
       setTimelineEvents(timelineEvents);
     } catch (err) {
       console.error('Error fetching timeline events:', err);
-      setError('Failed to load recruitment timeline events');
+      setTimelineEvents([]); // Set empty array instead of showing error
     } finally {
       setEventsLoading(false);
     }
@@ -110,6 +132,20 @@ export default function Dashboard() {
     try {
       setDemographicsLoading(true);
       const applications = await apiClient.get('/admin/applications');
+      
+      // Handle case where applications might be null or undefined
+      if (!applications || !Array.isArray(applications)) {
+        console.warn('No applications data received or invalid format');
+        setDemographicData({
+          majors: [],
+          genders: [],
+          gpaRanges: [],
+          graduationYears: [],
+          transferStudents: [],
+          firstGeneration: []
+        });
+        return;
+      }
       
       // Process demographic data
       const majors = {};
@@ -165,7 +201,15 @@ export default function Dashboard() {
       });
     } catch (err) {
       console.error('Error fetching demographic data:', err);
-      setError('Failed to load demographic data');
+      // Set empty demographic data instead of showing error
+      setDemographicData({
+        majors: [],
+        genders: [],
+        gpaRanges: [],
+        graduationYears: [],
+        transferStudents: [],
+        firstGeneration: []
+      });
     } finally {
       setDemographicsLoading(false);
     }

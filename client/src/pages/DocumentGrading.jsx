@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { useAuth } from '../context/AuthContext';
 import apiClient from '../utils/api';
 import DocumentGradingModal from '../components/DocumentGradingModal';
+import FlagDocumentModal from '../components/FlagDocumentModal';
 import {
   Box,
   Typography,
@@ -29,7 +30,8 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions
+  DialogActions,
+  Tooltip
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -121,6 +123,9 @@ export default function DocumentGrading() {
   const [showCompletionCelebration, setShowCompletionCelebration] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
   const [hasShownCelebration, setHasShownCelebration] = useState(false);
+  const [flagModalOpen, setFlagModalOpen] = useState(false);
+  const [flaggingApplication, setFlaggingApplication] = useState(null);
+  const [flaggingDocumentType, setFlaggingDocumentType] = useState('resume');
 
   // Calculate progress data based on actual grading completion
   const calculateProgressData = () => {
@@ -311,6 +316,18 @@ export default function DocumentGrading() {
     console.log('Closing celebration dialog');
     setShowCompletionCelebration(false);
     setShowConfetti(false);
+  };
+
+  const handleFlagDocument = (application, documentType) => {
+    setFlaggingApplication(application);
+    setFlaggingDocumentType(documentType);
+    setFlagModalOpen(true);
+  };
+
+  const handleCloseFlagModal = () => {
+    setFlagModalOpen(false);
+    setFlaggingApplication(null);
+    setFlaggingDocumentType('resume');
   };
 
   const fetchMemberApplications = async () => {
@@ -650,9 +667,23 @@ export default function DocumentGrading() {
                         </Button>
                       </TableCell>
                       <TableCell>
-                        <IconButton size="small">
-                          <FlagOutlinedIcon />
-                        </IconButton>
+                        {(() => {
+                          const documentType = tabValue === 0 ? 'resume' : tabValue === 1 ? 'coverLetter' : 'video';
+                          const isFlagged = row.application[`${documentType}Flagged`];
+                          
+                          return (
+                            <Tooltip title={isFlagged ? `Flagged: ${isFlagged.reason}` : "Flag document for review"}>
+                              <IconButton 
+                                size="small"
+                                onClick={() => handleFlagDocument(row.application, documentType)}
+                                disabled={!row.hasDocument || isFlagged}
+                                color={isFlagged ? "error" : "default"}
+                              >
+                                {isFlagged ? <FlagIcon /> : <FlagOutlinedIcon />}
+                              </IconButton>
+                            </Tooltip>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell>
                         <Chip
@@ -678,6 +709,14 @@ export default function DocumentGrading() {
         onClose={handleCloseGradingModal}
         application={selectedApplication}
         documentType={selectedDocumentType}
+      />
+
+      {/* Flag Document Modal */}
+      <FlagDocumentModal
+        open={flagModalOpen}
+        onClose={handleCloseFlagModal}
+        application={flaggingApplication}
+        documentType={flaggingDocumentType}
       />
 
       {/* Completion Celebration Dialog */}

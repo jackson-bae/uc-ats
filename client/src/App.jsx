@@ -33,6 +33,8 @@ import MemberEvents from './pages/MemberEvents';
 import CandidateApplications from './pages/CandidateApplications';
 import InterviewPreparation from './pages/InterviewPreparation';
 import InterviewDetail from './pages/InterviewDetail';
+import CoffeeChatsPublic from './pages/CoffeeChatsPublic';
+import MemberMeetingSlots from './pages/MemberMeetingSlots';
 import './styles/variables.css';
 // Protected Route wrapper for admin/member users
 const ProtectedRoute = ({ children }) => {
@@ -251,6 +253,17 @@ const AppRoutes = () => {
       
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
+      {/* Public meeting signup page */}
+      <Route path="/meet" element={<CoffeeChatsPublic />} />
+      {/* Member meeting slots management */}
+      <Route
+        path="/member/meeting-slots"
+        element={
+          <ProtectedRoute>
+            <MemberMeetingSlots />
+          </ProtectedRoute>
+        }
+      />
     </Routes>
   );
 };

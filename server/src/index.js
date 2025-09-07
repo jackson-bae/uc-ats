@@ -63,8 +63,14 @@ app.get('/api/test-uploads', (req, res) => {
 // Health check endpoint to test database connection
 app.get('/api/health', async (req, res) => {
   try {
-    // Test database connection
-    await prisma.$queryRaw`SELECT 1`;
+    // Test database connection with timeout
+    const healthCheckPromise = prisma.$queryRaw`SELECT 1`;
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Health check timeout')), 5000);
+    });
+    
+    await Promise.race([healthCheckPromise, timeoutPromise]);
+    
     res.json({ 
       status: 'healthy',
       database: 'connected',

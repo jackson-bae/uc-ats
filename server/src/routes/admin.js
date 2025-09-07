@@ -12,17 +12,51 @@ router.use(requireAuth, requireAdmin);
 // Get dashboard stats
 router.get('/stats', async (req, res) => {
   try {
-    const active = await prisma.recruitingCycle.findFirst({ where: { isActive: true } });
+    // Wrap all database calls in try-catch blocks to handle individual failures
+    let active = null;
+    try {
+      active = await prisma.recruitingCycle.findFirst({ where: { isActive: true } });
+    } catch (error) {
+      console.error('Error fetching active cycle:', error);
+    }
+    
     if (!active) {
       return res.json({ totalApplicants: 0, tasks: 0, candidates: 0, currentRound: 'SUBMITTED' });
     }
 
-    const [totalApplicants, resumeGrades, coverLetterGrades, videoGrades, candidates] = await Promise.all([
-      prisma.application.count({ where: { cycleId: active.id } }),
-      prisma.resumeScore.count(),
-      prisma.coverLetterScore.count(),
-      prisma.videoScore.count(),
-      prisma.application.findMany({
+    // Get each value individually with error handling
+    let totalApplicants = 0;
+    let resumeGrades = 0;
+    let coverLetterGrades = 0;
+    let videoGrades = 0;
+    let candidates = [];
+
+    try {
+      totalApplicants = await prisma.application.count({ where: { cycleId: active.id } });
+    } catch (error) {
+      console.error('Error fetching total applicants:', error);
+    }
+
+    try {
+      resumeGrades = await prisma.resumeScore.count();
+    } catch (error) {
+      console.error('Error fetching resume grades:', error);
+    }
+
+    try {
+      coverLetterGrades = await prisma.coverLetterScore.count();
+    } catch (error) {
+      console.error('Error fetching cover letter grades:', error);
+    }
+
+    try {
+      videoGrades = await prisma.videoScore.count();
+    } catch (error) {
+      console.error('Error fetching video grades:', error);
+    }
+
+    try {
+      candidates = await prisma.application.findMany({
         where: {
           cycleId: active.id,
           status: { in: ['SUBMITTED', 'UNDER_REVIEW', 'WAITLISTED'] }
@@ -31,8 +65,10 @@ router.get('/stats', async (req, res) => {
           currentRound: true,
           status: true
         }
-      })
-    ]);
+      });
+    } catch (error) {
+      console.error('Error fetching candidates:', error);
+    }
 
     const totalGrades = resumeGrades + coverLetterGrades + videoGrades;
 
@@ -64,7 +100,8 @@ router.get('/stats', async (req, res) => {
     res.json({ totalApplicants, tasks: totalGrades, candidates: candidates.length, currentRound });
   } catch (error) {
     console.error('[GET /api/admin/stats]', error);
-    res.status(500).json({ error: 'Failed to fetch dashboard stats' });
+    // Return default values instead of error to prevent dashboard from breaking
+    res.json({ totalApplicants: 0, tasks: 0, candidates: 0, currentRound: 'SUBMITTED' });
   }
 });
 
@@ -626,7 +663,8 @@ router.get('/cycles/active', async (req, res) => {
     res.json(active || null);
   } catch (error) {
     console.error('[GET /api/admin/cycles/active]', error);
-    res.status(500).json({ error: 'Failed to fetch active cycle' });
+    // Return null instead of error to prevent dashboard from breaking
+    res.json(null);
   }
 });
 
@@ -811,7 +849,8 @@ router.get('/events', async (req, res) => {
     res.json(events);
   } catch (error) {
     console.error('[GET /api/admin/events]', error);
-    res.status(500).json({ error: 'Failed to fetch events' });
+    // Return empty array instead of error to prevent dashboard from breaking
+    res.json([]);
   }
 });
 
@@ -1555,95 +1594,175 @@ router.post('/interviews/:id/start', async (req, res) => {
 router.get('/applications', async (req, res) => {
   try {
     // Get the active cycle first
-    const activeCycle = await prisma.recruitingCycle.findFirst({ 
-      where: { isActive: true } 
-    });
+    let activeCycle = null;
+    try {
+      activeCycle = await prisma.recruitingCycle.findFirst({ 
+        where: { isActive: true } 
+      });
+    } catch (error) {
+      console.error('Error fetching active cycle:', error);
+    }
     
     if (!activeCycle) {
       return res.json([]);
     }
 
-    // Get all applications for the active cycle directly
-    const applications = await prisma.application.findMany({
-      where: {
-        cycleId: activeCycle.id
-      },
-      include: {
-        candidate: {
-          select: {
-            id: true,
-            assignedGroupId: true
+    // Get all applications for the active cycle directly with error handling
+    let applications = [];
+    try {
+      applications = await prisma.application.findMany({
+        where: {
+          cycleId: activeCycle.id
+        },
+        include: {
+          candidate: {
+            select: {
+              id: true,
+              assignedGroupId: true
+            }
+          }
+        },
+        orderBy: {
+          submittedAt: 'desc'
+        }
+      });
+    } catch (error) {
+      console.error('Error fetching applications:', error);
+      return res.json([]); // Return empty array if query fails
+    }
+
+    // Get all groups and their members for the active cycle with error handling
+    let groups = [];
+    try {
+      groups = await prisma.groups.findMany({
+        where: {
+          cycleId: activeCycle.id
+        },
+        select: {
+          id: true,
+          memberOne: true,
+          memberTwo: true,
+          memberThree: true,
+          memberOneUser: {
+            select: {
+              id: true,
+              fullName: true,
+              email: true
+            }
+          },
+          memberTwoUser: {
+            select: {
+              id: true,
+              fullName: true,
+              email: true
+            }
+          },
+          memberThreeUser: {
+            select: {
+              id: true,
+              fullName: true,
+              email: true
+            }
           }
         }
-      },
-      orderBy: {
-        submittedAt: 'desc'
-      }
-    });
+      });
+    } catch (error) {
+      console.error('Error fetching groups:', error);
+    }
 
-    // Get all groups and their members for the active cycle
-    const groups = await prisma.groups.findMany({
-      where: {
-        cycleId: activeCycle.id
-      },
-      select: {
-        id: true,
-        memberOne: true,
-        memberTwo: true,
-        memberThree: true
-      }
-    });
-
-    // Get all grading records for these candidates
-    const resumeScores = await prisma.resumeScore.findMany({
-      where: {
-        candidateId: {
-          in: applications.map(app => app.candidateId)
+    // Get all grading records for these candidates with error handling
+    let resumeScores = [];
+    try {
+      resumeScores = await prisma.resumeScore.findMany({
+        where: {
+          candidateId: {
+            in: applications.map(app => app.candidateId)
+          }
+        },
+        select: {
+          candidateId: true,
+          evaluatorId: true,
+          assignedGroupId: true
         }
-      },
-      select: {
-        candidateId: true,
-        evaluatorId: true,
-        assignedGroupId: true
-      }
-    });
+      });
+    } catch (error) {
+      console.error('Error fetching resume scores:', error);
+    }
 
-    const coverLetterScores = await prisma.coverLetterScore.findMany({
-      where: {
-        candidateId: {
-          in: applications.map(app => app.candidateId)
+    // Get flagged documents for these applications
+    let flaggedDocuments = [];
+    try {
+      flaggedDocuments = await prisma.flaggedDocument.findMany({
+        where: {
+          applicationId: {
+            in: applications.map(app => app.id)
+          },
+          isResolved: false
+        },
+        select: {
+          applicationId: true,
+          documentType: true,
+          reason: true,
+          message: true,
+          flaggedBy: true,
+          createdAt: true
         }
-      },
-      select: {
-        candidateId: true,
-        evaluatorId: true,
-        assignedGroupId: true
-      }
-    });
+      });
+    } catch (error) {
+      console.error('Error fetching flagged documents:', error);
+    }
 
-    const videoScores = await prisma.videoScore.findMany({
-      where: {
-        candidateId: {
-          in: applications.map(app => app.candidateId)
+    let coverLetterScores = [];
+    try {
+      coverLetterScores = await prisma.coverLetterScore.findMany({
+        where: {
+          candidateId: {
+            in: applications.map(app => app.candidateId)
+          }
+        },
+        select: {
+          candidateId: true,
+          evaluatorId: true,
+          assignedGroupId: true
         }
-      },
-      select: {
-        candidateId: true,
-        evaluatorId: true,
-        assignedGroupId: true
-      }
-    });
+      });
+    } catch (error) {
+      console.error('Error fetching cover letter scores:', error);
+    }
+
+    let videoScores = [];
+    try {
+      videoScores = await prisma.videoScore.findMany({
+        where: {
+          candidateId: {
+            in: applications.map(app => app.candidateId)
+          }
+        },
+        select: {
+          candidateId: true,
+          evaluatorId: true,
+          assignedGroupId: true
+        }
+      });
+    } catch (error) {
+      console.error('Error fetching video scores:', error);
+    }
 
     // Helper function to check team completion and get missing grades count
     const checkTeamCompletion = (candidateId, groupId, scores, scoreType) => {
-      if (!groupId) return { completed: false, missingGrades: 0, totalMembers: 0 };
+      if (!groupId) return { completed: false, missingGrades: 0, totalMembers: 0, teamMembers: [], completedEvaluators: [] };
       
       const group = groups.find(g => g.id === groupId);
-      if (!group) return { completed: false, missingGrades: 0, totalMembers: 0 };
+      if (!group) return { completed: false, missingGrades: 0, totalMembers: 0, teamMembers: [], completedEvaluators: [] };
       
-      // Get all assigned team members (filter out null/undefined)
-      const teamMembers = [group.memberOne, group.memberTwo, group.memberThree].filter(Boolean);
-      if (teamMembers.length === 0) return { completed: false, missingGrades: 0, totalMembers: 0 };
+      // Get all assigned team members with user info (filter out null/undefined)
+      const teamMembers = [
+        group.memberOneUser,
+        group.memberTwoUser,
+        group.memberThreeUser
+      ].filter(Boolean);
+      
+      if (teamMembers.length === 0) return { completed: false, missingGrades: 0, totalMembers: 0, teamMembers: [], completedEvaluators: [] };
       
       // Get scores for this candidate and group
       const candidateScores = scores.filter(score => 
@@ -1652,8 +1771,8 @@ router.get('/applications', async (req, res) => {
       
       // Check if all team members have completed their scores
       const completedEvaluators = candidateScores.map(score => score.evaluatorId);
-      const allMembersCompleted = teamMembers.every(memberId => 
-        completedEvaluators.includes(memberId)
+      const allMembersCompleted = teamMembers.every(member => 
+        completedEvaluators.includes(member.id)
       );
       
       const missingGrades = teamMembers.length - completedEvaluators.length;
@@ -1661,8 +1780,17 @@ router.get('/applications', async (req, res) => {
       return {
         completed: allMembersCompleted,
         missingGrades,
-        totalMembers: teamMembers.length
+        totalMembers: teamMembers.length,
+        teamMembers: teamMembers,
+        completedEvaluators: completedEvaluators
       };
+    };
+
+    // Helper function to get flag info for a document type
+    const getFlagInfo = (applicationId, documentType) => {
+      return flaggedDocuments.find(flag => 
+        flag.applicationId === applicationId && flag.documentType === documentType
+      );
     };
 
     // Transform the data
@@ -1698,14 +1826,23 @@ router.get('/applications', async (req, res) => {
         videoMissingGrades: videoStatus.missingGrades,
         resumeTotalMembers: resumeStatus.totalMembers,
         coverLetterTotalMembers: coverLetterStatus.totalMembers,
-        videoTotalMembers: videoStatus.totalMembers
+        videoTotalMembers: videoStatus.totalMembers,
+        groupMembers: resumeStatus.teamMembers, // Team members info
+        resumeCompletedEvaluators: resumeStatus.completedEvaluators,
+        coverLetterCompletedEvaluators: coverLetterStatus.completedEvaluators,
+        videoCompletedEvaluators: videoStatus.completedEvaluators,
+        // Flag information
+        resumeFlagged: getFlagInfo(app.id, 'resume'),
+        coverLetterFlagged: getFlagInfo(app.id, 'coverLetter'),
+        videoFlagged: getFlagInfo(app.id, 'video')
       });
     });
 
     res.json(transformedApplications);
   } catch (error) {
     console.error('Error fetching admin applications:', error);
-    res.status(500).json({ error: 'Failed to fetch applications', details: error.message });
+    // Return empty array instead of error to prevent dashboard from breaking
+    res.json([]);
   }
 });
 
@@ -1897,6 +2034,9 @@ router.get('/staging/candidates', async (req, res) => {
         }
       },
       orderBy: { submittedAt: 'desc' }
+    }).catch((error) => {
+      console.error('Error fetching staging candidates:', error);
+      return []; // Return empty array if query fails
     });
 
     const stagingCandidates = await Promise.all(applications.map(async app => {
@@ -1935,6 +2075,18 @@ router.get('/staging/candidates', async (req, res) => {
       }, 0);
 
       overallScore += totalEventPoints;
+
+      // Add meeting attendance bonus (5 points for attending "Get to Know UC")
+      const meetingAttendance = await prisma.meetingSignup.findFirst({
+        where: { 
+          studentId: app.studentId,
+          attended: true
+        }
+      });
+
+      if (meetingAttendance) {
+        overallScore += 5;
+      }
 
       // Build attendance object
       const attendance = {};
@@ -2978,6 +3130,262 @@ router.post('/process-final-decisions', async (req, res) => {
   } catch (error) {
     console.error('[POST /api/admin/process-final-decisions]', error);
     res.status(500).json({ error: 'Failed to process final round decisions', details: error.message });
+  }
+});
+
+// Flag Document Routes
+
+// Flag a document
+router.post('/flag-document', async (req, res) => {
+  try {
+    const { applicationId, documentType, reason, message } = req.body;
+    const flaggedBy = req.user.id;
+
+    // Validate required fields
+    if (!applicationId || !documentType || !reason) {
+      return res.status(400).json({ error: 'Application ID, document type, and reason are required' });
+    }
+
+    // Validate document type
+    const validDocumentTypes = ['resume', 'coverLetter', 'video'];
+    if (!validDocumentTypes.includes(documentType)) {
+      return res.status(400).json({ error: 'Invalid document type. Must be resume, coverLetter, or video' });
+    }
+
+    // Check if document is already flagged
+    const existingFlag = await prisma.flaggedDocument.findFirst({
+      where: {
+        applicationId,
+        documentType,
+        isResolved: false
+      }
+    });
+
+    if (existingFlag) {
+      return res.status(409).json({ error: 'This document is already flagged' });
+    }
+
+    // Create the flag
+    const flaggedDocument = await prisma.flaggedDocument.create({
+      data: {
+        applicationId,
+        documentType,
+        flaggedBy,
+        reason,
+        message: message || null
+      },
+      include: {
+        application: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true
+          }
+        },
+        flagger: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true
+          }
+        }
+      }
+    });
+
+    res.status(201).json({
+      message: 'Document flagged successfully',
+      flaggedDocument
+    });
+  } catch (error) {
+    console.error('[POST /api/admin/flag-document]', error);
+    res.status(500).json({ error: 'Failed to flag document' });
+  }
+});
+
+// Get flagged documents
+router.get('/flagged-documents', async (req, res) => {
+  try {
+    const { resolved } = req.query;
+    
+    let whereClause = {};
+    if (resolved !== undefined) {
+      whereClause.isResolved = resolved === 'true';
+    }
+
+    const flaggedDocuments = await prisma.flaggedDocument.findMany({
+      where: whereClause,
+      include: {
+        application: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            major1: true,
+            graduationYear: true
+          }
+        },
+        flagger: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true
+          }
+        },
+        resolver: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    res.json(flaggedDocuments);
+  } catch (error) {
+    console.error('[GET /api/admin/flagged-documents]', error);
+    res.status(500).json({ error: 'Failed to fetch flagged documents' });
+  }
+});
+
+// Resolve a flagged document
+router.patch('/flagged-documents/:id/resolve', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const resolvedBy = req.user.id;
+
+    const flaggedDocument = await prisma.flaggedDocument.findUnique({
+      where: { id }
+    });
+
+    if (!flaggedDocument) {
+      return res.status(404).json({ error: 'Flagged document not found' });
+    }
+
+    if (flaggedDocument.isResolved) {
+      return res.status(400).json({ error: 'Document is already resolved' });
+    }
+
+    const updatedDocument = await prisma.flaggedDocument.update({
+      where: { id },
+      data: {
+        isResolved: true,
+        resolvedBy,
+        resolvedAt: new Date()
+      },
+      include: {
+        application: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true
+          }
+        },
+        flagger: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true
+          }
+        },
+        resolver: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true
+          }
+        }
+      }
+    });
+
+    res.json({
+      message: 'Document resolved successfully',
+      flaggedDocument: updatedDocument
+    });
+  } catch (error) {
+    console.error('[PATCH /api/admin/flagged-documents/:id/resolve]', error);
+    res.status(500).json({ error: 'Failed to resolve flagged document' });
+  }
+});
+
+// Unresolve a flagged document
+router.patch('/flagged-documents/:id/unresolve', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const flaggedDocument = await prisma.flaggedDocument.findUnique({
+      where: { id }
+    });
+
+    if (!flaggedDocument) {
+      return res.status(404).json({ error: 'Flagged document not found' });
+    }
+
+    if (!flaggedDocument.isResolved) {
+      return res.status(400).json({ error: 'Document is not resolved' });
+    }
+
+    const updatedDocument = await prisma.flaggedDocument.update({
+      where: { id },
+      data: {
+        isResolved: false,
+        resolvedBy: null,
+        resolvedAt: null
+      },
+      include: {
+        application: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true
+          }
+        },
+        flagger: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true
+          }
+        }
+      }
+    });
+
+    res.json({
+      message: 'Document unresolved successfully',
+      flaggedDocument: updatedDocument
+    });
+  } catch (error) {
+    console.error('[PATCH /api/admin/flagged-documents/:id/unresolve]', error);
+    res.status(500).json({ error: 'Failed to unresolve flagged document' });
+  }
+});
+
+// Delete a flagged document
+router.delete('/flagged-documents/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const flaggedDocument = await prisma.flaggedDocument.findUnique({
+      where: { id }
+    });
+
+    if (!flaggedDocument) {
+      return res.status(404).json({ error: 'Flagged document not found' });
+    }
+
+    await prisma.flaggedDocument.delete({
+      where: { id }
+    });
+
+    res.json({ message: 'Flagged document deleted successfully' });
+  } catch (error) {
+    console.error('[DELETE /api/admin/flagged-documents/:id]', error);
+    res.status(500).json({ error: 'Failed to delete flagged document' });
   }
 });
 

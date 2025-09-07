@@ -283,6 +283,110 @@ router.get('/interviews/:id', requireAuth, async (req, res) => {
   }
 });
 
+// Member: create a meeting slot
+router.post('/meeting-slots', requireAuth, async (req, res) => {
+  try {
+    const { location, startTime, endTime, capacity } = req.body || {};
+    if (!location || !startTime) {
+      return res.status(400).json({ error: 'Location and start time are required' });
+    }
+    const slot = await prisma.meetingSlot.create({
+      data: {
+        memberId: req.user.id,
+        location,
+        startTime: new Date(startTime),
+        endTime: endTime ? new Date(endTime) : null,
+        capacity: Number.isInteger(capacity) ? capacity : 2
+      }
+    });
+    res.json(slot);
+  } catch (error) {
+    console.error('[POST /api/member/meeting-slots]', error);
+    res.status(500).json({ error: 'Failed to create meeting slot' });
+  }
+});
+
+// Member: list own meeting slots with signups
+router.get('/meeting-slots', requireAuth, async (req, res) => {
+  try {
+    const slots = await prisma.meetingSlot.findMany({
+      where: { memberId: req.user.id },
+      orderBy: { startTime: 'asc' },
+      include: { signups: true }
+    });
+    res.json(slots);
+  } catch (error) {
+    console.error('[GET /api/member/meeting-slots]', error);
+    res.status(500).json({ error: 'Failed to fetch meeting slots' });
+  }
+});
+
+// Member: mark attendance for a signup
+router.patch('/meeting-signups/:id/attendance', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { attended } = req.body || {};
+
+    // Ensure the signup belongs to a slot of this member
+    const signup = await prisma.meetingSignup.findUnique({
+      where: { id },
+      include: { slot: true }
+    });
+
+    if (!signup) {
+      return res.status(404).json({ error: 'Signup not found' });
+    }
+    if (signup.slot.memberId !== req.user.id) {
+      return res.status(403).json({ error: 'Not authorized to update this signup' });
+    }
+
+    const updated = await prisma.meetingSignup.update({
+      where: { id },
+      data: { attended: Boolean(attended) }
+    });
+
+    // If marking as attended and studentId exists, add 5 points to overall score
+    if (Boolean(attended) && signup.studentId) {
+      try {
+        // Find the candidate by studentId
+        const candidate = await prisma.candidate.findUnique({
+          where: { studentId: parseInt(signup.studentId) },
+          include: { applications: true }
+        });
+
+        if (candidate && candidate.applications.length > 0) {
+          // Get the latest application for the active cycle
+          const activeCycle = await prisma.recruitingCycle.findFirst({
+            where: { isActive: true }
+          });
+
+          if (activeCycle) {
+            const latestApplication = candidate.applications
+              .filter(app => app.cycleId === activeCycle.id)
+              .sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt))[0];
+
+            if (latestApplication) {
+              console.log(`Adding 5 points to application ${latestApplication.id} for meeting attendance (studentId: ${signup.studentId})`);
+              
+              // Note: The 5 points will be automatically added when the overall score is calculated
+              // in the existing scoring system (similar to referral bonus and event points)
+              // No need to store this separately as it's calculated dynamically
+            }
+          }
+        }
+      } catch (scoreError) {
+        console.error('Error processing meeting attendance bonus:', scoreError);
+        // Don't fail the attendance update if scoring fails
+      }
+    }
+
+    res.json(updated);
+  } catch (error) {
+    console.error('[PATCH /api/member/meeting-signups/:id/attendance]', error);
+    res.status(500).json({ error: 'Failed to update attendance' });
+  }
+});
+
 // Get applications for interview groups (member version)
 router.get('/interviews/:id/applications', requireAuth, async (req, res) => {
   try {
