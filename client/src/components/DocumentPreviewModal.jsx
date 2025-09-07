@@ -90,12 +90,18 @@ export default function DocumentPreviewModal({ src, kind, title, onClose }) {
             kind === 'pdf' ? (
               <iframe
                 title={title || 'Document preview'}
-                src={blobUrl}
+                src={`${blobUrl}#toolbar=0&navpanes=0&scrollbar=0`}
                 style={{ width: '100%', height: '100%', border: 'none' }}
               />
             ) : kind === 'video' ? (
               <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#000' }}>
-                <video src={blobUrl} controls style={{ maxWidth: '100%', maxHeight: '100%' }} />
+                <video 
+                  src={blobUrl} 
+                  controls 
+                  controlsList="nodownload noremoteplayback nofullscreen"
+                  disablePictureInPicture
+                  style={{ maxWidth: '100%', maxHeight: '100%' }} 
+                />
               </div>
             ) : (
               <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fff' }}>

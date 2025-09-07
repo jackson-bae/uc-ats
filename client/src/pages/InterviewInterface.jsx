@@ -179,19 +179,7 @@ export default function InterviewInterface() {
         ...evaluationData
       });
       
-      setSaveStatus(prev => ({
-        ...prev,
-        [applicationId]: { type: 'success', message: 'Auto-saved', timestamp: Date.now() }
-      }));
-
-      // Clear the success message after 3 seconds
-      setTimeout(() => {
-        setSaveStatus(prev => {
-          const newStatus = { ...prev };
-          delete newStatus[applicationId];
-          return newStatus;
-        });
-      }, 3000);
+      // Auto-save completed successfully - no visual feedback needed
     } catch (error) {
       console.error('Auto-save failed:', error);
       setSaveStatus(prev => ({
@@ -381,7 +369,7 @@ export default function InterviewInterface() {
                   </div>
                 </div>
                 <div className="save-section">
-                  {saveStatus[application.id] && (
+                  {saveStatus[application.id] && saveStatus[application.id].type === 'error' && (
                     <div className={`save-status ${saveStatus[application.id].type}`}>
                       {saveStatus[application.id].message}
                     </div>

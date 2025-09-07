@@ -332,7 +332,7 @@ export default function ApplicationDetail() {
                   <span className="average-grade-label">Resume</span>
                   <div>
                     <span className="average-grade-value">{averageGrades.resume.toFixed(1)}</span>
-                    <span className="average-grade-total">/ 30</span>
+                    <span className="average-grade-total">/ 10</span>
                   </div>
                 </div>
                 
@@ -629,7 +629,7 @@ export default function ApplicationDetail() {
               <div className="grading-item">
                 <div className="grading-header">
                   <label className="grading-label">Resume</label>
-                  <span className="grade-value">{resumeGrade}/30</span>
+                  <span className="grade-value">{resumeGrade}/10</span>
                   <button 
                     className={`na-button ${isNa.resume ? 'active' : ''}`}
                     onClick={() => toggleNa('resume')}
@@ -642,15 +642,15 @@ export default function ApplicationDetail() {
                   <input
                     type="range"
                     min="1"
-                    max="30"
+                    max="10"
                     value={isNa.resume ? 0 : resumeGrade}
                     onChange={(e) => setResumeGrade(parseInt(e.target.value))}
                     className="grade-slider"
                     disabled={isNa.resume}
                   />
                   <div className="slider-ticks">
-                    {[5, 10, 15, 20, 25, 30].map((tick) => (
-                      <span key={tick} className="tick"></span>
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((tick) => (
+                      <span key={`resume-${tick}`} className="tick"></span>
                     ))}
                   </div>
                 </div>
@@ -737,8 +737,8 @@ export default function ApplicationDetail() {
                     }
 
                     // Validate individual grades that are not N/A
-                    if (!isNa.resume && (resumeGrade < 1 || resumeGrade > 30)) {
-                      setSaveStatus({ type: 'error', message: 'Resume grade must be between 1 and 30' });
+                    if (!isNa.resume && (resumeGrade < 1 || resumeGrade > 10)) {
+                      setSaveStatus({ type: 'error', message: 'Resume grade must be between 1 and 10' });
                       return;
                     }
                     if (!isNa.video && (videoGrade < 1 || videoGrade > 10)) {

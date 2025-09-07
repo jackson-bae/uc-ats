@@ -322,10 +322,11 @@ router.post('/process-decisions', async (req, res) => {
 
     console.log('Active cycle:', active.name);
 
-    // Get all applications for the current cycle with candidate information
+    // Get applications in Resume Review round (currentRound = '1') only
     const applications = await prisma.application.findMany({
       where: {
-        cycleId: active.id
+        cycleId: active.id,
+        currentRound: '1'
       },
       include: {
         candidate: true // Just include the candidate, no need for nested user
@@ -336,7 +337,7 @@ router.post('/process-decisions', async (req, res) => {
     console.log('Sample application:', applications[0]);
 
     if (applications.length === 0) {
-      return res.status(400).json({ error: 'No applications found for the current cycle.' });
+      return res.status(400).json({ error: 'No applications found in Resume Review round.' });
     }
 
     // Import email functions
@@ -422,7 +423,7 @@ router.post('/process-decisions', async (req, res) => {
             data: {
               status: 'UNDER_REVIEW', // This represents coffee chat round
               currentRound: '2', // Coffee chat round
-              approved: true
+              approved: null // reset for new round decisions
             }
           });
           
@@ -1190,14 +1191,29 @@ router.delete('/interviews/:id', async (req, res) => {
     if (!interview) {
       return res.status(404).json({ error: 'Interview not found' });
     }
-    
-    await prisma.interview.delete({
-      where: { id }
-    });
-    
+    // Delete dependent records first to satisfy FK constraints
+    const ops = [];
+    if (prisma.interviewAssignment?.deleteMany) {
+      ops.push(prisma.interviewAssignment.deleteMany({ where: { interviewId: id } }));
+    }
+    if (prisma.interviewActionItem?.deleteMany) {
+      ops.push(prisma.interviewActionItem.deleteMany({ where: { interviewId: id } }));
+    }
+    if (prisma.interviewEvaluation?.deleteMany) {
+      ops.push(prisma.interviewEvaluation.deleteMany({ where: { interviewId: id } }));
+    }
+    if (prisma.firstRoundInterviewEvaluation?.deleteMany) {
+      ops.push(prisma.firstRoundInterviewEvaluation.deleteMany({ where: { interviewId: id } }));
+    }
+    ops.push(prisma.interview.delete({ where: { id } }));
+    await prisma.$transaction(ops);
+
     res.json({ message: 'Interview deleted successfully' });
   } catch (error) {
     console.error('[DELETE /api/admin/interviews/:id]', error);
+    if (error?.code === 'P2003') {
+      return res.status(409).json({ error: 'Cannot delete interview due to related records' });
+    }
     res.status(500).json({ error: 'Failed to delete interview' });
   }
 });
@@ -1254,6 +1270,241 @@ router.patch('/interviews/:id/config', async (req, res) => {
   } catch (error) {
     console.error('[PATCH /api/admin/interviews/:id/config]', error);
     res.status(500).json({ error: 'Failed to update interview configuration' });
+  }
+});
+
+// Get interview action items
+router.get('/interviews/:id/action-items', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const actionItems = await prisma.interviewActionItem.findMany({
+      where: { interviewId: id },
+      orderBy: { order: 'asc' },
+      include: {
+        completedByUser: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true
+          }
+        }
+      }
+    });
+    
+    res.json(actionItems);
+  } catch (error) {
+    console.error('[GET /api/admin/interviews/:id/action-items]', error);
+    res.status(500).json({ error: 'Failed to fetch action items' });
+  }
+});
+
+// Create interview action item
+router.post('/interviews/:id/action-items', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, description, order } = req.body;
+    
+    if (!title) {
+      return res.status(400).json({ error: 'Title is required' });
+    }
+    
+    const actionItem = await prisma.interviewActionItem.create({
+      data: {
+        interviewId: id,
+        title,
+        description: description || null,
+        order: order || 0
+      },
+      include: {
+        completedByUser: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true
+          }
+        }
+      }
+    });
+    
+    res.json(actionItem);
+  } catch (error) {
+    console.error('[POST /api/admin/interviews/:id/action-items]', error);
+    res.status(500).json({ error: 'Failed to create action item' });
+  }
+});
+
+// Update interview action item
+router.patch('/interviews/:id/action-items/:actionItemId', async (req, res) => {
+  try {
+    const { id, actionItemId } = req.params;
+    const { title, description, isCompleted, order } = req.body;
+    
+    const actionItem = await prisma.interviewActionItem.update({
+      where: { 
+        id: actionItemId,
+        interviewId: id // Ensure the action item belongs to this interview
+      },
+      data: {
+        ...(title !== undefined && { title }),
+        ...(description !== undefined && { description }),
+        ...(isCompleted !== undefined && { 
+          isCompleted,
+          completedAt: isCompleted ? new Date() : null,
+          completedBy: isCompleted ? req.user?.id : null
+        }),
+        ...(order !== undefined && { order })
+      },
+      include: {
+        completedByUser: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true
+          }
+        }
+      }
+    });
+    
+    res.json(actionItem);
+  } catch (error) {
+    console.error('[PATCH /api/admin/interviews/:id/action-items/:actionItemId]', error);
+    res.status(500).json({ error: 'Failed to update action item' });
+  }
+});
+
+// Delete interview action item
+router.delete('/interviews/:id/action-items/:actionItemId', async (req, res) => {
+  try {
+    const { id, actionItemId } = req.params;
+    
+    await prisma.interviewActionItem.delete({
+      where: { 
+        id: actionItemId,
+        interviewId: id // Ensure the action item belongs to this interview
+      }
+    });
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('[DELETE /api/admin/interviews/:id/action-items/:actionItemId]', error);
+    res.status(500).json({ error: 'Failed to delete action item' });
+  }
+});
+
+// Get interview resources
+router.get('/interviews/:id/resources', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Get resources that are associated with this interview
+    // For now, we'll get all resources and filter by round/interview type
+    const interview = await prisma.interview.findUnique({
+      where: { id },
+      select: { interviewType: true }
+    });
+    
+    if (!interview) {
+      return res.status(404).json({ error: 'Interview not found' });
+    }
+    
+    const resources = await prisma.interviewResource.findMany({
+      where: { 
+        round: interview.interviewType,
+        isActive: true
+      },
+      orderBy: { order: 'asc' }
+    });
+    
+    res.json(resources);
+  } catch (error) {
+    console.error('[GET /api/admin/interviews/:id/resources]', error);
+    res.status(500).json({ error: 'Failed to fetch resources' });
+  }
+});
+
+// Create interview resource
+router.post('/interviews/:id/resources', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, description, url, fileUrl, type, category, icon, order } = req.body;
+    
+    if (!title) {
+      return res.status(400).json({ error: 'Title is required' });
+    }
+    
+    const interview = await prisma.interview.findUnique({
+      where: { id },
+      select: { interviewType: true }
+    });
+    
+    if (!interview) {
+      return res.status(404).json({ error: 'Interview not found' });
+    }
+    
+    const resource = await prisma.interviewResource.create({
+      data: {
+        title,
+        description: description || null,
+        url: url || null,
+        fileUrl: fileUrl || null,
+        type: type || null,
+        category: category || null,
+        icon: icon || 'book',
+        order: order || 0,
+        round: interview.interviewType,
+        createdBy: req.user?.id || 'system'
+      }
+    });
+    
+    res.json(resource);
+  } catch (error) {
+    console.error('[POST /api/admin/interviews/:id/resources]', error);
+    res.status(500).json({ error: 'Failed to create resource' });
+  }
+});
+
+// Update interview resource
+router.patch('/interviews/:id/resources/:resourceId', async (req, res) => {
+  try {
+    const { id, resourceId } = req.params;
+    const { title, description, url, fileUrl, type, category, icon, order, isActive } = req.body;
+    
+    const resource = await prisma.interviewResource.update({
+      where: { id: resourceId },
+      data: {
+        ...(title !== undefined && { title }),
+        ...(description !== undefined && { description }),
+        ...(url !== undefined && { url }),
+        ...(fileUrl !== undefined && { fileUrl }),
+        ...(type !== undefined && { type }),
+        ...(category !== undefined && { category }),
+        ...(icon !== undefined && { icon }),
+        ...(order !== undefined && { order }),
+        ...(isActive !== undefined && { isActive })
+      }
+    });
+    
+    res.json(resource);
+  } catch (error) {
+    console.error('[PATCH /api/admin/interviews/:id/resources/:resourceId]', error);
+    res.status(500).json({ error: 'Failed to update resource' });
+  }
+});
+
+// Delete interview resource
+router.delete('/interviews/:id/resources/:resourceId', async (req, res) => {
+  try {
+    const { resourceId } = req.params;
+    
+    await prisma.interviewResource.delete({
+      where: { id: resourceId }
+    });
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('[DELETE /api/admin/interviews/:id/resources/:resourceId]', error);
+    res.status(500).json({ error: 'Failed to delete resource' });
   }
 });
 
@@ -2317,6 +2568,378 @@ router.post('/applications/evaluation-summaries', async (req, res) => {
   } catch (error) {
     console.error('[POST /api/admin/applications/evaluation-summaries]', error);
     res.status(500).json({ error: 'Failed to fetch evaluation summaries', details: error.message });
+  }
+});
+
+// Process Coffee Chat decisions with emails and advancement to First Round
+router.post('/process-coffee-decisions', async (req, res) => {
+  try {
+    console.log('Starting coffee chat decision processing...');
+
+    const active = await prisma.recruitingCycle.findFirst({ where: { isActive: true } });
+    if (!active) {
+      return res.status(400).json({ error: 'No active recruiting cycle' });
+    }
+
+    console.log('Active cycle:', active.name);
+
+    // Get applications in Coffee Chat round (currentRound = '2') with clear decisions only
+    const allApplications = await prisma.application.findMany({
+      where: {
+        cycleId: active.id,
+        currentRound: '2'
+      },
+      include: {
+        candidate: true
+      }
+    });
+
+    // Filter to only applications with clear Yes/No decisions (approved field is true or false)
+    const applications = allApplications.filter(app => app.approved === true || app.approved === false);
+
+    console.log('Total coffee chat applications:', allApplications.length);
+    console.log('Coffee chat applications with clear decisions:', applications.length);
+
+    if (applications.length === 0) {
+      const unclearDecisions = allApplications.filter(app => app.approved === null || (app.approved !== true && app.approved !== false));
+      return res.status(400).json({ 
+        error: 'No applications with clear decisions found in Coffee Chat round.',
+        details: `${unclearDecisions.length} applications have unclear decisions (Maybe/Unsure) and cannot be processed.`
+      });
+    }
+
+    let sendCoffeeChatAcceptanceEmail, sendCoffeeChatRejectionEmail;
+    try {
+      const emailModule = await import('../services/emailNotifications.js');
+      sendCoffeeChatAcceptanceEmail = emailModule.sendCoffeeChatAcceptanceEmail;
+      sendCoffeeChatRejectionEmail = emailModule.sendCoffeeChatRejectionEmail;
+      if (typeof sendCoffeeChatAcceptanceEmail !== 'function' || typeof sendCoffeeChatRejectionEmail !== 'function') {
+        throw new Error('Coffee chat email service functions not found');
+      }
+    } catch (importError) {
+      console.error('Failed to import coffee chat email services:', importError);
+      return res.status(500).json({ 
+        error: 'Failed to import coffee chat email services', 
+        details: importError.message 
+      });
+    }
+
+    const results = {
+      accepted: [],
+      rejected: [],
+      errors: [],
+      emailsSent: 0,
+      emailsFailed: 0
+    };
+
+    for (const application of applications) {
+      try {
+        if (!application.candidate) {
+          results.errors.push({
+            applicationId: application.id,
+            candidateName: `${application.firstName} ${application.lastName}`,
+            error: 'No candidate associated with application'
+          });
+          continue;
+        }
+
+        // Decision from approved field (we already filtered for clear decisions)
+        const decision = application.approved === true ? 'yes' : 'no';
+
+        if (decision === 'yes') {
+          // Advance to First Round Interviews (round 3)
+          const updatedApp = await prisma.application.update({
+            where: { id: application.id },
+            data: {
+              status: 'UNDER_REVIEW',
+              currentRound: '3',
+              approved: null // reset for next round decisions
+            }
+          });
+
+          let emailResult;
+          try {
+            emailResult = await sendCoffeeChatAcceptanceEmail(
+              application.email,
+              `${application.firstName} ${application.lastName}`,
+              active.name
+            );
+          } catch (emailError) {
+            console.error(`Error sending coffee chat acceptance email to ${application.email}:`, emailError);
+            emailResult = { success: false, error: emailError.message };
+          }
+
+          if (emailResult.success) {
+            results.emailsSent++;
+            results.accepted.push({
+              applicationId: application.id,
+              candidateId: application.candidate.id,
+              candidateName: `${application.firstName} ${application.lastName}`,
+              email: application.email,
+              emailSent: true
+            });
+          } else {
+            results.emailsFailed++;
+            results.accepted.push({
+              applicationId: application.id,
+              candidateId: application.candidate.id,
+              candidateName: `${application.firstName} ${application.lastName}`,
+              email: application.email,
+              emailSent: false,
+              emailError: emailResult.error
+            });
+          }
+        } else if (decision === 'no') {
+          // Reject
+          await prisma.application.update({
+            where: { id: application.id },
+            data: {
+              status: 'REJECTED',
+              currentRound: '2',
+              approved: false
+            }
+          });
+
+          const emailResult = await sendCoffeeChatRejectionEmail(
+            application.email,
+            `${application.firstName} ${application.lastName}`,
+            active.name
+          );
+
+          if (emailResult.success) {
+            results.emailsSent++;
+            results.rejected.push({
+              applicationId: application.id,
+              candidateId: application.candidate.id,
+              candidateName: `${application.firstName} ${application.lastName}`,
+              email: application.email,
+              emailSent: true
+            });
+          } else {
+            results.emailsFailed++;
+            results.rejected.push({
+              applicationId: application.id,
+              candidateId: application.candidate.id,
+              candidateName: `${application.firstName} ${application.lastName}`,
+              email: application.email,
+              emailSent: false,
+              emailError: emailResult.error
+            });
+          }
+        }
+      } catch (error) {
+        console.error(`Error processing coffee chat application ${application.id}:`, error);
+        results.errors.push({
+          applicationId: application.id,
+          candidateId: application.candidate?.id,
+          candidateName: application.candidate ? `${application.firstName} ${application.lastName}` : 'Unknown',
+          error: error.message
+        });
+      }
+    }
+
+    res.json({
+      message: 'Coffee chat decision processing completed',
+      results,
+      summary: {
+        totalApplications: applications.length,
+        accepted: results.accepted.length,
+        rejected: results.rejected.length,
+        errors: results.errors.length,
+        emailsSent: results.emailsSent,
+        emailsFailed: results.emailsFailed
+      },
+      note: 'Accepted candidates moved to First Round Interviews (round 3). Rejected candidates remain in Coffee Chats (round 2).'
+    });
+  } catch (error) {
+    console.error('[POST /api/admin/process-coffee-decisions]', error);
+    res.status(500).json({ error: 'Failed to process coffee chat decisions', details: error.message });
+  }
+});
+
+// Process Final Round decisions with emails and final advancement
+router.post('/process-final-decisions', async (req, res) => {
+  try {
+    console.log('Starting final round decision processing...');
+
+    const active = await prisma.recruitingCycle.findFirst({ where: { isActive: true } });
+    if (!active) {
+      return res.status(400).json({ error: 'No active recruiting cycle' });
+    }
+
+    console.log('Active cycle:', active.name);
+
+    // Get applications in Final Round (currentRound = '4') with clear decisions only
+    const allApplications = await prisma.application.findMany({
+      where: {
+        cycleId: active.id,
+        currentRound: '4'
+      },
+      include: {
+        candidate: true
+      }
+    });
+
+    // Filter to only applications with clear Yes/No decisions (approved field is true or false)
+    const applications = allApplications.filter(app => app.approved === true || app.approved === false);
+
+    console.log('Total final round applications:', allApplications.length);
+    console.log('Final round applications with clear decisions:', applications.length);
+
+    if (applications.length === 0) {
+      const unclearDecisions = allApplications.filter(app => app.approved === null || (app.approved !== true && app.approved !== false));
+      return res.status(400).json({ 
+        error: 'No applications with clear decisions found in Final Round.',
+        details: `${unclearDecisions.length} applications have unclear decisions (Maybe/Unsure) and cannot be processed.`
+      });
+    }
+
+    let sendFinalAcceptanceEmail, sendFinalRejectionEmail;
+    try {
+      const emailModule = await import('../services/emailNotifications.js');
+      sendFinalAcceptanceEmail = emailModule.sendFinalAcceptanceEmail;
+      sendFinalRejectionEmail = emailModule.sendFinalRejectionEmail;
+      if (typeof sendFinalAcceptanceEmail !== 'function' || typeof sendFinalRejectionEmail !== 'function') {
+        throw new Error('Final round email service functions not found');
+      }
+    } catch (importError) {
+      console.error('Failed to import final round email services:', importError);
+      return res.status(500).json({ 
+        error: 'Failed to import final round email services', 
+        details: importError.message 
+      });
+    }
+
+    const results = {
+      accepted: [],
+      rejected: [],
+      errors: [],
+      emailsSent: 0,
+      emailsFailed: 0
+    };
+
+    for (const application of applications) {
+      try {
+        if (!application.candidate) {
+          results.errors.push({
+            applicationId: application.id,
+            candidateName: `${application.firstName} ${application.lastName}`,
+            error: 'No candidate associated with application'
+          });
+          continue;
+        }
+
+        // Decision from approved field (we already filtered for clear decisions)
+        const decision = application.approved === true ? 'yes' : 'no';
+
+        if (decision === 'yes') {
+          // Accept candidate - move to final stage (round 5)
+          const updatedApp = await prisma.application.update({
+            where: { id: application.id },
+            data: {
+              status: 'ACCEPTED',
+              currentRound: '5',
+              approved: true // final acceptance
+            }
+          });
+
+          let emailResult;
+          try {
+            emailResult = await sendFinalAcceptanceEmail(
+              application.email,
+              `${application.firstName} ${application.lastName}`,
+              active.name
+            );
+          } catch (emailError) {
+            console.error(`Error sending final acceptance email to ${application.email}:`, emailError);
+            emailResult = { success: false, error: emailError.message };
+          }
+
+          if (emailResult.success) {
+            results.emailsSent++;
+            results.accepted.push({
+              applicationId: application.id,
+              candidateId: application.candidate.id,
+              candidateName: `${application.firstName} ${application.lastName}`,
+              email: application.email,
+              emailSent: true
+            });
+          } else {
+            results.emailsFailed++;
+            results.accepted.push({
+              applicationId: application.id,
+              candidateId: application.candidate.id,
+              candidateName: `${application.firstName} ${application.lastName}`,
+              email: application.email,
+              emailSent: false,
+              emailError: emailResult.error
+            });
+          }
+        } else if (decision === 'no') {
+          // Reject
+          await prisma.application.update({
+            where: { id: application.id },
+            data: {
+              status: 'REJECTED',
+              currentRound: '4',
+              approved: false
+            }
+          });
+
+          const emailResult = await sendFinalRejectionEmail(
+            application.email,
+            `${application.firstName} ${application.lastName}`,
+            active.name
+          );
+
+          if (emailResult.success) {
+            results.emailsSent++;
+            results.rejected.push({
+              applicationId: application.id,
+              candidateId: application.candidate.id,
+              candidateName: `${application.firstName} ${application.lastName}`,
+              email: application.email,
+              emailSent: true
+            });
+          } else {
+            results.emailsFailed++;
+            results.rejected.push({
+              applicationId: application.id,
+              candidateId: application.candidate.id,
+              candidateName: `${application.firstName} ${application.lastName}`,
+              email: application.email,
+              emailSent: false,
+              emailError: emailResult.error
+            });
+          }
+        }
+      } catch (error) {
+        console.error(`Error processing final round application ${application.id}:`, error);
+        results.errors.push({
+          applicationId: application.id,
+          candidateId: application.candidate?.id,
+          candidateName: application.candidate ? `${application.firstName} ${application.lastName}` : 'Unknown',
+          error: error.message
+        });
+      }
+    }
+
+    res.json({
+      message: 'Final round decision processing completed',
+      results,
+      summary: {
+        totalApplications: applications.length,
+        accepted: results.accepted.length,
+        rejected: results.rejected.length,
+        errors: results.errors.length,
+        emailsSent: results.emailsSent,
+        emailsFailed: results.emailsFailed
+      },
+      note: 'Accepted candidates moved to final stage (round 5). Rejected candidates remain in Final Round (round 4).'
+    });
+  } catch (error) {
+    console.error('[POST /api/admin/process-final-decisions]', error);
+    res.status(500).json({ error: 'Failed to process final round decisions', details: error.message });
   }
 });
 

@@ -36,7 +36,6 @@ const Layout = ({ children }) => {
       { name: 'Events', href: '/events', icon: CalendarDaysIcon },
       { name: 'Assigned Interviews', href: '/assigned-interviews', icon: UserGroupIcon2 },
       { name: 'Candidates', href: '/candidates', icon: UserGroupIcon },
-      { name: 'Staging', href: '/staging', icon: UserGroupIcon },
       { name: 'Recruitment Resources and Timeline', href: '/recruitment-resources', icon: ClipboardDocumentListIcon },
     ] : user?.role === 'ADMIN' ? [
       { name: 'Applications', href: '/application-list', icon: DocumentTextIcon },
@@ -77,12 +76,12 @@ const Layout = ({ children }) => {
               </button>
               
               {/* Logo and title */}
-              <div className="logo-section">
+              <Link to="/" className="logo-section">
                 <UConsultingLogo size="medium" />
                 <div className="logo-subtitle">
                   <p>Application Tracking System</p>
                 </div>
-              </div>
+              </Link>
             </div>
 
             {/* Right side - User info and logout */}

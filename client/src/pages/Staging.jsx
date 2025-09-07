@@ -148,6 +148,14 @@ const stagingAPI = {
     return await apiClient.post('/admin/process-decisions', {});
   },
 
+  async processCoffeeDecisions() {
+    return await apiClient.post('/admin/process-coffee-decisions', {});
+  },
+
+  async processFinalDecisions() {
+    return await apiClient.post('/admin/process-final-decisions', {});
+  },
+
   async loadExistingDecisions() {
     return await apiClient.get('/admin/existing-decisions');
   },
@@ -487,6 +495,7 @@ export default function Staging() {
   const [evaluationsLoading, setEvaluationsLoading] = useState(false);
   const [docPreview, setDocPreview] = useState({ open: false, src: '', kind: 'pdf', title: '' });
   const [evaluationSummaries, setEvaluationSummaries] = useState({});
+  const [evaluationSummariesFirstRound, setEvaluationSummariesFirstRound] = useState({});
 
   // Decision state
   const [currentDecision, setCurrentDecision] = useState({
@@ -583,6 +592,16 @@ export default function Staging() {
     }
   }, [currentTab, adminApplications]);
 
+  // Fetch evaluation summaries when first round tab is active
+  useEffect(() => {
+    if (currentTab === 2 && adminApplications.length > 0) {
+      const firstRoundApps = (adminApplications || []).filter(app => String(app.currentRound) === '3');
+      if (firstRoundApps.length > 0) {
+        fetchFirstRoundEvaluations(firstRoundApps);
+      }
+    }
+  }, [currentTab, adminApplications]);
+
   const fetchCandidates = async () => {
     try {
       const [data, adminApplicationsData, eventsData, reviewTeamsData] = await Promise.all([
@@ -663,9 +682,36 @@ export default function Staging() {
     try {
       const applicationIds = applications.map(app => app.id);
       const summaries = await stagingAPI.fetchEvaluationSummaries(applicationIds);
-      setEvaluationSummaries(summaries);
+
+      // Only include evaluations from Coffee Chat interviews
+      const filteredSummaries = {};
+      Object.entries(summaries || {}).forEach(([appId, summary]) => {
+        const onlyCoffeeChat = (summary?.evaluations || []).filter(e => e?.interview?.interviewType === 'COFFEE_CHAT');
+        filteredSummaries[appId] = { evaluations: onlyCoffeeChat };
+      });
+
+      setEvaluationSummaries(filteredSummaries);
     } catch (error) {
       console.error('Error fetching evaluation summaries:', error);
+    }
+  };
+
+  // Function to fetch evaluation summaries for first round applications
+  const fetchFirstRoundEvaluations = async (applications) => {
+    try {
+      const applicationIds = applications.map(app => app.id);
+      const summaries = await stagingAPI.fetchEvaluationSummaries(applicationIds);
+
+      // Only include evaluations from First Round interviews
+      const filteredSummaries = {};
+      Object.entries(summaries || {}).forEach(([appId, summary]) => {
+        const onlyFirstRound = (summary?.evaluations || []).filter(e => e?.interview?.interviewType === 'ROUND_ONE');
+        filteredSummaries[appId] = { evaluations: onlyFirstRound };
+      });
+
+      setEvaluationSummariesFirstRound(filteredSummaries);
+    } catch (error) {
+      console.error('Error fetching first round evaluation summaries:', error);
     }
   };
 
@@ -797,23 +843,85 @@ export default function Staging() {
     setPushAllDialogOpen(true);
   };
 
+  const openPushAllCoffee = async () => {
+    try {
+      const adminCandidates = await stagingAPI.fetchAdminCandidates();
+      // Consider only applications in Coffee Chat round (UNDER_REVIEW for round 2)
+      const coffeeCandidates = adminCandidates.filter(c => c.status === 'UNDER_REVIEW');
+
+      const invalidDecisions = coffeeCandidates.filter(c => {
+        // Only count as valid if in phase 2 AND decision is yes/no
+        const decision = c.approved;
+        return decision === null || (decision !== true && decision !== false);
+      });
+
+      setPushAllPreview({
+        totalApproved: coffeeCandidates.length,
+        invalidDecisions: invalidDecisions.length,
+        invalidDecisionCandidates: invalidDecisions
+      });
+    } catch (e) {
+      console.error('Error preparing coffee chat push-all preview:', e);
+      setPushAllPreview({ totalApproved: 0, invalidDecisions: 0, invalidDecisionCandidates: [] });
+    }
+    setPushAllConfirmText('');
+    setPushAllAcknowledge(false);
+    setPushAllDialogOpen(true);
+  };
+
+  const openPushAllFinal = async () => {
+    try {
+      const adminCandidates = await stagingAPI.fetchAdminCandidates();
+      // Consider only applications in Final Round (currentRound = '4')
+      const finalCandidates = adminCandidates.filter(c => String(c.currentRound) === '4');
+
+      const invalidDecisions = finalCandidates.filter(c => {
+        // Only count as valid if in final round AND decision is yes/no
+        const decision = c.approved;
+        return decision === null || (decision !== true && decision !== false);
+      });
+
+      setPushAllPreview({
+        totalApproved: finalCandidates.length,
+        invalidDecisions: invalidDecisions.length,
+        invalidDecisionCandidates: invalidDecisions
+      });
+    } catch (e) {
+      console.error('Error preparing final round push-all preview:', e);
+      setPushAllPreview({ totalApproved: 0, invalidDecisions: 0, invalidDecisionCandidates: [] });
+    }
+    setPushAllConfirmText('');
+    setPushAllAcknowledge(false);
+    setPushAllDialogOpen(true);
+  };
+
   const confirmPushAll = async () => {
     try {
       setPushAllLoading(true);
       
-      // Process decisions with emails and round advancement
-      // The backend will read decisions from the database
-      const result = await stagingAPI.processDecisions();
+      // Determine which tab is active to choose processing route
+      let result;
+      if (currentTab === 1) {
+        result = await stagingAPI.processCoffeeDecisions();
+      } else if (currentTab === 3) {
+        result = await stagingAPI.processFinalDecisions();
+      } else {
+        result = await stagingAPI.processDecisions();
+      }
       
       setPushAllDialogOpen(false);
       
       // Show success message with results
       const { summary } = result;
-      setSnackbar({ 
-        open: true, 
-        message: `Successfully processed ${summary.totalApplications} candidates: ${summary.accepted} accepted, ${summary.rejected} rejected. ${summary.emailsSent} emails sent.`, 
-        severity: 'success' 
-      });
+      if (summary) {
+        setSnackbar({ 
+          open: true, 
+          message: `Successfully processed ${summary.totalApplications} candidates: ${summary.accepted} accepted, ${summary.rejected} rejected. ${summary.emailsSent} emails sent.`, 
+          severity: 'success' 
+        });
+      } else {
+        setSnackbar({ open: true, message: 'Processed decisions.', severity: 'success' });
+      }
       
       // Refresh candidates data
       await fetchCandidates();
@@ -955,20 +1063,7 @@ export default function Staging() {
             c.approved === null || (c.approved !== true && c.approved !== false)
           ).length;
           
-          if (invalidDecisionsCount > 0) {
-            return (
-              <Alert severity="warning" sx={{ mb: 3 }}>
-                <Typography variant="subtitle2" gutterBottom>
-                  ⚠️ {invalidDecisionsCount} candidate(s) have no decision, intermediate decisions, or decisions that are not "Yes" or "No"
-                </Typography>
-                <Typography variant="body2">
-                  These candidates cannot proceed to the next round until their decisions are updated to either "Yes" or "No". 
-                  "Maybe - Yes" and "Maybe - No" are intermediate decisions that need to be resolved to final decisions.
-                  "Yes" decisions will advance to Coffee Chats, "No" decisions will receive rejection emails.
-                </Typography>
-              </Alert>
-            );
-          }
+          
           return null;
         })()}
 
@@ -979,6 +1074,8 @@ export default function Staging() {
             <Tabs value={currentTab} onChange={(e, v) => setCurrentTab(v)}>
               <Tab label="Resume Review" />
               <Tab label="Coffee Chats" />
+              <Tab label="First Round" />
+              <Tab label="Final Round" />
             </Tabs>
           </CardContent>
         </Card>
@@ -1347,14 +1444,24 @@ Members: ${candidate.reviewTeam.members.map(m => m.fullName).join(', ')}`}
               <Typography variant="body2" color="text.secondary">
                 ℹ️ Coffee Chat Round: Previously accepted candidates need new decisions. "Yes" advances to First Round Interviews, "No" keeps rejection status.
               </Typography>
-              <Button 
-                variant="outlined" 
-                size="small" 
-                onClick={fetchCandidates}
-                sx={{ mt: 1 }}
-              >
-                Refresh Data
-              </Button>
+              <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                <Button 
+                  variant="outlined" 
+                  size="small" 
+                  onClick={fetchCandidates}
+                >
+                  Refresh Data
+                </Button>
+                <Button 
+                  variant="contained" 
+                  color="primary"
+                  size="small"
+                  startIcon={<SkipNextIcon />}
+                  onClick={openPushAllCoffee}
+                >
+                  Process All Decisions
+                </Button>
+              </Stack>
             </Box>
             <TableContainer>
               <Table>
@@ -1388,28 +1495,8 @@ Members: ${candidate.reviewTeam.members.map(m => m.fullName).join(', ')}`}
                     return sortedApps.map((application, index) => {
                       console.log('Coffee Chats application:', application); // Debug log
                       
-                      // For coffee chat round: reset "Yes" decisions to "not decided", keep "No" decisions
-                      let displayDecision = '';
-                      if (application.approved === false) {
-                        // Keep "No" decisions as they are already rejected
-                        displayDecision = 'no';
-                      } else if (application.approved === true) {
-                        // Check if there's a decision made in the current session
-                        const currentDecision = inlineDecisions[application.id];
-                        console.log('Coffee Chat decision calculation:', { 
-                          appId: application.id, 
-                          approved: application.approved, 
-                          currentDecision, 
-                          inlineDecisions: inlineDecisions[application.id] 
-                        });
-                        if (currentDecision && ['yes', 'no', 'maybe_yes', 'maybe_no'].includes(currentDecision)) {
-                          // Use the current session decision
-                          displayDecision = currentDecision;
-                        } else {
-                          // Reset "Yes" decisions to "not decided" for new round evaluation
-                          displayDecision = '';
-                        }
-                      }
+                      // Coffee chat round decisions start fresh for this round
+                      const displayDecision = inlineDecisions[application.id] || '';
                       console.log('Final displayDecision for app:', application.id, '=', displayDecision);
                       
                       return (
@@ -1574,6 +1661,303 @@ Members: ${candidate.reviewTeam.members.map(m => m.fullName).join(', ')}`}
                                   </Alert>
                                 </Box>
                               )}
+                            </Box>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    });
+                  })()}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </CardContent>
+        </Card>
+        )}
+
+        {/* First Round tab - Applications (Round 3) */}
+        {currentTab === 2 && (
+        <Card>
+          <CardContent>
+            <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
+              First Round — Applications
+            </Typography>
+            <Box mb={2}>
+              <Typography variant="body2" color="text.secondary">
+                ℹ️ First Round: Coffee Chat-advanced candidates need new decisions. "Yes" advances to next round.
+              </Typography>
+              <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                <Button 
+                  variant="outlined" 
+                  size="small" 
+                  onClick={fetchCandidates}
+                >
+                  Refresh Data
+                </Button>
+              </Stack>
+            </Box>
+            <TableContainer>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Rank</TableCell>
+                    <TableCell>Application</TableCell>
+                    <TableCell>Evaluation Summary</TableCell>
+                    <TableCell>Decisions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {(() => {
+                    const filteredApps = (adminApplications || []).filter(app => String(app.currentRound) === '3');
+                    const sortedApps = filteredApps.sort((a, b) => {
+                      const scoreA = calculateRankingScore(evaluationSummariesFirstRound[a.id]?.evaluations || []);
+                      const scoreB = calculateRankingScore(evaluationSummariesFirstRound[b.id]?.evaluations || []);
+                      return scoreB - scoreA;
+                    });
+                    return sortedApps.map((application, index) => {
+                      const displayDecision = inlineDecisions[application.id] || '';
+                      const evaluations = evaluationSummariesFirstRound[application.id]?.evaluations || [];
+                      return (
+                        <TableRow key={application.id} hover>
+                          <TableCell>
+                            <Box display="flex" alignItems="center" gap={1}>
+                              <Typography variant="h6" fontWeight="bold" color="primary">#{index + 1}</Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                Score: {calculateRankingScore(evaluations).toFixed(1)}
+                              </Typography>
+                            </Box>
+                          </TableCell>
+                          <TableCell>
+                            <Box>
+                              <Typography variant="subtitle2" fontWeight="bold">{application.name}</Typography>
+                              <Typography variant="body2" color="text.secondary">{application.email}</Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {application.major} • {application.year} • GPA: {application.gpa}
+                              </Typography>
+                            </Box>
+                          </TableCell>
+                          <TableCell>
+                            {(() => {
+                              if (evaluations.length === 0) {
+                                return (
+                                  <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                                    No evaluations yet
+                                  </Typography>
+                                );
+                              }
+                              const counts = evaluations.reduce((acc, evaluation) => {
+                                acc[evaluation.decision] = (acc[evaluation.decision] || 0) + 1;
+                                return acc;
+                              }, {});
+                              return (
+                                <Box>
+                                  <Typography variant="caption" display="block">
+                                    Total: {evaluations.length} evaluation{evaluations.length !== 1 ? 's' : ''}
+                                  </Typography>
+                                  {counts.YES > 0 && (
+                                    <Typography variant="caption" display="block" color="success.main">YES: {counts.YES}</Typography>
+                                  )}
+                                  {counts.MAYBE_YES > 0 && (
+                                    <Typography variant="caption" display="block" color="success.main">Maybe-Yes: {counts.MAYBE_YES}</Typography>
+                                  )}
+                                  {counts.UNSURE > 0 && (
+                                    <Typography variant="caption" display="block" color="warning.main">Unsure: {counts.UNSURE}</Typography>
+                                  )}
+                                  {counts.MAYBE_NO > 0 && (
+                                    <Typography variant="caption" display="block" color="error.main">Maybe-No: {counts.MAYBE_NO}</Typography>
+                                  )}
+                                  {counts.NO > 0 && (
+                                    <Typography variant="caption" display="block" color="error.main">NO: {counts.NO}</Typography>
+                                  )}
+                                </Box>
+                              );
+                            })()}
+                          </TableCell>
+                          <TableCell>
+                            <Box>
+                              <Typography variant="caption" display="block">Next Round: Final Decision</Typography>
+                              <FormControl size="small" fullWidth>
+                                <Select
+                                  value={displayDecision}
+                                  displayEmpty
+                                  onChange={(e) => handleInlineDecisionChange(application, e.target.value, 'round_one')}
+                                  sx={() => {
+                                    const sel = displayDecision;
+                                    const c = getDecisionHighlight(sel);
+                                    return {
+                                      '& .MuiSelect-select': {
+                                        bgcolor: c.bg,
+                                        border: `1px solid`,
+                                        borderColor: c.border,
+                                        borderRadius: 1,
+                                      }
+                                    };
+                                  }}
+                                  renderValue={(selected) => {
+                                    if (!selected) return 'Select decision';
+                                    const labels = { yes: 'Yes', maybe_yes: 'Maybe - Yes', maybe_no: 'Maybe - No', no: 'No' };
+                                    return labels[selected];
+                                  }}
+                                >
+                                  <MenuItem value=""><em>Select decision</em></MenuItem>
+                                  <MenuItem value="yes">Yes</MenuItem>
+                                  <MenuItem value="maybe_yes">Maybe - Yes</MenuItem>
+                                  <MenuItem value="maybe_no">Maybe - No</MenuItem>
+                                  <MenuItem value="no">No</MenuItem>
+                                </Select>
+                              </FormControl>
+                            </Box>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    });
+                  })()}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </CardContent>
+        </Card>
+        )}
+
+        {/* Final Round tab - Applications (Round 4) */}
+        {currentTab === 3 && (
+        <Card>
+          <CardContent>
+            <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
+              Final Round — Applications
+            </Typography>
+            <Box mb={2}>
+              <Typography variant="body2" color="text.secondary">
+                ℹ️ Final Round: First Round-advanced candidates need final decisions. "Yes" advances to final stage.
+              </Typography>
+              <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                <Button 
+                  variant="outlined" 
+                  size="small" 
+                  onClick={fetchCandidates}
+                >
+                  Refresh Data
+                </Button>
+                <Button 
+                  variant="contained" 
+                  color="primary"
+                  size="small"
+                  startIcon={<SkipNextIcon />}
+                  onClick={openPushAllFinal}
+                >
+                  Process All Decisions
+                </Button>
+              </Stack>
+            </Box>
+            <TableContainer>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Rank</TableCell>
+                    <TableCell>Application</TableCell>
+                    <TableCell>Evaluation Summary</TableCell>
+                    <TableCell>Decisions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {(() => {
+                    const filteredApps = (adminApplications || []).filter(app => String(app.currentRound) === '4');
+                    const sortedApps = filteredApps.sort((a, b) => {
+                      const scoreA = calculateRankingScore(evaluationSummariesFirstRound[a.id]?.evaluations || []);
+                      const scoreB = calculateRankingScore(evaluationSummariesFirstRound[b.id]?.evaluations || []);
+                      return scoreB - scoreA;
+                    });
+                    return sortedApps.map((application, index) => {
+                      const displayDecision = inlineDecisions[application.id] || '';
+                      const evaluations = evaluationSummariesFirstRound[application.id]?.evaluations || [];
+                      return (
+                        <TableRow key={application.id} hover>
+                          <TableCell>
+                            <Box display="flex" alignItems="center" gap={1}>
+                              <Typography variant="h6" fontWeight="bold" color="primary">#{index + 1}</Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                Score: {calculateRankingScore(evaluations).toFixed(1)}
+                              </Typography>
+                            </Box>
+                          </TableCell>
+                          <TableCell>
+                            <Box>
+                              <Typography variant="subtitle2" fontWeight="bold">{application.name}</Typography>
+                              <Typography variant="body2" color="text.secondary">{application.email}</Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {application.major} • {application.year} • GPA: {application.gpa}
+                              </Typography>
+                            </Box>
+                          </TableCell>
+                          <TableCell>
+                            {(() => {
+                              if (evaluations.length === 0) {
+                                return (
+                                  <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                                    No evaluations yet
+                                  </Typography>
+                                );
+                              }
+                              const counts = evaluations.reduce((acc, evaluation) => {
+                                acc[evaluation.decision] = (acc[evaluation.decision] || 0) + 1;
+                                return acc;
+                              }, {});
+                              return (
+                                <Box>
+                                  <Typography variant="caption" display="block">
+                                    Total: {evaluations.length} evaluation{evaluations.length !== 1 ? 's' : ''}
+                                  </Typography>
+                                  {counts.YES > 0 && (
+                                    <Typography variant="caption" display="block" color="success.main">YES: {counts.YES}</Typography>
+                                  )}
+                                  {counts.MAYBE_YES > 0 && (
+                                    <Typography variant="caption" display="block" color="success.main">Maybe-Yes: {counts.MAYBE_YES}</Typography>
+                                  )}
+                                  {counts.UNSURE > 0 && (
+                                    <Typography variant="caption" display="block" color="warning.main">Unsure: {counts.UNSURE}</Typography>
+                                  )}
+                                  {counts.MAYBE_NO > 0 && (
+                                    <Typography variant="caption" display="block" color="error.main">Maybe-No: {counts.MAYBE_NO}</Typography>
+                                  )}
+                                  {counts.NO > 0 && (
+                                    <Typography variant="caption" display="block" color="error.main">NO: {counts.NO}</Typography>
+                                  )}
+                                </Box>
+                              );
+                            })()}
+                          </TableCell>
+                          <TableCell>
+                            <Box>
+                              <Typography variant="caption" display="block">Final Decision</Typography>
+                              <FormControl size="small" fullWidth>
+                                <Select
+                                  value={displayDecision}
+                                  displayEmpty
+                                  onChange={(e) => handleInlineDecisionChange(application, e.target.value, 'final_round')}
+                                  sx={() => {
+                                    const sel = displayDecision;
+                                    const c = getDecisionHighlight(sel);
+                                    return {
+                                      '& .MuiSelect-select': {
+                                        bgcolor: c.bg,
+                                        border: `1px solid`,
+                                        borderColor: c.border,
+                                        borderRadius: 1,
+                                      }
+                                    };
+                                  }}
+                                  renderValue={(selected) => {
+                                    if (!selected) return 'Select decision';
+                                    const labels = { yes: 'Yes', maybe_yes: 'Maybe - Yes', maybe_no: 'Maybe - No', no: 'No' };
+                                    return labels[selected];
+                                  }}
+                                >
+                                  <MenuItem value=""><em>Select decision</em></MenuItem>
+                                  <MenuItem value="yes">Yes</MenuItem>
+                                  <MenuItem value="maybe_yes">Maybe - Yes</MenuItem>
+                                  <MenuItem value="maybe_no">Maybe - No</MenuItem>
+                                  <MenuItem value="no">No</MenuItem>
+                                </Select>
+                              </FormControl>
                             </Box>
                           </TableCell>
                         </TableRow>
@@ -1812,7 +2196,21 @@ Members: ${candidate.reviewTeam.members.map(m => m.fullName).join(', ')}`}
               )}
               
               <Typography variant="body2">
-                Candidates to process: <strong>{candidates.filter(c => inlineDecisions[c.id] === 'yes' || inlineDecisions[c.id] === 'no').length}</strong>
+                {currentTab === 1 ? (
+                  // Coffee Chats: count only phase 2 applications with yes/no decisions
+                  (() => {
+                    const coffeeApps = (adminApplications || []).filter(app => app.status === 'UNDER_REVIEW');
+                    const toProcess = coffeeApps.filter(app => {
+                      const localDecision = inlineDecisions[app.id];
+                      const dbDecision = app.approved === true ? 'yes' : app.approved === false ? 'no' : '';
+                      const decision = localDecision || dbDecision;
+                      return decision === 'yes' || decision === 'no';
+                    });
+                    return (<span>Applications to process: <strong>{toProcess.length}</strong></span>);
+                  })()
+                ) : (
+                  <span>Candidates to process: <strong>{candidates.filter(c => inlineDecisions[c.id] === 'yes' || inlineDecisions[c.id] === 'no').length}</strong></span>
+                )}
               </Typography>
               <TextField
                 label="Type PROCESS to confirm"

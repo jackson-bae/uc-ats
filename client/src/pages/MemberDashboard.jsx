@@ -30,29 +30,7 @@ import apiClient from '../utils/api';
 
 export default function MemberDashboard() {
   const { user } = useAuth();
-  const [tasks, setTasks] = useState([
-    {
-      id: 1,
-      title: 'Grade Resumes',
-      dueDate: 'Oct 5th, EOD',
-      items: '3 items to review',
-      status: 'pending'
-    },
-    {
-      id: 2,
-      title: 'Grade Cover Letters',
-      dueDate: 'Oct 5th, EOD',
-      items: '5 items to review',
-      status: 'pending'
-    },
-    {
-      id: 3,
-      title: 'RSVP for Coffee Chats',
-      dueDate: 'Oct 5th, EOD',
-      items: 'Pending Response',
-      status: 'pending'
-    }
-  ]);
+  const [tasks, setTasks] = useState([]);
 
   const [resources, setResources] = useState([
     {
@@ -81,6 +59,7 @@ export default function MemberDashboard() {
   const [userTeam, setUserTeam] = useState(null);
   const [teamLoading, setTeamLoading] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [tasksLoading, setTasksLoading] = useState(true);
   const [error, setError] = useState('');
 
   // Fetch events from the current recruitment cycle
@@ -138,14 +117,117 @@ export default function MemberDashboard() {
     }
   };
 
+  // Fetch member tasks (document grading and RSVP tasks)
+  const fetchMemberTasks = async () => {
+    try {
+      setTasksLoading(true);
+      
+      // Fetch member applications for document grading tasks
+      const applications = await apiClient.get(`/review-teams/member-applications/${user.id}`);
+      
+      // Fetch events with RSVP information
+      const events = await apiClient.get('/member/events');
+      
+      const tasksList = [];
+      
+      // Add document grading tasks
+      if (applications && applications.length > 0) {
+        const applicationsWithResumes = applications.filter(app => app.resumeUrl && !app.hasResumeScore);
+        const applicationsWithCoverLetters = applications.filter(app => app.coverLetterUrl && !app.hasCoverLetterScore);
+        const applicationsWithVideos = applications.filter(app => app.videoUrl && !app.hasVideoScore);
+        
+        if (applicationsWithResumes.length > 0) {
+          tasksList.push({
+            id: 'grade-resumes',
+            title: 'Grade Resumes',
+            type: 'document',
+            documentType: 'resume',
+            dueDate: 'Oct 5th, EOD',
+            items: `${applicationsWithResumes.length} items to review`,
+            status: 'pending',
+            count: applicationsWithResumes.length
+          });
+        }
+        
+        if (applicationsWithCoverLetters.length > 0) {
+          tasksList.push({
+            id: 'grade-cover-letters',
+            title: 'Grade Cover Letters',
+            type: 'document',
+            documentType: 'coverLetter',
+            dueDate: 'Oct 5th, EOD',
+            items: `${applicationsWithCoverLetters.length} items to review`,
+            status: 'pending',
+            count: applicationsWithCoverLetters.length
+          });
+        }
+        
+        if (applicationsWithVideos.length > 0) {
+          tasksList.push({
+            id: 'grade-videos',
+            title: 'Grade Videos',
+            type: 'document',
+            documentType: 'video',
+            dueDate: 'Oct 5th, EOD',
+            items: `${applicationsWithVideos.length} items to review`,
+            status: 'pending',
+            count: applicationsWithVideos.length
+          });
+        }
+      }
+      
+      // Add RSVP tasks for events that have member RSVP URLs and haven't been RSVP'd to
+      const eventsNeedingRsvp = events.filter(event => 
+        event.memberRsvpUrl && 
+        event.eventStartDate && 
+        new Date(event.eventStartDate) > new Date() // Only future events
+      );
+      
+      eventsNeedingRsvp.forEach(event => {
+        tasksList.push({
+          id: `rsvp-${event.id}`,
+          title: `RSVP for ${event.eventName}`,
+          type: 'rsvp',
+          eventId: event.id,
+          eventName: event.eventName,
+          eventDate: new Date(event.eventStartDate).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+          }),
+          dueDate: new Date(event.eventStartDate).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric'
+          }),
+          items: 'Pending Response',
+          status: 'pending',
+          rsvpUrl: event.memberRsvpUrl
+        });
+      });
+      
+      setTasks(tasksList);
+    } catch (err) {
+      console.error('Error fetching member tasks:', err);
+      setTasks([]);
+    } finally {
+      setTasksLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchTimelineEvents();
     fetchUserTeam();
-  }, []);
+    fetchMemberTasks();
+  }, [user?.id]);
 
-  const handleStartTask = (taskId) => {
-    // TODO: Implement task navigation
-    console.log('Starting task:', taskId);
+  const handleStartTask = (task) => {
+    if (task.type === 'document') {
+      // Navigate to document grading page
+      window.location.href = '/document-grading';
+    } else if (task.type === 'rsvp') {
+      // Open RSVP form in new tab
+      window.open(task.rsvpUrl, '_blank');
+    }
   };
 
   const handleViewMore = (section) => {
@@ -316,44 +398,56 @@ export default function MemberDashboard() {
             </Box>
             
             <Box>
-              {tasks.map((task, index) => (
-                <Box
-                  key={task.id}
-                  sx={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    p: 3,
-                    borderBottom: index < tasks.length - 1 ? 1 : 0,
-                    borderColor: 'grey.200'
-                  }}
-                >
-                  <Box sx={{ flex: 1 }}>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
-                      {task.title}
-                    </Typography>
-                    <Box sx={{ display: 'flex', gap: 3, alignItems: 'center' }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <ClockIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+              {tasksLoading ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+                  <CircularProgress />
+                </Box>
+              ) : tasks.length === 0 ? (
+                <Box sx={{ textAlign: 'center', p: 4 }}>
+                  <Typography variant="body1" color="text.secondary">
+                    No pending tasks at this time.
+                  </Typography>
+                </Box>
+              ) : (
+                tasks.map((task, index) => (
+                  <Box
+                    key={task.id}
+                    sx={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      p: 3,
+                      borderBottom: index < tasks.length - 1 ? 1 : 0,
+                      borderColor: 'grey.200'
+                    }}
+                  >
+                    <Box sx={{ flex: 1 }}>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
+                        {task.title}
+                      </Typography>
+                      <Box sx={{ display: 'flex', gap: 3, alignItems: 'center' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <ClockIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+                          <Typography variant="body2" color="text.secondary">
+                            {task.type === 'rsvp' ? `Event: ${task.eventDate}` : `Due: ${task.dueDate}`}
+                          </Typography>
+                        </Box>
                         <Typography variant="body2" color="text.secondary">
-                          Due: {task.dueDate}
+                          {task.items}
                         </Typography>
                       </Box>
-                      <Typography variant="body2" color="text.secondary">
-                        {task.items}
-                      </Typography>
                     </Box>
+                    <Button
+                      variant="contained"
+                      size="small"
+                      onClick={() => handleStartTask(task)}
+                      sx={{ ml: 2 }}
+                    >
+                      {task.type === 'rsvp' ? 'RSVP' : 'Start'}
+                    </Button>
                   </Box>
-                  <Button
-                    variant="contained"
-                    size="small"
-                    onClick={() => handleStartTask(task.id)}
-                    sx={{ ml: 2 }}
-                  >
-                    Start
-                  </Button>
-                </Box>
-              ))}
+                ))
+              )}
             </Box>
           </Paper>
         </Grid>

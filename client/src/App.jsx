@@ -19,6 +19,8 @@ import AdminDocumentGrading from './pages/AdminDocumentGrading';
 import AssignedInterviews from './pages/AssignedInterviews';
 import AdminAssignedInterviews from './pages/AdminAssignedInterviews';
 import InterviewInterface from './pages/InterviewInterface';
+import MemberInterviewInterface from './pages/MemberInterviewInterface';
+import FirstRoundInterviewInterface from './pages/FirstRoundInterviewInterface';
 import Candidates from './pages/Candidates';
 import Staging from './pages/Staging';
 import RecruitmentResources from './pages/RecruitmentResources';
@@ -206,6 +208,24 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute>
             <InterviewInterface />
+          </ProtectedRoute>
+        }
+      />
+      
+      <Route
+        path="/member/interview-interface"
+        element={
+          <ProtectedRoute>
+            <MemberInterviewInterface />
+          </ProtectedRoute>
+        }
+      />
+      
+      <Route
+        path="/member/first-round-interview"
+        element={
+          <ProtectedRoute>
+            <FirstRoundInterviewInterface />
           </ProtectedRoute>
         }
       />

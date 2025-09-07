@@ -742,6 +742,7 @@ router.get('/member-applications/:memberId', requireAuth, async (req, res) => {
         applications.push({
           id: latestApplication.id,
           candidateId: candidate.id,
+          studentId: candidate.studentId,
           name: `${latestApplication.firstName} ${latestApplication.lastName}`,
           major: latestApplication.major1 || 'N/A',
           year: latestApplication.graduationYear || 'N/A',
@@ -882,6 +883,222 @@ router.get('/resume-scores/:candidateId', requireAuth, async (req, res) => {
   } catch (error) {
     console.error('Error fetching resume scores:', error);
     res.status(500).json({ error: 'Failed to fetch resume scores' });
+  }
+});
+
+// Save cover letter score (per evaluator per candidate)
+router.post('/cover-letter-score', requireAuth, async (req, res) => {
+  try {
+    const { candidateId, assignedGroupId, scoreOne, scoreTwo, scoreThree, notes } = req.body;
+    const evaluatorId = req.user.id;
+
+    // Calculate overall score (average of the three scores)
+    const scores = [scoreOne, scoreTwo, scoreThree].filter(score => score !== null && score !== undefined);
+    const overallScore = scores.length > 0 ? scores.reduce((sum, score) => sum + score, 0) / scores.length : 0;
+
+    // Check if a score already exists for this candidate and evaluator
+    const existingScore = await prisma.coverLetterScore.findFirst({
+      where: { candidateId, evaluatorId }
+    });
+
+    let coverLetterScore;
+    if (existingScore) {
+      // Update existing score
+      coverLetterScore = await prisma.coverLetterScore.update({
+        where: { id: existingScore.id },
+        data: {
+          overallScore,
+          scoreOne,
+          scoreTwo,
+          scoreThree,
+          notesOne: notes, // Store general notes in notesOne field
+          assignedGroupId,
+          status: 'completed'
+        }
+      });
+    } else {
+      // Create new score
+      coverLetterScore = await prisma.coverLetterScore.create({
+        data: {
+          candidateId,
+          evaluatorId,
+          assignedGroupId,
+          overallScore,
+          scoreOne,
+          scoreTwo,
+          scoreThree,
+          notesOne: notes, // Store general notes in notesOne field
+          status: 'completed'
+        }
+      });
+    }
+
+    res.json(coverLetterScore);
+  } catch (error) {
+    console.error('Error saving cover letter score:', error);
+    res.status(500).json({ error: 'Failed to save cover letter score' });
+  }
+});
+
+// Get cover letter score for a candidate (for current evaluator)
+router.get('/cover-letter-score/:candidateId', requireAuth, async (req, res) => {
+  try {
+    const { candidateId } = req.params;
+    const evaluatorId = req.user.id;
+
+    const coverLetterScore = await prisma.coverLetterScore.findFirst({
+      where: { candidateId, evaluatorId }
+    });
+
+    // Transform the response to match frontend expectations
+    if (coverLetterScore) {
+      const transformedScore = {
+        ...coverLetterScore,
+        notes: coverLetterScore.notesOne // Map notesOne to notes for frontend compatibility
+      };
+      res.json(transformedScore);
+    } else {
+      res.json(null);
+    }
+  } catch (error) {
+    console.error('Error fetching cover letter score:', error);
+    res.status(500).json({ error: 'Failed to fetch cover letter score' });
+  }
+});
+
+// Get all cover letter scores for a candidate
+router.get('/cover-letter-scores/:candidateId', requireAuth, async (req, res) => {
+  try {
+    const { candidateId } = req.params;
+
+    const coverLetterScores = await prisma.coverLetterScore.findMany({
+      where: { candidateId },
+      include: {
+        evaluator: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    res.json(coverLetterScores);
+  } catch (error) {
+    console.error('Error fetching cover letter scores:', error);
+    res.status(500).json({ error: 'Failed to fetch cover letter scores' });
+  }
+});
+
+// Save video score (per evaluator per candidate)
+router.post('/video-score', requireAuth, async (req, res) => {
+  try {
+    const { candidateId, assignedGroupId, scoreOne, scoreTwo, scoreThree, notes } = req.body;
+    const evaluatorId = req.user.id;
+
+    // Calculate overall score (average of the three scores)
+    const scores = [scoreOne, scoreTwo, scoreThree].filter(score => score !== null && score !== undefined);
+    const overallScore = scores.length > 0 ? scores.reduce((sum, score) => sum + score, 0) / scores.length : 0;
+
+    // Check if a score already exists for this candidate and evaluator
+    const existingScore = await prisma.videoScore.findFirst({
+      where: { candidateId, evaluatorId }
+    });
+
+    let videoScore;
+    if (existingScore) {
+      // Update existing score
+      videoScore = await prisma.videoScore.update({
+        where: { id: existingScore.id },
+        data: {
+          overallScore,
+          scoreOne,
+          scoreTwo,
+          scoreThree,
+          notesOne: notes, // Store general notes in notesOne field
+          assignedGroupId,
+          status: 'completed'
+        }
+      });
+    } else {
+      // Create new score
+      videoScore = await prisma.videoScore.create({
+        data: {
+          candidateId,
+          evaluatorId,
+          assignedGroupId,
+          overallScore,
+          scoreOne,
+          scoreTwo,
+          scoreThree,
+          notesOne: notes, // Store general notes in notesOne field
+          status: 'completed'
+        }
+      });
+    }
+
+    res.json(videoScore);
+  } catch (error) {
+    console.error('Error saving video score:', error);
+    res.status(500).json({ error: 'Failed to save video score' });
+  }
+});
+
+// Get video score for a candidate (for current evaluator)
+router.get('/video-score/:candidateId', requireAuth, async (req, res) => {
+  try {
+    const { candidateId } = req.params;
+    const evaluatorId = req.user.id;
+
+    const videoScore = await prisma.videoScore.findFirst({
+      where: { candidateId, evaluatorId }
+    });
+
+    // Transform the response to match frontend expectations
+    if (videoScore) {
+      const transformedScore = {
+        ...videoScore,
+        notes: videoScore.notesOne // Map notesOne to notes for frontend compatibility
+      };
+      res.json(transformedScore);
+    } else {
+      res.json(null);
+    }
+  } catch (error) {
+    console.error('Error fetching video score:', error);
+    res.status(500).json({ error: 'Failed to fetch video score' });
+  }
+});
+
+// Get all video scores for a candidate
+router.get('/video-scores/:candidateId', requireAuth, async (req, res) => {
+  try {
+    const { candidateId } = req.params;
+
+    const videoScores = await prisma.videoScore.findMany({
+      where: { candidateId },
+      include: {
+        evaluator: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    res.json(videoScores);
+  } catch (error) {
+    console.error('Error fetching video scores:', error);
+    res.status(500).json({ error: 'Failed to fetch video scores' });
   }
 });
 

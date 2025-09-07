@@ -98,11 +98,11 @@
   box-shadow: 0 0 0 2px var(--hover-overlay);
 }
 
-/* Candidates grid - Compact rows */
+/* Candidates grid - Card layout */
 .candidates-grid {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 0.5rem;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
 }
 
 .candidate-card {
@@ -126,44 +126,47 @@
 .candidate-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
+  flex-direction: column;
+  gap: 0.75rem;
 }
 
 .candidate-info {
   display: flex;
   align-items: center;
-  flex: 1;
+  flex-direction: column;
 }
 
 .candidate-avatar {
-  width: 2.5rem;
-  height: 2.5rem;
+  width: 4rem;
+  height: 4rem;
   border-radius: 50%;
-  margin-right: 0.75rem;
+  margin-right: 0;
+  margin-bottom: 0.5rem;
   flex-shrink: 0;
   object-fit: cover;
   border: 2px solid var(--border-light);
 }
 
 .candidate-avatar-fallback {
-  width: 2.5rem;
-  height: 2.5rem;
+  width: 4rem;
+  height: 4rem;
   background-color: var(--bg-gray-light);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-right: 0.75rem;
+  margin-right: 0;
+  margin-bottom: 0.5rem;
   font-weight: 600;
   color: var(--text-tertiary);
-  font-size: 0.875rem;
+  font-size: 1rem;
   flex-shrink: 0;
   border: 2px solid var(--border-light);
 }
 
 .candidate-details {
-  flex: 1;
-  min-width: 0;
+  text-align: center;
 }
 
 .candidate-details h3 {
@@ -171,21 +174,16 @@
   font-family: var(--font-family-heading);
   font-weight: var(--font-weight-heading);
   color: var(--text-primary);
-  margin: 0 0 0.125rem 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  margin: 0 0 0.25rem 0;
 }
 
 .candidate-meta {
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   font-family: var(--font-family);
   font-weight: var(--font-weight-body);
   color: var(--text-tertiary);
   margin: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
 }
 
 .candidate-scores {
@@ -215,7 +213,7 @@
 }
 
 .candidate-status {
-  margin-left: 1rem;
+  margin-top: 0.5rem;
 }
 
 .status-badge {
@@ -300,17 +298,7 @@
     gap: 1rem;
   }
   
-  .candidate-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.5rem;
-  }
-  
-  .candidate-info {
-    width: 100%;
-  }
-  
-  .candidate-status {
-    margin-left: 0;
+  .candidates-grid {
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   }
 } 

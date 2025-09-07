@@ -314,3 +314,299 @@ export const sendRejectionEmail = async (candidateEmail, candidateName, currentC
     return { success: false, error: error.message };
   }
 };
+
+// Coffee Chat specific email templates
+
+// Create coffee chat acceptance email template (advancing to first round)
+const createCoffeeChatAcceptanceEmail = (candidateName, currentCycleName) => {
+  return {
+    subject: `Congratulations! You've Advanced to First Round Interviews - ${currentCycleName}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background-color: #007bff; padding: 20px; text-align: center; color: white;">
+          <h2 style="color: white; margin: 0;">UC Consulting ATS</h2>
+        </div>
+        
+        <div style="padding: 30px 20px;">
+          <h3 style="color: #333; margin-bottom: 20px;">🎉 Congratulations! You've Advanced to First Round Interviews!</h3>
+          
+          <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+            Dear ${candidateName},
+          </p>
+          
+          <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+            We're thrilled to inform you that you have successfully advanced to the <strong>First Round Interviews</strong> of our recruitment process for the <strong>${currentCycleName}</strong> cycle!
+          </p>
+          
+          <div style="background-color: #cce7ff; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #007bff;">
+            <h4 style="color: #004085; margin: 0 0 10px 0;">What This Means</h4>
+            <p style="color: #004085; margin: 5px 0;">✅ You've successfully passed the Coffee Chat round</p>
+            <p style="color: #004085; margin: 5px 0;">🎯 You'll be invited to participate in First Round Interviews</p>
+            <p style="color: #004085; margin: 5px 0;">📅 You'll receive detailed scheduling information soon</p>
+            <p style="color: #004085; margin: 5px 0;">📋 Prepare for behavioral and market sizing questions</p>
+          </div>
+          
+          <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+            This is a significant achievement! Your performance during the Coffee Chat round impressed our team, and we're excited to learn more about your qualifications during the First Round Interviews.
+          </p>
+          
+          <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+            The First Round Interviews will include both behavioral questions and a market sizing case. We'll send you detailed preparation materials and scheduling information in the coming days.
+          </p>
+          
+          <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+            Best regards,<br>
+            UC Consulting Recruitment Team
+          </p>
+        </div>
+        
+        <div style="background-color: #f8f9fa; padding: 20px; text-align: center; color: #666; font-size: 12px;">
+          <p style="margin: 0;">This is an automated message. Please do not reply to this email.</p>
+        </div>
+      </div>
+    `
+  };
+};
+
+// Create coffee chat rejection email template
+const createCoffeeChatRejectionEmail = (candidateName, currentCycleName) => {
+  return {
+    subject: `Update on Your Application - ${currentCycleName}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background-color: #dc3545; padding: 20px; text-align: center; color: white;">
+          <h2 style="color: white; margin: 0;">UC Consulting ATS</h2>
+        </div>
+        
+        <div style="padding: 30px 20px;">
+          <h3 style="color: #333; margin-bottom: 20px;">Application Update</h3>
+          
+          <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+            Dear ${candidateName},
+          </p>
+          
+          <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+            Thank you for your interest in UC Consulting and for participating in our <strong>${currentCycleName}</strong> recruitment cycle.
+          </p>
+          
+          <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+            After careful consideration following the Coffee Chat round, we regret to inform you that we are unable to move forward with your candidacy at this time.
+          </p>
+          
+          <div style="background-color: #f8d7da; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #dc3545;">
+            <h4 style="color: #721c24; margin: 0 0 10px 0;">Important Information</h4>
+            <p style="color: #721c24; margin: 5px 0;">📝 Your application and Coffee Chat performance were reviewed thoroughly</p>
+            <p style="color: #721c24; margin: 5px 0;">💼 We encourage you to apply to future recruitment cycles</p>
+            <p style="color: #721c24; margin: 5px 0;">🌟 Continue developing your skills and experience</p>
+            <p style="color: #721c24; margin: 5px 0;">🤝 We appreciate your time and engagement in our process</p>
+          </div>
+          
+          <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+            We appreciate the time and effort you put into your application and participation in the Coffee Chat round. We received many strong applications this cycle, and the decision was not easy.
+          </p>
+          
+          <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+            We encourage you to continue developing your skills and to consider applying to future recruitment cycles. Your growth and development are important to us.
+          </p>
+          
+          <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+            Best regards,<br>
+            UC Consulting Recruitment Team
+          </p>
+        </div>
+        
+        <div style="background-color: #f8f9fa; padding: 20px; text-align: center; color: #666; font-size: 12px;">
+          <p style="margin: 0;">This is an automated message. Please do not reply to this email.</p>
+        </div>
+      </div>
+    `
+  };
+};
+
+// Send coffee chat acceptance email (advancing to first round)
+export const sendCoffeeChatAcceptanceEmail = async (candidateEmail, candidateName, currentCycleName) => {
+  try {
+    const emailContent = createCoffeeChatAcceptanceEmail(candidateName, currentCycleName);
+    const result = await sendEmail(candidateEmail, emailContent.subject, emailContent.html);
+    
+    if (result.success) {
+      console.log(`Coffee chat acceptance email sent to ${candidateEmail} for cycle: ${currentCycleName}`);
+    } else {
+      console.error(`Failed to send coffee chat acceptance email to ${candidateEmail}:`, result.error);
+    }
+    
+    return result;
+  } catch (error) {
+    console.error('Error in sendCoffeeChatAcceptanceEmail:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+// Send coffee chat rejection email
+export const sendCoffeeChatRejectionEmail = async (candidateEmail, candidateName, currentCycleName) => {
+  try {
+    const emailContent = createCoffeeChatRejectionEmail(candidateName, currentCycleName);
+    const result = await sendEmail(candidateEmail, emailContent.subject, emailContent.html);
+    
+    if (result.success) {
+      console.log(`Coffee chat rejection email sent to ${candidateEmail} for cycle: ${currentCycleName}`);
+    } else {
+      console.error(`Failed to send coffee chat rejection email to ${candidateEmail}:`, result.error);
+    }
+    
+    return result;
+  } catch (error) {
+    console.error('Error in sendCoffeeChatRejectionEmail:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+// Final Round specific email templates
+
+// Create final round acceptance email template
+const createFinalAcceptanceEmail = (candidateName, currentCycleName) => {
+  return {
+    subject: `🎉 Congratulations! You've Been Accepted to UC Consulting - ${currentCycleName}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background-color: #28a745; padding: 20px; text-align: center; color: white;">
+          <h2 style="color: white; margin: 0;">UC Consulting ATS</h2>
+        </div>
+        
+        <div style="padding: 30px 20px;">
+          <h3 style="color: #333; margin-bottom: 20px;">🎉 Congratulations! You've Been Accepted!</h3>
+          
+          <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+            Dear ${candidateName},
+          </p>
+          
+          <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+            We are thrilled to inform you that you have been <strong>ACCEPTED</strong> to join UC Consulting for the <strong>${currentCycleName}</strong> recruitment cycle!
+          </p>
+          
+          <div style="background-color: #d4edda; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #28a745;">
+            <h4 style="color: #155724; margin: 0 0 10px 0;">What This Means</h4>
+            <p style="color: #155724; margin: 5px 0;">🎯 You've successfully completed our entire recruitment process</p>
+            <p style="color: #155724; margin: 5px 0;">✅ You've been selected to join UC Consulting</p>
+            <p style="color: #155724; margin: 5px 0;">🌟 You'll receive onboarding information soon</p>
+            <p style="color: #155724; margin: 5px 0;">🤝 Welcome to the UC Consulting team!</p>
+          </div>
+          
+          <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+            This is an incredible achievement! You've demonstrated exceptional qualifications throughout our rigorous recruitment process, and we're excited to have you join our team.
+          </p>
+          
+          <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+            You will receive detailed onboarding information, including next steps, orientation details, and important dates in the coming days. Please keep an eye on your email for these communications.
+          </p>
+          
+          <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+            Congratulations once again, and welcome to UC Consulting!
+          </p>
+          
+          <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+            Best regards,<br>
+            UC Consulting Recruitment Team
+          </p>
+        </div>
+        
+        <div style="background-color: #f8f9fa; padding: 20px; text-align: center; color: #666; font-size: 12px;">
+          <p style="margin: 0;">This is an automated message. Please do not reply to this email.</p>
+        </div>
+      </div>
+    `
+  };
+};
+
+// Create final round rejection email template
+const createFinalRejectionEmail = (candidateName, currentCycleName) => {
+  return {
+    subject: `Update on Your Application - ${currentCycleName}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background-color: #dc3545; padding: 20px; text-align: center; color: white;">
+          <h2 style="color: white; margin: 0;">UC Consulting ATS</h2>
+        </div>
+        
+        <div style="padding: 30px 20px;">
+          <h3 style="color: #333; margin-bottom: 20px;">Application Update</h3>
+          
+          <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+            Dear ${candidateName},
+          </p>
+          
+          <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+            Thank you for your continued interest in UC Consulting and for your participation throughout our <strong>${currentCycleName}</strong> recruitment process.
+          </p>
+          
+          <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+            After careful consideration following the Final Round, we regret to inform you that we are unable to offer you a position at this time.
+          </p>
+          
+          <div style="background-color: #f8d7da; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #dc3545;">
+            <h4 style="color: #721c24; margin: 0 0 10px 0;">Important Information</h4>
+            <p style="color: #721c24; margin: 5px 0;">📝 Your application was thoroughly reviewed at every stage</p>
+            <p style="color: #721c24; margin: 5px 0;">💼 We encourage you to apply to future recruitment cycles</p>
+            <p style="color: #721c24; margin: 5px 0;">🌟 Continue developing your skills and experience</p>
+            <p style="color: #721c24; margin: 5px 0;">🤝 We appreciate your dedication throughout our process</p>
+          </div>
+          
+          <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+            We were impressed by your qualifications and dedication throughout our recruitment process. The decision was extremely difficult, as we received many exceptional applications this cycle.
+          </p>
+          
+          <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+            We encourage you to continue developing your skills and to consider applying to future recruitment cycles. Your growth and potential are evident, and we believe you have a bright future ahead.
+          </p>
+          
+          <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+            Best regards,<br>
+            UC Consulting Recruitment Team
+          </p>
+        </div>
+        
+        <div style="background-color: #f8f9fa; padding: 20px; text-align: center; color: #666; font-size: 12px;">
+          <p style="margin: 0;">This is an automated message. Please do not reply to this email.</p>
+        </div>
+      </div>
+    `
+  };
+};
+
+// Send final round acceptance email
+export const sendFinalAcceptanceEmail = async (candidateEmail, candidateName, currentCycleName) => {
+  try {
+    const emailContent = createFinalAcceptanceEmail(candidateName, currentCycleName);
+    const result = await sendEmail(candidateEmail, emailContent.subject, emailContent.html);
+    
+    if (result.success) {
+      console.log(`Final acceptance email sent to ${candidateEmail} for cycle: ${currentCycleName}`);
+    } else {
+      console.error(`Failed to send final acceptance email to ${candidateEmail}:`, result.error);
+    }
+    
+    return result;
+  } catch (error) {
+    console.error('Error in sendFinalAcceptanceEmail:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+// Send final round rejection email
+export const sendFinalRejectionEmail = async (candidateEmail, candidateName, currentCycleName) => {
+  try {
+    const emailContent = createFinalRejectionEmail(candidateName, currentCycleName);
+    const result = await sendEmail(candidateEmail, emailContent.subject, emailContent.html);
+    
+    if (result.success) {
+      console.log(`Final rejection email sent to ${candidateEmail} for cycle: ${currentCycleName}`);
+    } else {
+      console.error(`Failed to send final rejection email to ${candidateEmail}:`, result.error);
+    }
+    
+    return result;
+  } catch (error) {
+    console.error('Error in sendFinalRejectionEmail:', error);
+    return { success: false, error: error.message };
+  }
+};

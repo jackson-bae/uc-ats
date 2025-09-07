@@ -11,47 +11,319 @@ import {
   ArrowDownTrayIcon,
   ArrowTopRightOnSquareIcon,
   PlayIcon,
-  EyeIcon
+  EyeIcon,
+  PlusIcon,
+  XMarkIcon,
+  UsersIcon,
+  DocumentDuplicateIcon
 } from '@heroicons/react/24/outline';
-import UConsultingLogo from '../components/UConsultingLogo';
-import '../styles/AssignedInterviews.css';
+import apiClient from '../utils/api';
+import '../styles/AdminAssignedInterviews.css';
 
 export default function AssignedInterviews() {
   const navigate = useNavigate();
-  const [actionItems, setActionItems] = useState({
-    reviewExpectations: true,
-    fillQuestions: false
-  });
+  const [interviews, setInterviews] = useState([]);
+  const [selectedInterviewId, setSelectedInterviewId] = useState(null);
+  const [expandedInterviewId, setExpandedInterviewId] = useState(null);
+  const [interviewData, setInterviewData] = useState({});
+  const [groupSelectionOpen, setGroupSelectionOpen] = useState(false);
+  const [selectedInterviewForStart, setSelectedInterviewForStart] = useState(null);
+  const [groupSearchTerm, setGroupSearchTerm] = useState('');
+  const [selectedGroups, setSelectedGroups] = useState([]);
+  const [currentUser, setCurrentUser] = useState(null);
 
-  const handleActionItemToggle = (item) => {
-    setActionItems(prev => ({
+  // Get current user information
+  useEffect(() => {
+    const getCurrentUser = async () => {
+      try {
+        const response = await apiClient.get('/member/profile');
+        console.log('Current user loaded:', response);
+        setCurrentUser(response);
+      } catch (error) {
+        console.error('Failed to get current user:', error);
+      }
+    };
+    getCurrentUser();
+  }, []);
+
+  // Fetch member's assigned interviews
+  useEffect(() => {
+    const loadMemberInterviews = async () => {
+      try {
+        const [ivsRes] = await Promise.allSettled([
+          apiClient.get('/member/interviews')
+        ]);
+
+        const ivs = ivsRes.status === 'fulfilled' ? ivsRes.value : [];
+        if (ivsRes.status === 'rejected') {
+          console.warn('Interviews fetch failed, continuing without them');
+        }
+
+        setInterviews(ivs);
+
+        console.log('Loaded interviews:', ivs);
+        console.log('Interview types:', ivs.map(i => ({ id: i.id, title: i.title, type: i.interviewType })));
+
+        // Auto-expand the first interview card by default
+        if (ivs.length > 0) {
+          setExpandedInterviewId(ivs[0].id);
+          setSelectedInterviewId(ivs[0].id);
+        }
+
+        // Initialize interview-specific data for each interview
+        const initialData = {};
+        ivs.forEach(interview => {
+          const desc = interview.description;
+          let parsed;
+          try {
+            parsed = typeof desc === 'string' ? JSON.parse(desc) : desc;
+          } catch {
+            parsed = {};
+          }
+          
+          console.log('Interview description for', interview.id, ':', parsed);
+          initialData[interview.id] = {
+            memberGroups: parsed?.memberGroups || [],
+            applicationGroups: parsed?.applicationGroups || [],
+            groupAssignments: parsed?.groupAssignments || {},
+            actionItems: parsed?.actionItems || {
+              reviewInstructions: false,
+              fillQuestions: false,
+              createMarketSizing: false,
+              reviewResumes: false
+            },
+            resources: parsed?.resources || [
+              { id: 1, name: 'Interview Instructions Guide', url: '#' },
+              { id: 2, name: 'Interview Questions Bank', url: '#' }
+            ]
+          };
+        });
+        setInterviewData(initialData);
+      } catch (e) {
+        console.error('Failed to load interview data', e);
+      }
+    };
+    loadMemberInterviews();
+  }, []);
+
+  const handleActionItemToggle = (interviewId, item) => {
+    setInterviewData(prev => ({
       ...prev,
-      [item]: !prev[item]
+      [interviewId]: {
+        ...prev[interviewId],
+        actionItems: {
+          ...prev[interviewId]?.actionItems,
+          [item]: !prev[interviewId]?.actionItems?.[item]
+        }
+      }
     }));
   };
 
-  const handleStartInterview = () => {
-    // Navigate to interview interface
-    navigate('/interview-interface');
+  const handleStartInterview = (interviewId) => {
+    setSelectedInterviewForStart(interviewId);
+    setGroupSelectionOpen(true);
+    setGroupSearchTerm('');
+    setSelectedGroups([]);
+  };
+
+  const handleGroupToggle = (groupId) => {
+    setSelectedGroups(prev => {
+      if (prev.includes(groupId)) {
+        return prev.filter(id => id !== groupId);
+      } else if (prev.length < 3) {
+        return [...prev, groupId];
+      }
+      return prev;
+    });
+  };
+
+  const handleStartWithSelectedGroups = () => {
+    console.log('handleStartWithSelectedGroups called!');
+    console.log('selectedGroups:', selectedGroups);
+    console.log('selectedInterviewForStart:', selectedInterviewForStart);
+    
+    if (selectedGroups.length === 0) return;
+    
+    const groupIdsParam = selectedGroups.join(',');
+    const interview = interviews.find(i => i.id === selectedInterviewForStart);
+    
+    console.log('Interview found:', interview);
+    console.log('Interview type:', interview?.interviewType);
+    console.log('Is ROUND_ONE?', interview?.interviewType === 'ROUND_ONE');
+    
+    // Route to appropriate interface based on interview type
+    if (interview?.interviewType === 'ROUND_ONE') {
+      console.log('Routing to first round interview interface');
+      navigate(`/member/first-round-interview?interviewId=${selectedInterviewForStart}&groupIds=${groupIdsParam}`);
+    } else {
+      console.log('Routing to regular interview interface');
+      navigate(`/member/interview-interface?interviewId=${selectedInterviewForStart}&groupIds=${groupIdsParam}`);
+    }
+    
+    setGroupSelectionOpen(false);
+    setSelectedInterviewForStart(null);
+    setSelectedGroups([]);
+  };
+
+  const handleCloseGroupSelection = () => {
+    setGroupSelectionOpen(false);
+    setSelectedInterviewForStart(null);
+    setGroupSearchTerm('');
+    setSelectedGroups([]);
   };
 
   const handleViewDeliberations = () => {
-    // Navigate to deliberations page
     navigate('/deliberations');
   };
 
+  const handleSelectInterview = (id) => {
+    setSelectedInterviewId(id);
+  };
+
+  const toggleExpandInterview = (id) => {
+    setExpandedInterviewId(expandedInterviewId === id ? null : id);
+  };
+
   const handleDownloadResource = (resourceName) => {
-    // Handle resource download
     console.log(`Downloading ${resourceName}`);
   };
 
   const handleOpenResource = (resourceName) => {
-    // Handle opening resource in new tab
     console.log(`Opening ${resourceName}`);
   };
 
+  // Find which member group the current user belongs to for a given interview
+  const getUserMemberGroup = (interviewId) => {
+    if (!currentUser) {
+      console.log('No current user found');
+      return null;
+    }
+    
+    const data = interviewData[interviewId];
+    if (!data?.memberGroups) {
+      console.log('No member groups found for interview:', interviewId, data);
+      return null;
+    }
+    
+    console.log('Looking for user in member groups:', {
+      userId: currentUser.id,
+      userIdType: typeof currentUser.id,
+      memberGroups: data.memberGroups
+    });
+    
+    // Log each member group's IDs for debugging
+    data.memberGroups.forEach((group, index) => {
+      console.log(`Member Group ${index + 1} (${group.name}):`, {
+        memberIds: group.memberIds,
+        memberIdTypes: group.memberIds?.map(id => typeof id)
+      });
+    });
+    
+    const userGroup = data.memberGroups.find(group => {
+      const isInGroup = group.memberIds?.includes(currentUser.id);
+      console.log(`Checking group "${group.name}":`, {
+        groupMemberIds: group.memberIds,
+        currentUserId: currentUser.id,
+        isInGroup: isInGroup
+      });
+      return isInGroup;
+    });
+    
+    console.log('Found user group:', userGroup);
+    return userGroup;
+  };
+
   return (
-    <div className="assigned-interviews-container">
+    <div className="admin-assigned-interviews-container">
+      {/* Group Selection Modal */}
+      {groupSelectionOpen && selectedInterviewForStart && (
+        <div className="modal-overlay">
+          <div className="modal-content group-selection-modal">
+            <div className="modal-header">
+              <h3>Select Application Groups to Evaluate</h3>
+              <div className="selection-info">
+                {selectedGroups.length}/3 groups selected
+              </div>
+              <button className="icon-btn" onClick={handleCloseGroupSelection}>
+                <XMarkIcon className="btn-icon" />
+              </button>
+            </div>
+            <div className="modal-body">
+              {(() => {
+                const interview = interviews.find(i => i.id === selectedInterviewForStart);
+                const data = interviewData[selectedInterviewForStart] || { applicationGroups: [] };
+                const filteredGroups = (data.applicationGroups || []).filter(group =>
+                  group.name.toLowerCase().includes(groupSearchTerm.toLowerCase())
+                );
+                
+                return (
+                  <>
+                    <div className="search-section">
+                      <input
+                        type="text"
+                        placeholder="Search application groups..."
+                        value={groupSearchTerm}
+                        onChange={(e) => setGroupSearchTerm(e.target.value)}
+                        className="group-search-input"
+                      />
+                    </div>
+                    
+                    <div className="groups-selection-list">
+                      {filteredGroups.length === 0 ? (
+                        <div className="no-groups-message">
+                          {groupSearchTerm ? 'No groups match your search' : 'No application groups available'}
+                        </div>
+                      ) : (
+                        filteredGroups.map(group => {
+                          const isSelected = selectedGroups.includes(group.id);
+                          const isDisabled = !isSelected && selectedGroups.length >= 3;
+                          
+                          return (
+                            <div 
+                              key={group.id} 
+                              className={`group-selection-item ${isSelected ? 'selected' : ''} ${isDisabled ? 'disabled' : ''}`}
+                              onClick={() => !isDisabled && handleGroupToggle(group.id)}
+                            >
+                              <div className="group-checkbox">
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={() => !isDisabled && handleGroupToggle(group.id)}
+                                  disabled={isDisabled}
+                                />
+                                <span className="checkmark"></span>
+                              </div>
+                              <div className="group-info">
+                                <h4 className="group-name">{group.name}</h4>
+                                <p className="group-count">
+                                  {group.applicationIds?.length || 0} applications
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+            <div className="modal-footer">
+              <button className="btn-secondary" onClick={handleCloseGroupSelection}>
+                Cancel
+              </button>
+              <button 
+                className="btn-primary" 
+                onClick={handleStartWithSelectedGroups}
+                disabled={selectedGroups.length === 0}
+              >
+                Start Interview ({selectedGroups.length} group{selectedGroups.length !== 1 ? 's' : ''})
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header Section */}
       <div className="interview-header">
         <button 
@@ -61,197 +333,263 @@ export default function AssignedInterviews() {
           <ArrowLeftIcon className="back-icon" />
           Back
         </button>
-        <div className="social-links">
-          <span>Follow us on:</span>
-          {/* Social media icons would go here */}
-        </div>
       </div>
 
-      {/* Main Content */}
-      <div className="interview-content">
-        {/* Left Column - Event Overview */}
-        <div className="event-overview">
-          {/* Date Block */}
-          <div className="date-block">
-            <div className="date-day">Friday</div>
-            <div className="date-number">09</div>
-            <div className="date-month">Sep, 2025</div>
-          </div>
-
-          {/* Event Title and Times */}
-          <div className="event-title">
-            <h1>Coffee Chats (Round 1)</h1>
-            <div className="event-times">
-              <div className="time-slot">
-                <ClockIcon className="time-icon" />
-                <span>5:00 - 7:00 PM</span>
-              </div>
-              <div className="time-slot deliberations">
-                <ClockIcon className="time-icon" />
-                <span>Delibs @ 7:00 - 8:00 PM</span>
-              </div>
+      {/* Main Content - Interview Cards Grid */}
+      <div className="interviews-grid">
+        {interviews.length === 0 ? (
+          <div className="no-interviews-card">
+            <div className="no-interviews-icon">
+              <CalendarIcon className="empty-icon" />
             </div>
+            <h2>No Interviews Assigned</h2>
+            <p>You don't have any interviews assigned at this time</p>
           </div>
-
-          {/* Location and Dresscode */}
-          <div className="event-details">
-            <div className="detail-item">
-              <MapPinIcon className="detail-icon" />
-              <span>Location: Hanes Hall Room 100 | Business Casual</span>
-            </div>
-          </div>
-
-          {/* Candidates and Team */}
-          <div className="event-stats">
-            <div className="stat-item">
-              <UserGroupIcon className="stat-icon" />
-              <span>Candidates: 50</span>
-            </div>
-            <div className="stat-item">
-              <UserGroupIcon className="stat-icon" />
-              <span>Team: Group 7 with: Ksenya Gotlieb</span>
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="action-buttons">
-            <button 
-              className="btn-primary start-interview-btn"
-              onClick={handleStartInterview}
-            >
-              <PlayIcon className="btn-icon" />
-              Start Interview
-            </button>
-            <button 
-              className="btn-secondary deliberations-btn"
-              onClick={handleViewDeliberations}
-            >
-              <EyeIcon className="btn-icon" />
-              View Deliberations
-            </button>
-          </div>
-        </div>
-
-        {/* Main Column - Event Description */}
-        <div className="event-description">
-          <div className="description-section">
-            <h3>Description</h3>
-            <div className="description-content">
-              <div className="key-info">
-                <strong>Key Information:</strong> It is NECCESSARY for you to review our candidate rubric and question bank prior to the event, and record your planned questions on the table provided to ensure there are no repeats
-              </div>
-              
-              <div className="info-item">
-                <strong>Time:</strong> Arrive by 5:45. Coffee chat ends at 8:00PM and delibs will be right after, approximately an hour
-              </div>
-              
-              <div className="info-item">
-                <strong>Dresscode:</strong> Business Casual
-              </div>
-              
-              <div className="info-item">
-                <strong>What to bring:</strong> Laptop or something else for note-taking
-              </div>
-              
-              <div className="info-item">
-                <strong>How This Will Work:</strong> Each round is 10 minutes. You will stay at your assigned table while the candidates move around. On the applicants name tag, you will see either an ↑ or ↓. If they have an ↑, they will move to the UC member with the number above, If they have an ↓, they should move to the member with the number below.
-              </div>
-              
-              <div className="info-item">
-                <strong>Tips:</strong> Take notes and make a judgement on Yes/Maybe/No for each candidate right after each round because it's easy to forget after many rounds.
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Right Column - Action Items & Resources */}
-        <div className="right-sidebar">
-          {/* Action Items */}
-          <div className="action-items-section">
-            <h3>Action Items</h3>
-            <div className="action-item">
-              <label className="checkbox-container">
-                <input
-                  type="checkbox"
-                  checked={actionItems.reviewExpectations}
-                  onChange={() => handleActionItemToggle('reviewExpectations')}
-                />
-                <span className="checkmark"></span>
-                Review Candidate Expectations
-              </label>
-              <button 
-                className="external-link-btn"
-                onClick={() => handleOpenResource('Candidate Expectations')}
-              >
-                <ArrowTopRightOnSquareIcon className="external-link-icon" />
-              </button>
-            </div>
+        ) : (
+          interviews.map((interview) => {
+            const startDate = new Date(interview.startDate);
+            const endDate = new Date(interview.endDate);
+            const isSelected = interview.id === selectedInterviewId;
+            const isExpanded = expandedInterviewId === interview.id;
+            const data = interviewData[interview.id] || { 
+              actionItems: {}, 
+              resources: [] 
+            };
             
-            <div className="action-item">
-              <label className="checkbox-container">
-                <input
-                  type="checkbox"
-                  checked={actionItems.fillQuestions}
-                  onChange={() => handleActionItemToggle('fillQuestions')}
-                />
-                <span className="checkmark"></span>
-                Fill Out Interview Questions!!
-              </label>
-              <button 
-                className="external-link-btn"
-                onClick={() => handleOpenResource('Interview Questions')}
+            return (
+              <div 
+                key={interview.id} 
+                className={`interview-card ${isSelected ? 'selected' : ''} ${isExpanded ? 'expanded' : ''}`}
               >
-                <ArrowTopRightOnSquareIcon className="external-link-icon" />
-              </button>
-            </div>
-          </div>
+                {/* Card Header */}
+                <div className="interview-card-header" onClick={() => handleSelectInterview(interview.id)}>
+                  <div className="interview-type-badge">
+                    {interview.interviewType?.replace(/_/g, ' ')}
+                  </div>
+                  <div className="interview-card-actions">
+                    <button 
+                      className={`icon-btn expand ${isExpanded ? 'expanded' : ''}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleExpandInterview(interview.id);
+                      }}
+                      title={isExpanded ? "Collapse" : "Expand"}
+                    >
+                      {isExpanded ? <XMarkIcon className="btn-icon" /> : <PlusIcon className="btn-icon" />}
+                    </button>
+                  </div>
+                </div>
 
-          {/* Resources */}
-          <div className="resources-section">
-            <h3>Resources</h3>
-            <div className="resource-card">
-              <div className="resource-info">
-                <DocumentTextIcon className="resource-icon" />
-                <span className="resource-label">Candidate Expectations</span>
+                {/* Card Body */}
+                <div className="interview-card-body">
+                  {/* Date Section */}
+                  <div className="interview-date-section">
+                    <div className="interview-date-badge">
+                      <div className="date-day">{startDate.toLocaleDateString('en-US', { weekday: 'short' })}</div>
+                      <div className="date-number">{startDate.getDate()}</div>
+                      <div className="date-month">{startDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</div>
+                    </div>
+                    
+                    <div className="interview-info">
+                      <h3 className="interview-card-title">{interview.title}</h3>
+                      
+                      <div className="interview-details">
+                        <div className="detail-item">
+                          <ClockIcon className="detail-icon" />
+                          <span>
+                            {startDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })} - 
+                            {endDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                        
+                        <div className="detail-item">
+                          <MapPinIcon className="detail-icon" />
+                          <span>{interview.location || 'No location set'}</span>
+                        </div>
+                        
+                        <div className="detail-item">
+                          <UserGroupIcon className="detail-icon" />
+                          <span>{interview.dresscode || 'No dress code specified'}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Member Group Assignment - Show when not expanded */}
+                  {!isExpanded && isSelected && currentUser && (() => {
+                    const userGroup = getUserMemberGroup(interview.id);
+                    return (
+                      <div className="interview-groups-summary">
+                        <div className="groups-header">
+                          <span className="groups-label">Your Assignment:</span>
+                        </div>
+                        <div className="groups-preview">
+                          {userGroup ? (
+                            <div className="preview-section">
+                              <UsersIcon className="group-type-icon" />
+                              <span className="preview-label">Member Group: </span>
+                              <span className="preview-value">{userGroup.name}</span>
+                            </div>
+                          ) : (
+                            <div className="preview-section">
+                              <UsersIcon className="group-type-icon" />
+                              <span className="preview-label">Member Group: </span>
+                              <span className="preview-value" style={{color: 'var(--status-warning-text)'}}>
+                                Not assigned to any group
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Expanded Content */}
+                  {isExpanded && (
+                    <div className="interview-expanded-content">
+                      {/* Member Assignment Section */}
+                      {currentUser && (() => {
+                        const userGroup = getUserMemberGroup(interview.id);
+                        return (
+                          <div className="expanded-section">
+                            <h3 className="expanded-section-title">Your Assignment</h3>
+                            <div className="assignment-details">
+                              {userGroup ? (
+                                <>
+                                  <div className="assignment-item">
+                                    <UsersIcon className="assignment-icon" />
+                                    <div className="assignment-info">
+                                      <span className="assignment-label">Member Group:</span>
+                                      <span className="assignment-value">{userGroup.name}</span>
+                                    </div>
+                                  </div>
+                                  {userGroup.notes && (
+                                    <div className="assignment-notes">
+                                      <span className="notes-label">Notes:</span>
+                                      <span className="notes-value">{userGroup.notes}</span>
+                                    </div>
+                                  )}
+                                </>
+                              ) : (
+                                <div className="assignment-item">
+                                  <UsersIcon className="assignment-icon" />
+                                  <div className="assignment-info">
+                                    <span className="assignment-label">Member Group:</span>
+                                    <span className="assignment-value" style={{color: 'var(--status-warning-text)'}}>
+                                      Not assigned to any group
+                                    </span>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      {/* Action Items Section */}
+                      <div className="expanded-section">
+                        <h3 className="expanded-section-title">Action Items</h3>
+                        <div className="action-items-grid">
+                          <label className="action-item-checkbox">
+                            <input
+                              type="checkbox"
+                              checked={data.actionItems?.reviewInstructions || false}
+                              onChange={() => handleActionItemToggle(interview.id, 'reviewInstructions')}
+                            />
+                            <span className="checkmark"></span>
+                            <span>Review Interview Instructions Guide</span>
+                          </label>
+                          <label className="action-item-checkbox">
+                            <input
+                              type="checkbox"
+                              checked={data.actionItems?.fillQuestions || false}
+                              onChange={() => handleActionItemToggle(interview.id, 'fillQuestions')}
+                            />
+                            <span className="checkmark"></span>
+                            <span>Fill Out Interview Questions</span>
+                          </label>
+                          <label className="action-item-checkbox">
+                            <input
+                              type="checkbox"
+                              checked={data.actionItems?.createMarketSizing || false}
+                              onChange={() => handleActionItemToggle(interview.id, 'createMarketSizing')}
+                            />
+                            <span className="checkmark"></span>
+                            <span>Create Market Sizing Questions</span>
+                          </label>
+                          <label className="action-item-checkbox">
+                            <input
+                              type="checkbox"
+                              checked={data.actionItems?.reviewResumes || false}
+                              onChange={() => handleActionItemToggle(interview.id, 'reviewResumes')}
+                            />
+                            <span className="checkmark"></span>
+                            <span>Review Applicant Resumes</span>
+                          </label>
+                        </div>
+                      </div>
+
+                      {/* Resources Section */}
+                      <div className="expanded-section">
+                        <h3 className="expanded-section-title">Resources</h3>
+                        <div className="resources-grid">
+                          {data.resources?.map(resource => (
+                            <div key={resource.id} className="resource-item">
+                              <DocumentTextIcon className="resource-icon" />
+                              <span className="resource-name">{resource.name}</span>
+                              <div className="resource-actions">
+                                <button 
+                                  className="resource-btn"
+                                  onClick={() => handleDownloadResource(resource.name)}
+                                  title="Download"
+                                >
+                                  <ArrowDownTrayIcon className="resource-action-icon" />
+                                </button>
+                                <button 
+                                  className="resource-btn"
+                                  onClick={() => handleOpenResource(resource.name)}
+                                  title="Open"
+                                >
+                                  <ArrowTopRightOnSquareIcon className="resource-action-icon" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Card Footer */}
+                <div className="interview-card-footer">
+                  <button 
+                    className="btn-primary interview-action-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedInterviewId(interview.id);
+                      handleStartInterview(interview.id);
+                    }}
+                  >
+                    <PlayIcon className="btn-icon" />
+                    Start Interview
+                  </button>
+                  <button 
+                    className="btn-secondary interview-action-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedInterviewId(interview.id);
+                      handleViewDeliberations();
+                    }}
+                  >
+                    <EyeIcon className="btn-icon" />
+                    Deliberations
+                  </button>
+                </div>
               </div>
-              <div className="resource-actions">
-                <button 
-                  className="resource-btn download-btn"
-                  onClick={() => handleDownloadResource('Candidate Expectations')}
-                >
-                  <ArrowDownTrayIcon className="resource-action-icon" />
-                </button>
-                <button 
-                  className="resource-btn external-btn"
-                  onClick={() => handleOpenResource('Candidate Expectations')}
-                >
-                  <ArrowTopRightOnSquareIcon className="resource-action-icon" />
-                </button>
-              </div>
-            </div>
-            
-            <div className="resource-card">
-              <div className="resource-info">
-                <DocumentTextIcon className="resource-icon" />
-                <span className="resource-label">Interview Questions Bank</span>
-              </div>
-              <div className="resource-actions">
-                <button 
-                  className="resource-btn download-btn"
-                  onClick={() => handleDownloadResource('Interview Questions Bank')}
-                >
-                  <ArrowDownTrayIcon className="resource-action-icon" />
-                </button>
-                <button 
-                  className="resource-btn external-btn"
-                  onClick={() => handleOpenResource('Interview Questions Bank')}
-                >
-                  <ArrowTopRightOnSquareIcon className="resource-action-icon" />
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+            );
+          })
+        )}
       </div>
     </div>
   );

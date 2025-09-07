@@ -8,31 +8,31 @@ datasource db {
 }
 
 model User {
-  id                 String              @id @default(uuid())
-  email              String              @unique
-  password           String
-  fullName           String
-  graduationClass    String?
-  role               UserRole            @default(USER)
-  createdAt          DateTime            @default(now())
-  resetToken         String?
-  resetTokenExpiry   DateTime?
-  profileImage       String?
-  studentId          Int?
-  comments           Comment[]
-  coverLetterScores  CoverLetterScore[]
-  evaluations        Evaluation[]
-  memberOneGroups    Groups[]            @relation("GroupMemberOne")
-  memberThreeGroups  Groups[]            @relation("GroupMemberThree")
-  memberTwoGroups    Groups[]            @relation("GroupMemberTwo")
-  interviewResources InterviewResource[]
-  resumeScores       ResumeScore[]
-  videoScores        VideoScore[]
-  // New interview relations
-  createdInterviews  Interview[]         @relation("InterviewCreator")
-  interviewAssignments InterviewAssignment[] @relation("InterviewAssignment")
+  id                   String                @id @default(uuid())
+  email                String                @unique
+  password             String
+  fullName             String
+  graduationClass      String?
+  role                 UserRole              @default(USER)
+  createdAt            DateTime              @default(now())
+  resetToken           String?
+  resetTokenExpiry     DateTime?
+  profileImage         String?
+  studentId            Int?
+  comments             Comment[]
+  coverLetterScores    CoverLetterScore[]
+  evaluations          Evaluation[]
+  memberOneGroups      Groups[]              @relation("GroupMemberOne")
+  memberThreeGroups    Groups[]              @relation("GroupMemberThree")
+  memberTwoGroups      Groups[]              @relation("GroupMemberTwo")
   completedActionItems InterviewActionItem[] @relation("InterviewActionItemCompletion")
+  interviewAssignments InterviewAssignment[] @relation("InterviewAssignment")
   interviewEvaluations InterviewEvaluation[] @relation("InterviewEvaluator")
+  firstRoundEvaluations FirstRoundInterviewEvaluation[] @relation("FirstRoundEvaluator")
+  interviewResources   InterviewResource[]
+  createdInterviews    Interview[]           @relation("InterviewCreator")
+  resumeScores         ResumeScore[]
+  videoScores          VideoScore[]
 
   @@map("users")
 }
@@ -62,38 +62,39 @@ model Candidate {
 }
 
 model Application {
-  id                String            @id @default(uuid())
-  status            ApplicationStatus @default(SUBMITTED)
-  responseID        String            @unique
-  submittedAt       DateTime          @default(now())
-  email             String
-  firstName         String
-  lastName          String
-  studentId         String
-  phoneNumber       String
-  graduationYear    String
-  isTransferStudent Boolean
-  priorCollegeYears String?
-  cumulativeGpa     Decimal           @db.Decimal(3, 2)
-  majorGpa          Decimal           @db.Decimal(3, 2)
-  major1            String
-  major2            String?
-  gender            String?
-  isFirstGeneration Boolean
-  resumeUrl         String
-  blindResumeUrl    String?
-  headshotUrl       String
-  coverLetterUrl    String?
-  videoUrl          String?
-  rawResponses      Json
-  approved          Boolean?
-  currentRound      String?
-  cycleId           String?
-  candidateId       String?
-  candidate         Candidate?        @relation(fields: [candidateId], references: [id])
-  cycle             RecruitingCycle?  @relation(fields: [cycleId], references: [id])
-  comments          Comment[]
+  id                   String                @id @default(uuid())
+  status               ApplicationStatus     @default(SUBMITTED)
+  responseID           String                @unique
+  submittedAt          DateTime              @default(now())
+  email                String
+  firstName            String
+  lastName             String
+  studentId            String
+  phoneNumber          String
+  graduationYear       String
+  isTransferStudent    Boolean
+  priorCollegeYears    String?
+  cumulativeGpa        Decimal               @db.Decimal(3, 2)
+  majorGpa             Decimal               @db.Decimal(3, 2)
+  major1               String
+  major2               String?
+  gender               String?
+  isFirstGeneration    Boolean
+  resumeUrl            String
+  blindResumeUrl       String?
+  headshotUrl          String
+  coverLetterUrl       String?
+  videoUrl             String?
+  rawResponses         Json
+  approved             Boolean?
+  currentRound         String?
+  cycleId              String?
+  candidateId          String?
+  candidate            Candidate?            @relation(fields: [candidateId], references: [id])
+  cycle                RecruitingCycle?      @relation(fields: [cycleId], references: [id])
+  comments             Comment[]
   interviewEvaluations InterviewEvaluation[]
+  firstRoundEvaluations FirstRoundInterviewEvaluation[]
 
   @@map("applications")
 }
@@ -109,8 +110,8 @@ model RecruitingCycle {
   applications Application[]
   events       Events[]
   groups       Groups[]
-  resumeScores ResumeScore[]
   interviews   Interview[]
+  resumeScores ResumeScore[]
 
   @@map("recruiting_cycles")
 }
@@ -361,6 +362,134 @@ model InterviewResource {
   @@map("interview_resources")
 }
 
+model Interview {
+  id                 String                @id @default(uuid())
+  title              String
+  description        String?
+  interviewType      InterviewType
+  startDate          DateTime
+  endDate            DateTime
+  deliberationsStart DateTime?
+  deliberationsEnd   DateTime?
+  location           String
+  dresscode          String?
+  maxCandidates      Int?
+  currentCandidates  Int                   @default(0)
+  status             InterviewStatus       @default(UPCOMING)
+  cycleId            String
+  createdBy          String
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  actionItems        InterviewActionItem[]
+  assignments        InterviewAssignment[]
+  evaluations        InterviewEvaluation[]
+  firstRoundEvaluations FirstRoundInterviewEvaluation[]
+  creator            User                  @relation("InterviewCreator", fields: [createdBy], references: [id])
+  cycle              RecruitingCycle       @relation(fields: [cycleId], references: [id])
+
+  @@map("interviews")
+}
+
+model InterviewAssignment {
+  id          String          @id @default(uuid())
+  interviewId String
+  userId      String
+  role        InterviewerRole
+  assignedAt  DateTime        @default(now())
+  notes       String?
+  interview   Interview       @relation(fields: [interviewId], references: [id])
+  user        User            @relation("InterviewAssignment", fields: [userId], references: [id])
+
+  @@unique([interviewId, userId])
+  @@map("interview_assignments")
+}
+
+model InterviewActionItem {
+  id              String    @id @default(uuid())
+  interviewId     String
+  title           String
+  description     String?
+  isCompleted     Boolean   @default(false)
+  completedAt     DateTime?
+  completedBy     String?
+  order           Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  completedByUser User?     @relation("InterviewActionItemCompletion", fields: [completedBy], references: [id])
+  interview       Interview @relation(fields: [interviewId], references: [id])
+
+  @@map("interview_action_items")
+}
+
+model InterviewEvaluation {
+  id            String                 @id @default(uuid())
+  interviewId   String
+  applicationId String
+  evaluatorId   String
+  notes         String?
+  decision      InterviewDecision?
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+  application   Application            @relation(fields: [applicationId], references: [id])
+  evaluator     User                   @relation("InterviewEvaluator", fields: [evaluatorId], references: [id])
+  interview     Interview              @relation(fields: [interviewId], references: [id])
+  rubricScores  InterviewRubricScore[]
+
+  @@unique([interviewId, applicationId, evaluatorId])
+  @@map("interview_evaluations")
+}
+
+// First round interview evaluation model
+model FirstRoundInterviewEvaluation {
+  id            String            @id @default(uuid())
+  interviewId   String
+  applicationId String
+  evaluatorId   String
+  decision      InterviewDecision?
+  
+  // Behavioral Rubric Scores (1-5 each)
+  behavioralLeadership     Int?
+  behavioralProblemSolving Int?
+  behavioralInterest       Int?
+  behavioralTotal          Int? // Sum of the above three (1-15)
+  
+  // Market Sizing Rubric Scores (1-5 each)
+  marketSizingTeamwork     Int?
+  marketSizingLogic        Int?
+  marketSizingCreativity   Int?
+  marketSizingTotal        Int? // Sum of the above three (1-15)
+  
+  // Notes sections
+  behavioralNotes          String?
+  marketSizingNotes        String?
+  additionalNotes          String?
+  
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  
+  // Relations
+  interview     Interview         @relation(fields: [interviewId], references: [id])
+  application   Application       @relation(fields: [applicationId], references: [id])
+  evaluator     User              @relation("FirstRoundEvaluator", fields: [evaluatorId], references: [id])
+  
+  @@unique([interviewId, applicationId, evaluatorId])
+  @@map("first_round_interview_evaluations")
+}
+
+model InterviewRubricScore {
+  id           String              @id @default(uuid())
+  evaluationId String
+  category     String
+  score        Int
+  comments     String?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  evaluation   InterviewEvaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+
+  @@unique([evaluationId, category])
+  @@map("interview_rubric_scores")
+}
+
 enum UserRole {
   USER
   ADMIN
@@ -375,72 +504,6 @@ enum ApplicationStatus {
   WAITLISTED
 }
 
-// New models for interview management
-model Interview {
-  id                    String                @id @default(uuid())
-  title                 String
-  description           String?
-  interviewType         InterviewType
-  startDate            DateTime
-  endDate              DateTime
-  deliberationsStart   DateTime?
-  deliberationsEnd     DateTime?
-  location             String
-  dresscode            String?
-  maxCandidates        Int?
-  currentCandidates    Int                    @default(0)
-  status               InterviewStatus        @default(UPCOMING)
-  cycleId              String
-  createdBy            String
-  createdAt            DateTime               @default(now())
-  updatedAt            DateTime               @updatedAt
-  
-  // Relations
-  cycle                RecruitingCycle       @relation(fields: [cycleId], references: [id])
-  creator              User                  @relation("InterviewCreator", fields: [createdBy], references: [id])
-  assignments          InterviewAssignment[]
-  actionItems          InterviewActionItem[]
-  evaluations          InterviewEvaluation[]
-  
-  @@map("interviews")
-}
-
-model InterviewAssignment {
-  id            String    @id @default(uuid())
-  interviewId   String
-  userId        String
-  role          InterviewerRole
-  assignedAt    DateTime  @default(now())
-  notes         String?
-  
-  // Relations
-  interview     Interview @relation(fields: [interviewId], references: [id])
-  user         User      @relation("InterviewAssignment", fields: [userId], references: [id])
-  
-  @@unique([interviewId, userId])
-  @@map("interview_assignments")
-}
-
-model InterviewActionItem {
-  id            String    @id @default(uuid())
-  interviewId   String
-  title         String
-  description   String?
-  isCompleted   Boolean   @default(false)
-  completedAt   DateTime?
-  completedBy   String?
-  order         Int       @default(0)
-  createdAt     DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  
-  // Relations
-  interview     Interview @relation(fields: [interviewId], references: [id])
-  completedByUser User?   @relation("InterviewActionItemCompletion", fields: [completedBy], references: [id])
-  
-  @@map("interview_action_items")
-}
-
-// New enums for interview management
 enum InterviewType {
   COFFEE_CHAT
   ROUND_ONE
@@ -470,41 +533,4 @@ enum InterviewDecision {
   UNSURE
   MAYBE_NO
   NO
-}
-
-// Interview evaluation models
-model InterviewEvaluation {
-  id            String            @id @default(uuid())
-  interviewId   String
-  applicationId String
-  evaluatorId   String
-  notes         String?
-  decision      InterviewDecision?
-  rubricScores  InterviewRubricScore[]
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
-  
-  // Relations
-  interview     Interview         @relation(fields: [interviewId], references: [id])
-  application   Application       @relation(fields: [applicationId], references: [id])
-  evaluator     User              @relation("InterviewEvaluator", fields: [evaluatorId], references: [id])
-  
-  @@unique([interviewId, applicationId, evaluatorId])
-  @@map("interview_evaluations")
-}
-
-model InterviewRubricScore {
-  id              String            @id @default(uuid())
-  evaluationId    String
-  category        String            // e.g., "Communication", "Problem Solving", "Cultural Fit"
-  score           Int               // 1-5 scale
-  comments        String?
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
-  
-  // Relations
-  evaluation      InterviewEvaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
-  
-  @@unique([evaluationId, category])
-  @@map("interview_rubric_scores")
 }

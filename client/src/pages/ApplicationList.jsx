@@ -199,52 +199,13 @@ export default function ApplicationList() {
                       {getInitials(applicant.firstName, applicant.lastName)}
                     </div>
                   )}
-                  
                   <div className="candidate-details">
                     <h3>{applicant.firstName} {applicant.lastName}</h3>
                     <p className="candidate-meta">
                       {applicant.major1} • {applicant.graduationYear} • GPA: {applicant.cumulativeGpa}
-                      {applicant.isFirstGeneration && " • First Gen"}
-                      {applicant.isTransferStudent && " • Transfer"}
                     </p>
                   </div>
                 </div>
-
-                <div className="candidate-scores">
-                  {applicant.averageGrades?.resume || applicant.averageGrades?.cover_letter || applicant.averageGrades?.video ? (
-                    <>
-                      <div className="score-item">
-                        <p className="score-label">Resume</p>
-                        <p className="score-value">
-                          {applicant.averageGrades?.resume || 'N/A'}
-                        </p>
-                      </div>
-                      <div className="score-item">
-                        <p className="score-label">Cover Letter</p>
-                        <p className="score-value">
-                          {applicant.averageGrades?.cover_letter || 'N/A'}
-                        </p>
-                      </div>
-                      <div className="score-item">
-                        <p className="score-label">Video</p>
-                        <p className="score-value">
-                          {applicant.averageGrades?.video || 'N/A'}
-                        </p>
-                      </div>
-                      <div className="score-item">
-                        <p className="score-label">Overall</p>
-                        <p className="score-value" style={{ color: '#3b82f6' }}>
-                          {applicant.averageGrades?.overall || 'N/A'}
-                        </p>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="no-grades-message" style={{ fontStyle: 'italic', color: '#6b7280' }}>
-                      Be the first to grade this application
-                    </div>
-                  )}
-                </div>
-
                 <div className="candidate-status">
                   <span className={`status-badge ${formatStatus(applicant.status)}`}>
                     {applicant.status.replace('_', ' ')}

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useAuth } from '../context/AuthContext';
 import apiClient from '../utils/api';
-import ResumeGradingModal from '../components/ResumeGradingModal';
+import DocumentGradingModal from '../components/DocumentGradingModal';
 import {
   Box,
   Typography,
@@ -25,7 +25,11 @@ import {
   Chip,
   IconButton,
   Stack,
-  Divider
+  Divider,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -37,8 +41,51 @@ import {
   Flag as FlagIcon,
   FlagOutlined as FlagOutlinedIcon,
   CheckCircle as CheckCircleIcon,
-  Schedule as ScheduleIcon
+  Schedule as ScheduleIcon,
+  Celebration as CelebrationIcon
 } from '@mui/icons-material';
+
+// Confetti Component
+const Confetti = ({ active }) => {
+  if (!active) return null;
+
+  const confettiPieces = Array.from({ length: 50 }, (_, i) => (
+    <div
+      key={i}
+      style={{
+        position: 'fixed',
+        width: '10px',
+        height: '10px',
+        backgroundColor: ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57', '#ff9ff3'][Math.floor(Math.random() * 6)],
+        left: `${Math.random() * 100}%`,
+        top: '-10px',
+        animation: `confetti-fall ${2 + Math.random() * 3}s linear forwards`,
+        zIndex: 9999,
+        borderRadius: '50%'
+      }}
+    />
+  ));
+
+  return (
+    <>
+      <style>
+        {`
+          @keyframes confetti-fall {
+            0% {
+              transform: translateY(-100vh) rotate(0deg);
+              opacity: 1;
+            }
+            100% {
+              transform: translateY(100vh) rotate(720deg);
+              opacity: 0;
+            }
+          }
+        `}
+      </style>
+      {confettiPieces}
+    </>
+  );
+};
 
 // Tab Panel component
 function TabPanel({ children, value, index, ...other }) {
@@ -70,11 +117,19 @@ export default function DocumentGrading() {
   const [error, setError] = useState(null);
   const [gradingModalOpen, setGradingModalOpen] = useState(false);
   const [selectedApplication, setSelectedApplication] = useState(null);
+  const [selectedDocumentType, setSelectedDocumentType] = useState('resume');
+  const [showCompletionCelebration, setShowCompletionCelebration] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [hasShownCelebration, setHasShownCelebration] = useState(false);
 
   // Calculate progress data based on actual grading completion
   const calculateProgressData = () => {
-    const totalApplications = applications.length;
+    // Count applications that have documents for each category
+    const applicationsWithResumes = applications.filter(app => app.resumeUrl).length;
+    const applicationsWithCoverLetters = applications.filter(app => app.coverLetterUrl).length;
+    const applicationsWithVideos = applications.filter(app => app.videoUrl).length;
     
+    // Count applications that have been graded for each category
     const resumeGraded = applications.filter(app => app.hasResumeScore).length;
     const coverLetterGraded = applications.filter(app => app.hasCoverLetterScore).length;
     const videoGraded = applications.filter(app => app.hasVideoScore).length;
@@ -84,33 +139,65 @@ export default function DocumentGrading() {
         title: 'Resume Completion',
         icon: <DocumentIcon />,
         completed: resumeGraded,
-        total: totalApplications,
+        total: applicationsWithResumes,
         deadline: 'Oct 5th, EOD',
-        percentage: totalApplications > 0 ? Math.round((resumeGraded / totalApplications) * 100) : 0,
+        percentage: applicationsWithResumes > 0 ? Math.round((resumeGraded / applicationsWithResumes) * 100) : 100,
         color: 'success'
       },
       {
         title: 'Cover Letter Completion',
         icon: <EditIcon />,
         completed: coverLetterGraded,
-        total: totalApplications,
+        total: applicationsWithCoverLetters,
         deadline: 'Oct 5th, EOD',
-        percentage: totalApplications > 0 ? Math.round((coverLetterGraded / totalApplications) * 100) : 0,
+        percentage: applicationsWithCoverLetters > 0 ? Math.round((coverLetterGraded / applicationsWithCoverLetters) * 100) : 100,
         color: 'success'
       },
       {
         title: 'Video Review Completion',
         icon: <VideoIcon />,
         completed: videoGraded,
-        total: totalApplications,
+        total: applicationsWithVideos,
         deadline: 'Oct 5th, EOD',
-        percentage: totalApplications > 0 ? Math.round((videoGraded / totalApplications) * 100) : 0,
+        percentage: applicationsWithVideos > 0 ? Math.round((videoGraded / applicationsWithVideos) * 100) : 100,
         color: 'success'
       }
     ];
   };
 
   const progressData = calculateProgressData();
+
+  // Check if all documents are completed
+  const checkAllDocumentsCompleted = () => {
+    const applicationsWithResumes = applications.filter(app => app.resumeUrl).length;
+    const applicationsWithCoverLetters = applications.filter(app => app.coverLetterUrl).length;
+    const applicationsWithVideos = applications.filter(app => app.videoUrl).length;
+    
+    const resumeGraded = applications.filter(app => app.hasResumeScore).length;
+    const coverLetterGraded = applications.filter(app => app.hasCoverLetterScore).length;
+    const videoGraded = applications.filter(app => app.hasVideoScore).length;
+
+    const allResumesGraded = applicationsWithResumes === 0 || resumeGraded === applicationsWithResumes;
+    const allCoverLettersGraded = applicationsWithCoverLetters === 0 || coverLetterGraded === applicationsWithCoverLetters;
+    const allVideosGraded = applicationsWithVideos === 0 || videoGraded === applicationsWithVideos;
+
+    return allResumesGraded && allCoverLettersGraded && allVideosGraded && applications.length > 0;
+  };
+
+  // Trigger celebration when all documents are completed
+  useEffect(() => {
+    if (applications.length > 0 && checkAllDocumentsCompleted() && !hasShownCelebration) {
+      console.log('Triggering celebration!');
+      setShowConfetti(true);
+      setShowCompletionCelebration(true);
+      setHasShownCelebration(true);
+      
+      // Stop confetti after 3 seconds
+      setTimeout(() => {
+        setShowConfetti(false);
+      }, 3000);
+    }
+  }, [applications, hasShownCelebration]);
 
   // Fetch applications assigned to the member's review team
   useEffect(() => {
@@ -119,7 +206,7 @@ export default function DocumentGrading() {
 
   // Filter and sort applications based on current filters
   const filteredApplications = applications.filter(app => {
-    const matchesSearch = app.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const matchesSearch = app.studentId.toString().includes(searchTerm) ||
                          app.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          app.major.toLowerCase().includes(searchTerm.toLowerCase());
     
@@ -140,9 +227,9 @@ export default function DocumentGrading() {
   const sortedApplications = [...filteredApplications].sort((a, b) => {
     switch (sortBy) {
       case 'name-az':
-        return a.name.localeCompare(b.name);
+        return a.studentId - b.studentId;
       case 'name-za':
-        return b.name.localeCompare(a.name);
+        return b.studentId - a.studentId;
       case 'date-new':
         return new Date(b.submittedAt) - new Date(a.submittedAt);
       case 'date-old':
@@ -191,7 +278,7 @@ export default function DocumentGrading() {
 
       return {
         id: `${app.id}-${documentType}`,
-        candidate: app.name,
+        candidate: `Student ${app.studentId}`,
         document,
         hasDocument,
         isGraded,
@@ -205,8 +292,9 @@ export default function DocumentGrading() {
     setTabValue(newValue);
   };
 
-  const handleGradeResume = (application) => {
+  const handleGradeDocument = (application, documentType) => {
     setSelectedApplication(application);
+    setSelectedDocumentType(documentType);
     setGradingModalOpen(true);
   };
 
@@ -217,6 +305,12 @@ export default function DocumentGrading() {
     if (user?.id) {
       fetchMemberApplications();
     }
+  };
+
+  const handleCloseCelebration = () => {
+    console.log('Closing celebration dialog');
+    setShowCompletionCelebration(false);
+    setShowConfetti(false);
   };
 
   const fetchMemberApplications = async () => {
@@ -263,8 +357,15 @@ export default function DocumentGrading() {
     }
   };
 
+  // Debug logging
+  console.log('showCompletionCelebration:', showCompletionCelebration);
+  console.log('showConfetti:', showConfetti);
+
   return (
     <Box sx={{ p: 3 }}>
+      {/* Confetti Animation */}
+      <Confetti active={showConfetti} />
+      
       {/* Main Title */}
       <Typography variant="h4" component="h1" sx={{ fontWeight: 700, color: 'primary.dark', mb: 4 }}>
         Document Grading
@@ -322,7 +423,7 @@ export default function DocumentGrading() {
                     {item.title}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    {item.completed} / {item.total} Tasks Complete | Deadline: {item.deadline}
+                    {item.completed} / {item.total} Documents Graded | Deadline: {item.deadline}
                   </Typography>
                 </Box>
                 <Typography variant="body2" sx={{ fontWeight: 600, color: 'success.main' }}>
@@ -355,7 +456,7 @@ export default function DocumentGrading() {
         {/* Search and Sort Row */}
         <Box sx={{ display: 'flex', gap: 2, mb: 3, alignItems: 'center' }}>
           <TextField
-            placeholder="Search candidates..."
+            placeholder="Search by student ID, email, or major..."
             variant="outlined"
             size="small"
             sx={{ flex: 1, maxWidth: 300 }}
@@ -382,8 +483,8 @@ export default function DocumentGrading() {
                 </InputAdornment>
               }
             >
-              <MenuItem value="name-az">Name (A-Z)</MenuItem>
-              <MenuItem value="name-za">Name (Z-A)</MenuItem>
+              <MenuItem value="name-az">Student ID (Low to High)</MenuItem>
+              <MenuItem value="name-za">Student ID (High to Low)</MenuItem>
               <MenuItem value="date-new">Date (Newest)</MenuItem>
               <MenuItem value="date-old">Date (Oldest)</MenuItem>
             </Select>
@@ -543,7 +644,7 @@ export default function DocumentGrading() {
                           startIcon={<DocumentIcon />}
                           sx={{ textTransform: 'none' }}
                           disabled={!row.hasDocument}
-                          onClick={() => row.hasDocument && handleGradeResume(row.application)}
+                          onClick={() => row.hasDocument && handleGradeDocument(row.application, tabValue === 0 ? 'resume' : tabValue === 1 ? 'coverLetter' : 'video')}
                         >
                           {row.document}
                         </Button>
@@ -571,12 +672,71 @@ export default function DocumentGrading() {
         )}
       </Paper>
 
-      {/* Resume Grading Modal */}
-      <ResumeGradingModal
+      {/* Document Grading Modal */}
+      <DocumentGradingModal
         open={gradingModalOpen}
         onClose={handleCloseGradingModal}
         application={selectedApplication}
+        documentType={selectedDocumentType}
       />
+
+      {/* Completion Celebration Dialog */}
+      <Dialog
+        open={showCompletionCelebration}
+        onClose={handleCloseCelebration}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            textAlign: 'center',
+            p: 3
+          }
+        }}
+      >
+        <DialogTitle sx={{ pb: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 2 }}>
+            <CelebrationIcon sx={{ fontSize: 48, color: 'primary.main', mr: 2 }} />
+            <Typography variant="h4" component="div" sx={{ fontWeight: 700, color: 'primary.main' }}>
+              🎉 Congratulations! 🎉
+            </Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+            You've graded all documents!
+          </Typography>
+          <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+            Amazing work! You have successfully completed grading all the documents assigned to you. 
+            Your thorough review helps ensure the best candidates are selected.
+          </Typography>
+          <Box sx={{ 
+            backgroundColor: 'success.light', 
+            color: 'success.contrastText', 
+            p: 2, 
+            borderRadius: 2,
+            mb: 2
+          }}>
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+              All document types have been reviewed and scored.
+            </Typography>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ justifyContent: 'center', pb: 3 }}>
+          <Button
+            variant="contained"
+            size="large"
+            onClick={handleCloseCelebration}
+            sx={{ 
+              px: 4,
+              py: 1.5,
+              fontSize: '1.1rem',
+              fontWeight: 600
+            }}
+          >
+            Awesome! 🚀
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

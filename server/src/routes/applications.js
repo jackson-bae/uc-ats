@@ -243,9 +243,9 @@ router.get('/:id/grades/latest', async (req, res) => {
     }
 
     // Convert to the old format for compatibility
-    // Resume is the sum of all three scores (0-30), video and cover letter are separate 0-10 scores
+    // Resume is the average of all three scores (0-10), video and cover letter are separate 0-10 scores
     res.json({
-      resume: (resumeScore.scoreOne || 0) + (resumeScore.scoreTwo || 0) + (resumeScore.scoreThree || 0), // Sum of all three categories
+      resume: ((resumeScore.scoreOne || 0) + (resumeScore.scoreTwo || 0) + (resumeScore.scoreThree || 0)) / 3, // Average of all three categories
       video: resumeScore.scoreTwo, // Using scoreTwo as video for compatibility
       cover_letter: resumeScore.scoreThree, // Using scoreThree as cover letter for compatibility
       createdAt: resumeScore.createdAt
@@ -301,11 +301,11 @@ router.get('/:id/grades/average', async (req, res) => {
     // Calculate averages from resume scores
     const validScores = resumeScores.filter(score => score.overallScore !== null);
     
-    // Resume is sum of all three categories (0-30), video and cover letter are separate (0-10)
+    // Resume is average of all three categories (0-10), video and cover letter are separate (0-10)
     const avgResume = validScores.length > 0 ? 
       (validScores.reduce((sum, score) => {
-        const totalResume = (parseFloat(score.scoreOne || 0) + parseFloat(score.scoreTwo || 0) + parseFloat(score.scoreThree || 0));
-        return sum + totalResume;
+        const avgResume = (parseFloat(score.scoreOne || 0) + parseFloat(score.scoreTwo || 0) + parseFloat(score.scoreThree || 0)) / 3;
+        return sum + avgResume;
       }, 0) / validScores.length).toFixed(1) : 0;
     
     const avgVideo = validScores.length > 0 ? 
