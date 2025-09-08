@@ -53,6 +53,9 @@ export default function Dashboard() {
   });
   const [eventsLoading, setEventsLoading] = useState(false);
   const [demographicsLoading, setDemographicsLoading] = useState(false);
+  const [timelineScrollPosition, setTimelineScrollPosition] = useState(0);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
 
   const load = async () => {
     try {
@@ -223,9 +226,44 @@ export default function Dashboard() {
     }
   }, [user]);
 
+  // Update scroll button states when timeline events change
+  useEffect(() => {
+    if (timelineEvents.length > 0) {
+      // Use setTimeout to ensure DOM is updated
+      setTimeout(updateScrollButtons, 100);
+    }
+  }, [timelineEvents]);
+
   const handleViewMore = (section) => {
     // TODO: Implement navigation to detailed views
     console.log('View more:', section);
+  };
+
+  const handleTimelineScroll = (direction) => {
+    const timelineContainer = document.getElementById('timeline-container');
+    if (!timelineContainer) return;
+
+    const scrollAmount = 200; // pixels to scroll
+    const newPosition = direction === 'left' 
+      ? timelineScrollPosition - scrollAmount 
+      : timelineScrollPosition + scrollAmount;
+
+    timelineContainer.scrollTo({
+      left: newPosition,
+      behavior: 'smooth'
+    });
+
+    setTimelineScrollPosition(newPosition);
+  };
+
+  const updateScrollButtons = () => {
+    const timelineContainer = document.getElementById('timeline-container');
+    if (!timelineContainer) return;
+
+    const { scrollLeft, scrollWidth, clientWidth } = timelineContainer;
+    setCanScrollLeft(scrollLeft > 0);
+    setCanScrollRight(scrollLeft < scrollWidth - clientWidth);
+    setTimelineScrollPosition(scrollLeft);
   };
 
   // Color schemes for charts
@@ -334,17 +372,37 @@ export default function Dashboard() {
         ) : (
           <Box sx={{ display: 'flex', alignItems: 'center', position: 'relative' }}>
             <IconButton
+              onClick={() => handleTimelineScroll('left')}
+              disabled={!canScrollLeft}
               sx={{
                 bgcolor: 'grey.100',
                 border: 1,
                 borderColor: 'grey.300',
-                '&:hover': { bgcolor: 'primary.main', color: 'white' }
+                '&:hover': { bgcolor: 'primary.main', color: 'white' },
+                '&:disabled': { 
+                  bgcolor: 'grey.50', 
+                  color: 'grey.400',
+                  borderColor: 'grey.200'
+                }
               }}
             >
               <ChevronLeftIcon />
             </IconButton>
             
-            <Box sx={{ display: 'flex', alignItems: 'center', flex: 1, mx: 2, gap: 4, overflowX: 'auto' }}>
+            <Box 
+              id="timeline-container"
+              sx={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                flex: 1, 
+                mx: 2, 
+                gap: 4, 
+                overflowX: 'auto',
+                scrollbarWidth: 'none', // Firefox
+                '&::-webkit-scrollbar': { display: 'none' } // Chrome, Safari
+              }}
+              onScroll={updateScrollButtons}
+            >
               {timelineEvents.map((event, index) => (
                 <Box key={event.id} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 120 }}>
                   <Box
@@ -390,11 +448,18 @@ export default function Dashboard() {
             </Box>
             
             <IconButton
+              onClick={() => handleTimelineScroll('right')}
+              disabled={!canScrollRight}
               sx={{
                 bgcolor: 'grey.100',
                 border: 1,
                 borderColor: 'grey.300',
-                '&:hover': { bgcolor: 'primary.main', color: 'white' }
+                '&:hover': { bgcolor: 'primary.main', color: 'white' },
+                '&:disabled': { 
+                  bgcolor: 'grey.50', 
+                  color: 'grey.400',
+                  borderColor: 'grey.200'
+                }
               }}
             >
               <ChevronRightIcon />

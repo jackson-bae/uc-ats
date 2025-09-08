@@ -157,9 +157,11 @@ export default function MemberEvents() {
                   <MapPinIcon className="location-icon" />
                   <span>{event.eventLocation || 'Location TBD'}</span>
                 </div>
-                <p className="event-description">
-                  {event.description || 'Join us for this exciting event!'}
-                </p>
+                {event.description && (
+                  <p className="event-description">
+                    {event.description}
+                  </p>
+                )}
               </div>
               
               <div className="event-action">

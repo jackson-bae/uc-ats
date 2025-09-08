@@ -36,6 +36,7 @@ model User {
   flaggedDocuments     FlaggedDocument[]     @relation("DocumentFlagger")
   resolvedDocuments    FlaggedDocument[]     @relation("DocumentResolver")
   meetingSlots         MeetingSlot[]
+  memberEventRsvp      MemberEventRsvp[]
 
   @@map("users")
 }
@@ -265,6 +266,7 @@ model Events {
   showToCandidates Boolean           @default(false)
   eventAttendance  EventAttendance[]
   eventRsvp        EventRsvp[]
+  memberEventRsvp  MemberEventRsvp[]
   cycle            RecruitingCycle   @relation(fields: [cycleId], references: [id])
 
   @@map("events")
@@ -292,6 +294,18 @@ model EventAttendance {
   event       Events    @relation(fields: [eventId], references: [id])
 
   @@map("event_attendance")
+}
+
+model MemberEventRsvp {
+  id          String    @id @default(uuid())
+  responseId  String    @unique
+  eventId     String
+  memberId    String
+  createdAt   DateTime  @default(now())
+  member      User      @relation(fields: [memberId], references: [id])
+  event       Events    @relation(fields: [eventId], references: [id])
+
+  @@map("member_event_rsvp")
 }
 
 model CoffeeChat {

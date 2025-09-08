@@ -14,9 +14,11 @@ import {
   Cog6ToothIcon,
   CalendarDaysIcon,
   UserGroupIcon as UserGroupIcon2,
-  ChatBubbleLeftRightIcon
+  ChatBubbleLeftRightIcon,
+  ChatBubbleOvalLeftEllipsisIcon
 } from '@heroicons/react/24/outline';
 import UConsultingLogo from './UConsultingLogo';
+import MessageAdminModal from './MessageAdminModal';
 import '../styles/Layout.css';
 
 const Layout = ({ children }) => {
@@ -24,6 +26,7 @@ const Layout = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [messageModalOpen, setMessageModalOpen] = useState(false);
 
   const handleLogout = () => {
     logout();
@@ -39,6 +42,7 @@ const Layout = ({ children }) => {
       { name: 'Applications', href: '/candidates', icon: DocumentTextIcon },
       { name: 'Get to Know UC', href: '/member/meeting-slots', icon: ChatBubbleLeftRightIcon },
       { name: 'Recruitment Resources and Timeline', href: '/recruitment-resources', icon: ClipboardDocumentListIcon },
+      { name: 'Message an Admin', href: '#', icon: ChatBubbleOvalLeftEllipsisIcon, isAction: true },
     ] : user?.role === 'ADMIN' ? [
       { name: 'Applications', href: '/application-list', icon: DocumentTextIcon },
       { name: 'Document Grading', href: '/admin-document-grading', icon: DocumentTextIcon },
@@ -118,6 +122,22 @@ const Layout = ({ children }) => {
                 const Icon = item.icon;
                 const current = isCurrentPath(item.href);
                 
+                if (item.isAction) {
+                  return (
+                    <button
+                      key={item.name}
+                      onClick={() => {
+                        setMessageModalOpen(true);
+                        setSidebarOpen(false);
+                      }}
+                      className="nav-item"
+                    >
+                      <Icon className="nav-icon" />
+                      {item.name}
+                    </button>
+                  );
+                }
+                
                 return (
                   <Link
                     key={item.name}
@@ -151,6 +171,12 @@ const Layout = ({ children }) => {
           </main>
         </div>
       </div>
+
+      {/* Message Admin Modal */}
+      <MessageAdminModal 
+        open={messageModalOpen} 
+        onClose={() => setMessageModalOpen(false)} 
+      />
     </div>
   );
 };

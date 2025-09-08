@@ -1,6 +1,7 @@
 import express from 'express';
 import { requireAuth } from '../middleware/auth.js';
 import prisma from '../prismaClient.js';
+import { sendSlackMessage } from '../services/slackService.js';
 
 const router = express.Router();
 
@@ -583,6 +584,81 @@ router.post('/evaluations', requireAuth, async (req, res) => {
   } catch (error) {
     console.error('[POST /api/member/evaluations]', error);
     res.status(500).json({ error: 'Failed to save evaluation' });
+  }
+});
+
+// Message admin endpoint
+router.post('/message-admin', requireAuth, async (req, res) => {
+  try {
+    const { message } = req.body;
+    const userId = req.user.id;
+    
+    if (!message || !message.trim()) {
+      return res.status(400).json({ error: 'Message is required' });
+    }
+
+    // Get user information
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        fullName: true,
+        email: true,
+        role: true
+      }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Send message to Slack
+    const slackMessage = {
+      text: `New message from UC Member`,
+      blocks: [
+        {
+          type: "header",
+          text: {
+            type: "plain_text",
+            text: "📩 New Message from UC Member"
+          }
+        },
+        {
+          type: "section",
+          fields: [
+            {
+              type: "mrkdwn",
+              text: `*From:* ${user.fullName}`
+            },
+            {
+              type: "mrkdwn",
+              text: `*Email:* ${user.email}`
+            },
+            {
+              type: "mrkdwn",
+              text: `*Role:* ${user.role}`
+            },
+            {
+              type: "mrkdwn",
+              text: `*Time:* ${new Date().toLocaleString()}`
+            }
+          ]
+        },
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: `*Message:*\n${message.trim()}`
+          }
+        }
+      ]
+    };
+
+    await sendSlackMessage(slackMessage);
+
+    res.json({ success: true, message: 'Message sent successfully' });
+  } catch (error) {
+    console.error('[POST /api/member/message-admin]', error);
+    res.status(500).json({ error: 'Failed to send message' });
   }
 });
 

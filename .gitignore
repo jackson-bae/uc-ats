@@ -9,4 +9,4 @@ server/.env
 .vscode/
 
 
-google-cloud-key.json
+google-cloud-key.jsonnode_modules/

@@ -61,6 +61,9 @@ export default function MemberDashboard() {
   const [loading, setLoading] = useState(true);
   const [tasksLoading, setTasksLoading] = useState(true);
   const [error, setError] = useState('');
+  const [timelineScrollPosition, setTimelineScrollPosition] = useState(0);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
 
   // Fetch events from the current recruitment cycle
   const fetchTimelineEvents = async () => {
@@ -214,11 +217,46 @@ export default function MemberDashboard() {
     }
   };
 
+  const handleTimelineScroll = (direction) => {
+    const timelineContainer = document.getElementById('member-timeline-container');
+    if (!timelineContainer) return;
+
+    const scrollAmount = 200; // pixels to scroll
+    const newPosition = direction === 'left' 
+      ? timelineScrollPosition - scrollAmount 
+      : timelineScrollPosition + scrollAmount;
+
+    timelineContainer.scrollTo({
+      left: newPosition,
+      behavior: 'smooth'
+    });
+
+    setTimelineScrollPosition(newPosition);
+  };
+
+  const updateScrollButtons = () => {
+    const timelineContainer = document.getElementById('member-timeline-container');
+    if (!timelineContainer) return;
+
+    const { scrollLeft, scrollWidth, clientWidth } = timelineContainer;
+    setCanScrollLeft(scrollLeft > 0);
+    setCanScrollRight(scrollLeft < scrollWidth - clientWidth);
+    setTimelineScrollPosition(scrollLeft);
+  };
+
   useEffect(() => {
     fetchTimelineEvents();
     fetchUserTeam();
     fetchMemberTasks();
   }, [user?.id]);
+
+  // Update scroll button states when timeline events change
+  useEffect(() => {
+    if (timelineEvents.length > 0) {
+      // Use setTimeout to ensure DOM is updated
+      setTimeout(updateScrollButtons, 100);
+    }
+  }, [timelineEvents]);
 
   const handleStartTask = (task) => {
     if (task.type === 'document') {
@@ -302,17 +340,37 @@ export default function MemberDashboard() {
         ) : (
           <Box sx={{ display: 'flex', alignItems: 'center', position: 'relative' }}>
             <IconButton
+              onClick={() => handleTimelineScroll('left')}
+              disabled={!canScrollLeft}
               sx={{
                 bgcolor: 'grey.100',
                 border: 1,
                 borderColor: 'grey.300',
-                '&:hover': { bgcolor: 'primary.main', color: 'white' }
+                '&:hover': { bgcolor: 'primary.main', color: 'white' },
+                '&:disabled': { 
+                  bgcolor: 'grey.50', 
+                  color: 'grey.400',
+                  borderColor: 'grey.200'
+                }
               }}
             >
               <ChevronLeftIcon />
             </IconButton>
             
-            <Box sx={{ display: 'flex', alignItems: 'center', flex: 1, mx: 2, gap: 4, overflowX: 'auto' }}>
+            <Box 
+              id="member-timeline-container"
+              sx={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                flex: 1, 
+                mx: 2, 
+                gap: 4, 
+                overflowX: 'auto',
+                scrollbarWidth: 'none', // Firefox
+                '&::-webkit-scrollbar': { display: 'none' } // Chrome, Safari
+              }}
+              onScroll={updateScrollButtons}
+            >
               {timelineEvents.map((event, index) => (
                 <Box key={event.id} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 120 }}>
                   <Box
@@ -358,11 +416,18 @@ export default function MemberDashboard() {
             </Box>
             
             <IconButton
+              onClick={() => handleTimelineScroll('right')}
+              disabled={!canScrollRight}
               sx={{
                 bgcolor: 'grey.100',
                 border: 1,
                 borderColor: 'grey.300',
-                '&:hover': { bgcolor: 'primary.main', color: 'white' }
+                '&:hover': { bgcolor: 'primary.main', color: 'white' },
+                '&:disabled': { 
+                  bgcolor: 'grey.50', 
+                  color: 'grey.400',
+                  borderColor: 'grey.200'
+                }
               }}
             >
               <ChevronRightIcon />

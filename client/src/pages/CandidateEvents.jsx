@@ -155,20 +155,24 @@ export default function CandidateEvents() {
                   <MapPinIcon className="location-icon" />
                   <span>{event.eventLocation || 'Location TBD'}</span>
                 </div>
-                <p className="event-description">
-                  {event.description || 'Join us for this exciting event!'}
-                </p>
+                {event.description && (
+                  <p className="event-description">
+                    {event.description}
+                  </p>
+                )}
               </div>
               
               <div className="event-action">
                 <div className="event-buttons">
-                  <button 
-                    className={`rsvp-button ${event.hasAttended ? 'attended' : event.hasRsvpd ? 'rsvpd' : ''}`}
-                    onClick={() => handleRSVP(event)}
-                    disabled={event.hasAttended || event.hasRsvpd}
-                  >
-                    {event.hasAttended ? 'Attended' : event.hasRsvpd ? 'RSVP\'d' : 'RSVP'}
-                  </button>
+                  {event.rsvpForm && (
+                    <button 
+                      className={`rsvp-button ${event.hasAttended ? 'attended' : event.hasRsvpd ? 'rsvpd' : ''}`}
+                      onClick={() => handleRSVP(event)}
+                      disabled={event.hasAttended || event.hasRsvpd}
+                    >
+                      {event.hasAttended ? 'Attended' : event.hasRsvpd ? 'RSVP\'d' : 'RSVP'}
+                    </button>
+                  )}
                   <button 
                     className="calendar-button"
                     onClick={() => handleAddToCalendar(event)}

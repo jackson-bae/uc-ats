@@ -97,7 +97,7 @@ const UserManagement = () => {
   const handleCreateUser = async (e) => {
     e.preventDefault();
     try {
-      await apiClient.post('/admin/users', createForm);
+      await apiClient.post('/users', createForm);
       setShowCreateModal(false);
       setCreateForm({
         email: '',
@@ -116,7 +116,7 @@ const UserManagement = () => {
   const handleUpdateUser = async (e) => {
     e.preventDefault();
     try {
-      await apiClient.patch(`/admin/users/${selectedUser.id}`, editForm);
+      await apiClient.patch(`/users/${selectedUser.id}`, editForm);
       setShowEditModal(false);
       setSelectedUser(null);
       fetchUsers();
@@ -128,7 +128,7 @@ const UserManagement = () => {
 
   const handleUpdateRole = async (userId, newRole) => {
     try {
-      await apiClient.patch(`/admin/users/${userId}/role`, { role: newRole });
+      await apiClient.patch(`/users/${userId}/role`, { role: newRole });
       fetchUsers();
     } catch (err) {
       setError('Failed to update user role');
@@ -144,7 +144,7 @@ const UserManagement = () => {
     formData.append('profileImage', imageFile);
 
     try {
-      const response = await apiClient.post(`/admin/users/${selectedUser.id}/profile-image`, formData);
+      const response = await apiClient.post(`/users/${selectedUser.id}/profile-image`, formData);
       console.log('Upload response:', response);
       setShowImageModal(false);
       setSelectedUser(null);

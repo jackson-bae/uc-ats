@@ -275,6 +275,96 @@ export async function syncEventRSVP(eventId) {
   }
 }
 
+// Sync member RSVP responses for a specific event
+export async function syncMemberEventRSVP(eventId) {
+  try {
+    console.log(`Syncing member RSVP for event ${eventId}...`);
+
+    // Get the event with its member RSVP form URL
+    const event = await prisma.events.findUnique({
+      where: { id: eventId }
+    });
+
+    if (!event) {
+      throw new Error(`Event not found: ${eventId}`);
+    }
+
+    if (!event.memberRsvpUrl) {
+      console.warn(`Event ${eventId} has no member RSVP form URL. Skipping sync.`);
+      return { processed: 0, errors: 0 };
+    }
+
+    const formId = extractFormIdFromUrl(event.memberRsvpUrl);
+    if (!formId) {
+      console.warn(`Invalid member RSVP form URL for event ${eventId}: ${event.memberRsvpUrl}`);
+      return { processed: 0, errors: 0 };
+    }
+
+    console.log(`Fetching responses from member RSVP form: ${formId}`);
+    const responses = await getResponses(formId);
+
+    // Get existing member RSVP response IDs for this event
+    const existingResponseIds = new Set(
+      (await prisma.memberEventRsvp.findMany({
+        where: { eventId },
+        select: { responseId: true }
+      })).map(r => r.responseId)
+    );
+
+    // Filter out responses that are already processed
+    const newResponses = responses.filter(response => !existingResponseIds.has(response.responseId));
+    console.log(`Found ${newResponses.length} new member RSVP responses to process`);
+
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const response of newResponses) {
+      try {
+        const transformedData = transformEventResponse(response, eventId, 'member-rsvp');
+        
+        console.log(`Transformed data for member RSVP response:`, JSON.stringify(transformedData, null, 2));
+        
+        // Find the member by email
+        let member = null;
+        if (transformedData.email) {
+          member = await prisma.user.findUnique({
+            where: { email: transformedData.email }
+          });
+        }
+
+        if (!member) {
+          console.warn(`Member not found for RSVP response: ${transformedData.email}`);
+          errorCount++;
+          continue;
+        }
+
+        // Create member RSVP record
+        await prisma.memberEventRsvp.create({
+          data: {
+            responseId: transformedData.responseId,
+            eventId: eventId,
+            memberId: member.id
+          }
+        });
+
+        successCount++;
+        console.log(`Successfully processed member RSVP response ${transformedData.responseId} for member ${member.id}`);
+
+      } catch (error) {
+        console.error(`Error processing member RSVP response ${response.responseId}:`, error);
+        errorCount++;
+      }
+    }
+
+    console.log(`Member RSVP sync completed for event ${eventId}: ${successCount} processed, ${errorCount} errors`);
+    return { processed: successCount, errors: errorCount };
+
+  } catch (error) {
+    console.error(`Error syncing member RSVP for event ${eventId}:`, error);
+    throw error;
+  }
+}
+
 // Sync all event forms (both RSVP and attendance) for all active events
 export async function syncAllEventForms() {
   try {

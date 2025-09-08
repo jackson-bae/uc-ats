@@ -1,7 +1,8 @@
 import express from 'express';
 import prisma from '../prismaClient.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
-import { syncEventAttendance, syncEventRSVP, syncAllEventForms } from '../services/syncEventResponses.js';
+import { syncEventAttendance, syncEventRSVP, syncMemberEventRSVP, syncAllEventForms } from '../services/syncEventResponses.js';
+import syncFormResponses from '../services/syncResponses.js';
 import { sendRSVPConfirmation, sendAttendanceConfirmation, formatEventDate } from '../services/emailNotifications.js';
 
 const router = express.Router();
@@ -989,6 +990,22 @@ router.patch('/events/:id', async (req, res) => {
   }
 });
 
+// Application Form Sync Routes
+
+// Sync main application form responses
+router.post('/forms/sync', async (req, res) => {
+  try {
+    console.log('Admin triggering sync for application form responses...');
+    await syncFormResponses();
+    res.json({ 
+      message: 'Application form sync completed successfully'
+    });
+  } catch (error) {
+    console.error('[POST /api/admin/forms/sync]', error);
+    res.status(500).json({ error: 'Failed to sync application form responses' });
+  }
+});
+
 // Event Form Sync Routes
 
 // Sync all event forms (both RSVP and attendance)
@@ -1040,12 +1057,29 @@ router.post('/events/:id/sync-attendance', async (req, res) => {
   }
 });
 
+// Sync member RSVP responses for a specific event
+router.post('/events/:id/sync-member-rsvp', async (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log(`Admin triggering member RSVP sync for event ${id}...`);
+    
+    const result = await syncMemberEventRSVP(id);
+    res.json({ 
+      message: `Member RSVP sync completed for event ${id}`,
+      result: result 
+    });
+  } catch (error) {
+    console.error(`[POST /api/admin/events/${req.params.id}/sync-member-rsvp]`, error);
+    res.status(500).json({ error: 'Failed to sync member RSVP responses' });
+  }
+});
+
 // Get event statistics (RSVP and attendance counts)
 router.get('/events/:id/stats', async (req, res) => {
   try {
     const { id } = req.params;
 
-    const [event, rsvpCount, attendanceCount] = await Promise.all([
+    const [event, rsvpCount, attendanceCount, memberRsvpCount] = await Promise.all([
       prisma.events.findUnique({
         where: { id },
         select: { 
@@ -1053,11 +1087,13 @@ router.get('/events/:id/stats', async (req, res) => {
           eventStartDate: true, 
           eventEndDate: true,
           rsvpForm: true,
-          attendanceForm: true
+          attendanceForm: true,
+          memberRsvpUrl: true
         }
       }),
       prisma.eventRsvp.count({ where: { eventId: id } }),
-      prisma.eventAttendance.count({ where: { eventId: id } })
+      prisma.eventAttendance.count({ where: { eventId: id } }),
+      prisma.memberEventRsvp.count({ where: { eventId: id } })
     ]);
 
     if (!event) {
@@ -1069,8 +1105,10 @@ router.get('/events/:id/stats', async (req, res) => {
       stats: {
         rsvpCount: rsvpCount,
         attendanceCount: attendanceCount,
+        memberRsvpCount: memberRsvpCount,
         hasRsvpForm: !!event.rsvpForm,
-        hasAttendanceForm: !!event.attendanceForm
+        hasAttendanceForm: !!event.attendanceForm,
+        hasMemberRsvpForm: !!event.memberRsvpUrl
       }
     });
   } catch (error) {

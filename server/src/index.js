@@ -87,12 +87,14 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
-// Temporarily disable sync to test auth
-// await syncFormResponses();
-// cron.schedule('*/5 * * * *', () => {
-//   console.log('Running scheduled response sync...');
-//   syncFormResponses();
-// });
+// Run initial sync on startup
+await syncFormResponses();
+
+// Schedule automatic sync every 5 minutes
+cron.schedule('*/5 * * * *', () => {
+  console.log('Running scheduled response sync...');
+  syncFormResponses();
+});
 
 app.listen(config.port, () => {
   console.log(`Server running on port ${config.port}`);

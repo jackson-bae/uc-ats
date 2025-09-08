@@ -36,13 +36,7 @@ export default function EventManagement() {
   const [successMessage, setSuccessMessage] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
-  const [testEmailOpen, setTestEmailOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
-  const [testEmailForm, setTestEmailForm] = useState({
-    candidateEmail: '',
-    type: 'rsvp'
-  });
-  const [emailTestLoading, setEmailTestLoading] = useState(false);
   const [editLoading, setEditLoading] = useState(false);
   const [form, setForm] = useState({
     eventName: '',
@@ -81,7 +75,7 @@ export default function EventManagement() {
           stats[event.id] = eventStats.stats;
         } catch (e) {
           console.warn(`Failed to fetch stats for event ${event.id}:`, e);
-          stats[event.id] = { rsvpCount: 0, attendanceCount: 0, hasRsvpForm: false, hasAttendanceForm: false };
+          stats[event.id] = { rsvpCount: 0, attendanceCount: 0, memberRsvpCount: 0, hasRsvpForm: false, hasAttendanceForm: false, hasMemberRsvpForm: false };
         }
       }
       setEventStats(stats);
@@ -191,40 +185,6 @@ export default function EventManagement() {
     }
   };
 
-  const openTestEmailDialog = (event) => {
-    setSelectedEvent(event);
-    setTestEmailForm({
-      candidateEmail: '',
-      type: 'rsvp'
-    });
-    setTestEmailOpen(true);
-  };
-
-  const testEmailNotification = async () => {
-    try {
-      setEmailTestLoading(true);
-      setError('');
-      setSuccessMessage('');
-      
-      if (!testEmailForm.candidateEmail) {
-        setError('Please enter a candidate email address');
-        return;
-      }
-
-      await apiClient.post('/admin/test-email-notifications', {
-        eventId: selectedEvent.id,
-        type: testEmailForm.type,
-        candidateEmail: testEmailForm.candidateEmail
-      });
-      
-      setSuccessMessage(`${testEmailForm.type.toUpperCase()} confirmation email sent successfully!`);
-      setTestEmailOpen(false);
-    } catch (e) {
-      setError(e.message || 'Failed to send test email notification');
-    } finally {
-      setEmailTestLoading(false);
-    }
-  };
 
   const syncEventRSVP = async (eventId) => {
     try {
@@ -259,6 +219,24 @@ export default function EventManagement() {
       setError(e.message || 'Failed to sync attendance responses');
     } finally {
       setSyncLoading(prev => ({ ...prev, [`${eventId}-attendance`]: false }));
+    }
+  };
+
+  const syncMemberRSVP = async (eventId) => {
+    try {
+      setSyncLoading(prev => ({ ...prev, [`${eventId}-member-rsvp`]: true }));
+      setError('');
+      setSuccessMessage('');
+      
+      const result = await apiClient.post(`/admin/events/${eventId}/sync-member-rsvp`);
+      setSuccessMessage(`Member RSVP sync completed: ${result.result.processed} responses processed, ${result.result.errors} errors`);
+      
+      // Refresh event stats
+      await fetchEvents();
+    } catch (e) {
+      setError(e.message || 'Failed to sync member RSVP responses');
+    } finally {
+      setSyncLoading(prev => ({ ...prev, [`${eventId}-member-rsvp`]: false }));
     }
   };
 
@@ -309,7 +287,13 @@ export default function EventManagement() {
   };
 
   return (
-    <Box>
+    <Box sx={{ 
+      width: '100%', 
+      overflow: 'visible',
+      maxWidth: 'none',
+      margin: 0,
+      padding: 0
+    }}>
       <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2}>
         <Typography variant="h4">Event Management</Typography>
         <Stack direction="row" spacing={2}>
@@ -334,24 +318,51 @@ export default function EventManagement() {
         <Alert severity="success" sx={{ mb: 2 }}>{successMessage}</Alert>
       )}
 
-      <TableContainer component={Paper}>
-        <Table>
+      <Box sx={{ 
+        width: '100%',
+        overflowX: 'auto',
+        overflowY: 'visible',
+        '&::-webkit-scrollbar': {
+          height: '8px',
+        },
+        '&::-webkit-scrollbar-track': {
+          backgroundColor: '#f1f1f1',
+          borderRadius: '4px',
+        },
+        '&::-webkit-scrollbar-thumb': {
+          backgroundColor: '#c1c1c1',
+          borderRadius: '4px',
+          '&:hover': {
+            backgroundColor: '#a8a8a8',
+          },
+        },
+      }}>
+        <TableContainer 
+          component={Paper} 
+          sx={{ 
+            minWidth: 'max-content',
+            width: 'max-content',
+            overflow: 'visible'
+          }}
+        >
+          <Table sx={{ minWidth: 1400, width: 'max-content' }}>
           <TableHead>
             <TableRow>
-              <TableCell>Event Name</TableCell>
-              <TableCell>Start Date</TableCell>
-              <TableCell>End Date</TableCell>
-              <TableCell>Location</TableCell>
-              <TableCell>Cycle</TableCell>
-              <TableCell>Show to Candidates</TableCell>
-              <TableCell>RSVP</TableCell>
-              <TableCell>Attendance</TableCell>
-              <TableCell align="right">Actions</TableCell>
+              <TableCell sx={{ minWidth: 200 }}>Event Name</TableCell>
+              <TableCell sx={{ minWidth: 150 }}>Start Date</TableCell>
+              <TableCell sx={{ minWidth: 150 }}>End Date</TableCell>
+              <TableCell sx={{ minWidth: 120 }}>Location</TableCell>
+              <TableCell sx={{ minWidth: 100 }}>Cycle</TableCell>
+              <TableCell sx={{ minWidth: 140 }}>Show to Candidates</TableCell>
+              <TableCell sx={{ minWidth: 200 }}>RSVP</TableCell>
+              <TableCell sx={{ minWidth: 200 }}>Attendance</TableCell>
+              <TableCell sx={{ minWidth: 200 }}>Member RSVP</TableCell>
+              <TableCell align="right" sx={{ minWidth: 120 }}>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {events.map((event) => {
-              const stats = eventStats[event.id] || { rsvpCount: 0, attendanceCount: 0, hasRsvpForm: false, hasAttendanceForm: false };
+              const stats = eventStats[event.id] || { rsvpCount: 0, attendanceCount: 0, memberRsvpCount: 0, hasRsvpForm: false, hasAttendanceForm: false, hasMemberRsvpForm: false };
               
               return (
                 <TableRow key={event.id}>
@@ -434,6 +445,39 @@ export default function EventManagement() {
                       )}
                     </Stack>
                   </TableCell>
+                  <TableCell>
+                    <Stack spacing={1} alignItems="flex-start">
+                      {event.memberRsvpUrl ? (
+                        <>
+                          <Stack direction="row" spacing={1} alignItems="center">
+                            <Chip 
+                              label={`${stats.memberRsvpCount} RSVPs`} 
+                              size="small" 
+                              color="secondary" 
+                              variant="outlined"
+                            />
+                            <Button
+                              size="small"
+                              variant="text"
+                              onClick={() => window.open(event.memberRsvpUrl, '_blank')}
+                            >
+                              View Form
+                            </Button>
+                          </Stack>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            disabled={syncLoading[`${event.id}-member-rsvp`]}
+                            onClick={() => syncMemberRSVP(event.id)}
+                          >
+                            {syncLoading[`${event.id}-member-rsvp`] ? <CircularProgress size={16} /> : 'Sync'}
+                          </Button>
+                        </>
+                      ) : (
+                        <Typography variant="body2" color="text.secondary">No Form</Typography>
+                      )}
+                    </Stack>
+                  </TableCell>
                   <TableCell align="right">
                     <Stack direction="row" spacing={1}>
                       <IconButton
@@ -444,14 +488,6 @@ export default function EventManagement() {
                       >
                         <PencilIcon style={{ width: '1rem', height: '1rem' }} />
                       </IconButton>
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        color="primary"
-                        onClick={() => openTestEmailDialog(event)}
-                      >
-                        Test Email
-                      </Button>
                       <IconButton
                         size="small"
                         color="error"
@@ -468,6 +504,7 @@ export default function EventManagement() {
           </TableBody>
         </Table>
       </TableContainer>
+      </Box>
 
       <Dialog open={createOpen} onClose={() => setCreateOpen(false)} fullWidth maxWidth="md">
         <DialogTitle>Create New Event</DialogTitle>
@@ -682,55 +719,6 @@ export default function EventManagement() {
         </DialogActions>
       </Dialog>
 
-      {/* Test Email Notification Dialog */}
-      <Dialog open={testEmailOpen} onClose={() => setTestEmailOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>Test Email Notification</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} mt={1}>
-            <Typography variant="body2" color="text.secondary">
-              Test email notification for: <strong>{selectedEvent?.eventName}</strong>
-            </Typography>
-            
-            <TextField
-              label="Candidate Email"
-              type="email"
-              value={testEmailForm.candidateEmail}
-              onChange={(e) => setTestEmailForm({ ...testEmailForm, candidateEmail: e.target.value })}
-              fullWidth
-              required
-              placeholder="candidate@example.com"
-              helperText="Enter the email address of a candidate to test the notification"
-            />
-
-            <TextField
-              label="Notification Type"
-              select
-              value={testEmailForm.type}
-              onChange={(e) => setTestEmailForm({ ...testEmailForm, type: e.target.value })}
-              fullWidth
-              required
-            >
-              <MenuItem value="rsvp">RSVP Confirmation</MenuItem>
-              <MenuItem value="attendance">Attendance Confirmation</MenuItem>
-            </TextField>
-
-            <Alert severity="info">
-              This will send a test email notification to verify that the email system is working correctly.
-              Make sure the candidate email exists in the system.
-            </Alert>
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setTestEmailOpen(false)}>Cancel</Button>
-          <Button 
-            onClick={testEmailNotification} 
-            variant="contained"
-            disabled={emailTestLoading}
-          >
-            {emailTestLoading ? <CircularProgress size={20} /> : 'Send Test Email'}
-          </Button>
-        </DialogActions>
-      </Dialog>
     </Box>
   );
 }
