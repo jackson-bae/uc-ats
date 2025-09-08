@@ -9,9 +9,10 @@ server/.env
 .vscode/
 .env
 .env.example
-.google-cloud-key.json
-form-config.json
+server/google-cloud-key.json
+server/form-config.json
 
 
 
-google-cloud-key.jsonnode_modules/
+server/google-cloud-key.json
+
