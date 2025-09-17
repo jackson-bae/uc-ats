@@ -748,25 +748,15 @@ router.get('/:id/grades/average', requireAuth, async (req, res) => {
     let overallAverage = allGradeValues.length > 0 ? 
       (allGradeValues.reduce((a, b) => a + b, 0) / allGradeValues.length) : 0;
 
-    // Check if candidate has a referral and add 5 points bonus
+    // Get application for candidate ID
     const application = await prisma.application.findUnique({
       where: { id: applicationId },
-      select: { candidateId: true }
+      select: { candidateId: true, studentId: true }
     });
 
-    let referralBonus = 0;
     let eventPointsContribution = 0;
     
     if (application && application.candidateId) {
-      // Check for referral
-      const referral = await prisma.referral.findFirst({
-        where: { candidateId: application.candidateId }
-      });
-      if (referral) {
-        referralBonus = 5;
-        overallAverage += referralBonus;
-      }
-
       // Calculate event points contribution (raw points, not scaled)
       const eventAttendance = await prisma.eventAttendance.findMany({
         where: { candidateId: application.candidateId },
@@ -799,7 +789,7 @@ router.get('/:id/grades/average', requireAuth, async (req, res) => {
       cover_letter: parseFloat(avgCoverLetter.toFixed(2)),
       total: parseFloat(overallAverage.toFixed(2)),
       count: grades.length,
-      referralBonus: referralBonus,
+      referralBonus: 0, // Referrals no longer contribute to overall score
       eventPointsContribution: parseFloat(eventPointsContribution.toFixed(2))
     };
 

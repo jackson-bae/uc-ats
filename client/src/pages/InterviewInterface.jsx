@@ -66,6 +66,9 @@ export default function InterviewInterface() {
         console.log('Loading interview details...');
         const interviewRes = await apiClient.get(`/admin/interviews/${interviewId}`);
         console.log('Interview data loaded:', interviewRes);
+        console.log('Interview type from API:', interviewRes.interviewType);
+        console.log('Is this supposed to be ROUND_ONE?', interviewRes.interviewType === 'ROUND_ONE');
+        console.log('=== THIS IS THE ADMIN INTERVIEW INTERFACE ===');
         setInterview(interviewRes);
         
         // Load applications for selected groups

@@ -141,9 +141,26 @@ export default function AdminAssignedInterviews() {
   const handleStartWithSelectedGroups = () => {
     if (selectedGroups.length === 0) return;
     
-    // Navigate to interview interface with selected groups
     const groupIdsParam = selectedGroups.join(',');
-    navigate(`/admin/interview-interface?interviewId=${selectedInterviewForStart}&groupIds=${groupIdsParam}`);
+    const interview = interviews.find(i => i.id === selectedInterviewForStart);
+    
+    console.log('Admin - Interview found:', interview);
+    console.log('Admin - Interview type:', interview?.interviewType);
+    console.log('Admin - Is ROUND_ONE?', interview?.interviewType === 'ROUND_ONE');
+    
+    // Route to appropriate interface based on interview type
+    if (interview?.interviewType === 'ROUND_ONE') {
+      console.log('Admin - Routing to first round interview interface');
+      const url = `/member/first-round-interview?interviewId=${selectedInterviewForStart}&groupIds=${groupIdsParam}`;
+      console.log('Admin - Navigating to:', url);
+      navigate(url);
+    } else {
+      console.log('Admin - Routing to regular interview interface');
+      const url = `/admin/interview-interface?interviewId=${selectedInterviewForStart}&groupIds=${groupIdsParam}`;
+      console.log('Admin - Navigating to:', url);
+      navigate(url);
+    }
+    
     setGroupSelectionOpen(false);
     setSelectedInterviewForStart(null);
     setSelectedGroups([]);

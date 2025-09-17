@@ -1848,6 +1848,7 @@ router.get('/applications', async (req, res) => {
         gpa: app.cumulativeGpa?.toString() || 'N/A',
         status: app.status || 'SUBMITTED',
         approved: app.approved, // Add approved field for decision status
+        currentRound: app.currentRound, // Add currentRound field for round filtering
         email: app.email,
         submittedAt: app.submittedAt,
         gender: app.gender || 'N/A',
@@ -2067,7 +2068,8 @@ router.get('/staging/candidates', async (req, res) => {
                   }
                 }
               }
-            }
+            },
+            referrals: true
           }
         }
       },
@@ -2093,14 +2095,6 @@ router.get('/staging/candidates', async (req, res) => {
       let overallScore = [avgResume, avgCoverLetter, avgVideo]
         .filter(score => score > 0)
         .reduce((a, b) => a + b, 0) / 3;
-
-      // Add referral bonus if candidate has a referral
-      const referral = await prisma.referral.findFirst({
-        where: { candidateId: app.candidateId }
-      });
-      if (referral) {
-        overallScore += 5;
-      }
 
       // Add event points contribution (raw points, not scaled)
       const eventAttendance = await prisma.eventAttendance.findMany({
@@ -2194,6 +2188,8 @@ router.get('/staging/candidates', async (req, res) => {
           final: app.status === 'ACCEPTED' ? 'ACCEPT' : 
                  app.status === 'REJECTED' ? 'REJECT' : null
         },
+        hasReferral: app.candidate.referrals && app.candidate.referrals.length > 0,
+        referral: app.candidate.referrals && app.candidate.referrals.length > 0 ? app.candidate.referrals[0] : null,
         notes: ''
       };
     }));
@@ -2603,17 +2599,103 @@ router.get('/interviews/:id/applications', async (req, res) => {
   }
 });
 
+// Get evaluations for current admin user
+router.get('/evaluations', async (req, res) => {
+  try {
+    const { interviewId } = req.query;
+    const userId = req.user.id;
+    
+    if (!interviewId) {
+      return res.status(400).json({ error: 'Interview ID is required' });
+    }
+    
+    // Check if this is a first round interview
+    const interview = await prisma.interview.findUnique({
+      where: { id: interviewId }
+    });
+    
+    if (!interview) {
+      return res.status(404).json({ error: 'Interview not found' });
+    }
+    
+    let evaluations = [];
+    
+    if (interview.interviewType === 'ROUND_ONE') {
+      // Get first round evaluations
+      evaluations = await prisma.firstRoundInterviewEvaluation.findMany({
+        where: {
+          interviewId,
+          evaluatorId: userId
+        },
+        include: {
+          application: {
+            include: {
+              candidate: true
+            }
+          }
+        }
+      });
+    } else {
+      // Get regular evaluations
+      evaluations = await prisma.interviewEvaluation.findMany({
+        where: {
+          interviewId,
+          evaluatorId: userId
+        },
+        include: {
+          application: {
+            include: {
+              candidate: true
+            }
+          }
+        }
+      });
+    }
+    
+    res.json(evaluations);
+  } catch (error) {
+    console.error('[GET /api/admin/evaluations]', error);
+    res.status(500).json({ error: 'Failed to fetch evaluations' });
+  }
+});
+
 // Get interview evaluations
 router.get('/interviews/:id/evaluations', async (req, res) => {
   try {
     const { id: interviewId } = req.params;
     
-    const evaluations = await prisma.interviewEvaluation.findMany({
-      where: { interviewId },
-      include: {
-        rubricScores: true
-      }
+    // Check if this is a first round interview
+    const interview = await prisma.interview.findUnique({
+      where: { id: interviewId }
     });
+    
+    if (!interview) {
+      return res.status(404).json({ error: 'Interview not found' });
+    }
+    
+    let evaluations = [];
+    
+    if (interview.interviewType === 'ROUND_ONE') {
+      // Get first round evaluations
+      evaluations = await prisma.firstRoundInterviewEvaluation.findMany({
+        where: { interviewId },
+        include: {
+          application: {
+            include: {
+              candidate: true
+            }
+          }
+        }
+      });
+    } else {
+      // Get regular evaluations
+      evaluations = await prisma.interviewEvaluation.findMany({
+        where: { interviewId },
+        include: {
+          rubricScores: true
+        }
+      });
+    }
     
     res.json(evaluations);
   } catch (error) {
@@ -2626,7 +2708,24 @@ router.get('/interviews/:id/evaluations', async (req, res) => {
 router.post('/interviews/:id/evaluations', async (req, res) => {
   try {
     const { id: interviewId } = req.params;
-    const { applicationId, notes, decision, rubricScores } = req.body;
+    const { 
+      applicationId, 
+      notes, 
+      decision, 
+      rubricScores,
+      // First round interview specific fields
+      behavioralLeadership,
+      behavioralProblemSolving,
+      behavioralInterest,
+      behavioralTotal,
+      marketSizingTeamwork,
+      marketSizingLogic,
+      marketSizingCreativity,
+      marketSizingTotal,
+      behavioralNotes,
+      marketSizingNotes,
+      additionalNotes
+    } = req.body;
     const evaluatorId = req.user.id;
     
     console.log('Creating evaluation:', { interviewId, applicationId, evaluatorId, decision, rubricScores });
@@ -2636,75 +2735,131 @@ router.post('/interviews/:id/evaluations', async (req, res) => {
       return res.status(400).json({ error: 'Application ID is required' });
     }
     
-    // Check if evaluation already exists
-    const existingEvaluation = await prisma.interviewEvaluation.findFirst({
-      where: {
-        interviewId,
-        applicationId,
-        evaluatorId
-      },
-      include: {
-        rubricScores: true
-      }
+    // Check if this is a first round interview
+    const interview = await prisma.interview.findUnique({
+      where: { id: interviewId }
     });
     
-    if (existingEvaluation) {
-      // Update existing evaluation
-      const updatedEvaluation = await prisma.interviewEvaluation.update({
-        where: { id: existingEvaluation.id },
-        data: {
-          notes,
-          decision
-        }
-      });
-      
-      // Update rubric scores
-      if (rubricScores) {
-        for (const [category, score] of Object.entries(rubricScores)) {
-          await prisma.interviewRubricScore.upsert({
-            where: {
-              evaluationId_category: {
-                evaluationId: existingEvaluation.id,
-                category
-              }
-            },
-            update: { score },
-            create: {
-              evaluationId: existingEvaluation.id,
-              category,
-              score
-            }
-          });
-        }
-      }
-      
-      res.json(updatedEvaluation);
-    } else {
-      // Create new evaluation
-      const newEvaluation = await prisma.interviewEvaluation.create({
-        data: {
+    if (!interview) {
+      return res.status(404).json({ error: 'Interview not found' });
+    }
+    
+    // Handle first round interviews with dedicated table
+    if (interview.interviewType === 'ROUND_ONE') {
+      // Check if first round evaluation already exists
+      const existingFirstRoundEvaluation = await prisma.firstRoundInterviewEvaluation.findFirst({
+        where: {
           interviewId,
           applicationId,
-          evaluatorId,
-          notes,
-          decision
+          evaluatorId
         }
       });
       
-      // Create rubric scores
-      if (rubricScores) {
-        for (const [category, score] of Object.entries(rubricScores)) {
-          await prisma.interviewRubricScore.create({
-            data: {
-              evaluationId: newEvaluation.id,
-              category,
-              score
-            }
-          });
-        }
+      const firstRoundData = {
+        interviewId,
+        applicationId,
+        evaluatorId,
+        decision,
+        behavioralLeadership,
+        behavioralProblemSolving,
+        behavioralInterest,
+        behavioralTotal,
+        marketSizingTeamwork,
+        marketSizingLogic,
+        marketSizingCreativity,
+        marketSizingTotal,
+        behavioralNotes,
+        marketSizingNotes,
+        additionalNotes,
+        updatedAt: new Date()
+      };
+      
+      let evaluation;
+      if (existingFirstRoundEvaluation) {
+        // Update existing first round evaluation
+        evaluation = await prisma.firstRoundInterviewEvaluation.update({
+          where: { id: existingFirstRoundEvaluation.id },
+          data: firstRoundData
+        });
+      } else {
+        // Create new first round evaluation
+        evaluation = await prisma.firstRoundInterviewEvaluation.create({
+          data: firstRoundData
+        });
       }
       
-      res.json(newEvaluation);
+      res.json(evaluation);
+    } else {
+      // Handle regular interviews with standard evaluation table
+      const existingEvaluation = await prisma.interviewEvaluation.findFirst({
+        where: {
+          interviewId,
+          applicationId,
+          evaluatorId
+        },
+        include: {
+          rubricScores: true
+        }
+      });
+      
+      if (existingEvaluation) {
+        // Update existing evaluation
+        const updatedEvaluation = await prisma.interviewEvaluation.update({
+          where: { id: existingEvaluation.id },
+          data: {
+            notes,
+            decision
+          }
+        });
+        
+        // Update rubric scores
+        if (rubricScores) {
+          for (const [category, score] of Object.entries(rubricScores)) {
+            await prisma.interviewRubricScore.upsert({
+              where: {
+                evaluationId_category: {
+                  evaluationId: existingEvaluation.id,
+                  category
+                }
+              },
+              update: { score },
+              create: {
+                evaluationId: existingEvaluation.id,
+                category,
+                score
+              }
+            });
+          }
+        }
+        
+        res.json(updatedEvaluation);
+      } else {
+        // Create new evaluation
+        const newEvaluation = await prisma.interviewEvaluation.create({
+          data: {
+            interviewId,
+            applicationId,
+            evaluatorId,
+            notes,
+            decision
+          }
+        });
+        
+        // Create rubric scores
+        if (rubricScores) {
+          for (const [category, score] of Object.entries(rubricScores)) {
+            await prisma.interviewRubricScore.create({
+              data: {
+                evaluationId: newEvaluation.id,
+                category,
+                score
+              }
+            });
+          }
+        }
+        
+        res.json(newEvaluation);
+      }
     }
   } catch (error) {
     console.error('[POST /api/admin/interviews/:id/evaluations]', error);
@@ -2918,42 +3073,25 @@ router.post('/process-coffee-decisions', async (req, res) => {
             });
           }
         } else if (decision === 'no') {
-          // Reject
+          // Keep in Coffee Chat round but reset decision for reconsideration
           await prisma.application.update({
             where: { id: application.id },
             data: {
-              status: 'REJECTED',
+              status: 'UNDER_REVIEW',
               currentRound: '2',
-              approved: false
+              approved: null // reset for reconsideration
             }
           });
 
-          const emailResult = await sendCoffeeChatRejectionEmail(
-            application.email,
-            `${application.firstName} ${application.lastName}`,
-            active.name
-          );
-
-          if (emailResult.success) {
-            results.emailsSent++;
-            results.rejected.push({
-              applicationId: application.id,
-              candidateId: application.candidate.id,
-              candidateName: `${application.firstName} ${application.lastName}`,
-              email: application.email,
-              emailSent: true
-            });
-          } else {
-            results.emailsFailed++;
-            results.rejected.push({
-              applicationId: application.id,
-              candidateId: application.candidate.id,
-              candidateName: `${application.firstName} ${application.lastName}`,
-              email: application.email,
-              emailSent: false,
-              emailError: emailResult.error
-            });
-          }
+          // Don't send rejection email - they remain in the process for reconsideration
+          results.rejected.push({
+            applicationId: application.id,
+            candidateId: application.candidate.id,
+            candidateName: `${application.firstName} ${application.lastName}`,
+            email: application.email,
+            emailSent: false,
+            note: 'Remains in Coffee Chat for reconsideration'
+          });
         }
       } catch (error) {
         console.error(`Error processing coffee chat application ${application.id}:`, error);
@@ -2977,11 +3115,183 @@ router.post('/process-coffee-decisions', async (req, res) => {
         emailsSent: results.emailsSent,
         emailsFailed: results.emailsFailed
       },
-      note: 'Accepted candidates moved to First Round Interviews (round 3). Rejected candidates remain in Coffee Chats (round 2).'
+      note: 'Accepted candidates moved to First Round Interviews (round 3). "No" candidates remain in Coffee Chats (round 2) for reconsideration.'
     });
   } catch (error) {
     console.error('[POST /api/admin/process-coffee-decisions]', error);
     res.status(500).json({ error: 'Failed to process coffee chat decisions', details: error.message });
+  }
+});
+
+// Process First Round decisions with emails and advancement to Final Round
+router.post('/process-first-round-decisions', async (req, res) => {
+  try {
+    console.log('Starting first round decision processing...');
+
+    const active = await prisma.recruitingCycle.findFirst({ where: { isActive: true } });
+    if (!active) {
+      return res.status(400).json({ error: 'No active recruiting cycle' });
+    }
+
+    console.log('Active cycle:', active.name);
+
+    // Get applications in First Round (currentRound = '3') with clear decisions only
+    const allApplications = await prisma.application.findMany({
+      where: {
+        cycleId: active.id,
+        currentRound: '3'
+      },
+      include: {
+        candidate: true
+      }
+    });
+
+    // Filter to only applications with clear Yes/No decisions (approved field is true or false)
+    const applications = allApplications.filter(app => app.approved === true || app.approved === false);
+
+    console.log('Total first round applications:', allApplications.length);
+    console.log('First round applications with clear decisions:', applications.length);
+
+    if (applications.length === 0) {
+      const unclearDecisions = allApplications.filter(app => app.approved === null || (app.approved !== true && app.approved !== false));
+      return res.status(400).json({ 
+        error: 'No applications with clear decisions found in First Round.',
+        details: `${unclearDecisions.length} applications have unclear decisions (Maybe/Unsure) and cannot be processed.`
+      });
+    }
+
+    let sendFirstRoundAcceptanceEmail, sendFirstRoundRejectionEmail;
+    try {
+      const emailModule = await import('../services/emailNotifications.js');
+      sendFirstRoundAcceptanceEmail = emailModule.sendFirstRoundAcceptanceEmail;
+      sendFirstRoundRejectionEmail = emailModule.sendFirstRoundRejectionEmail;
+      if (typeof sendFirstRoundAcceptanceEmail !== 'function' || typeof sendFirstRoundRejectionEmail !== 'function') {
+        throw new Error('First round email service functions not found');
+      }
+    } catch (importError) {
+      console.error('Failed to import first round email services:', importError);
+      return res.status(500).json({ 
+        error: 'Failed to import first round email services', 
+        details: importError.message 
+      });
+    }
+
+    const results = {
+      accepted: [],
+      rejected: [],
+      errors: [],
+      emailsSent: 0,
+      emailsFailed: 0
+    };
+
+    for (const application of applications) {
+      try {
+        if (!application.candidate) {
+          results.errors.push({
+            applicationId: application.id,
+            candidateName: `${application.firstName} ${application.lastName}`,
+            error: 'No candidate associated with application'
+          });
+          continue;
+        }
+
+        // Decision from approved field (we already filtered for clear decisions)
+        const decision = application.approved === true ? 'yes' : 'no';
+
+        if (decision === 'yes') {
+          // Advance to Final Round (round 4) but keep the decision in First Round
+          const updatedApp = await prisma.application.update({
+            where: { id: application.id },
+            data: {
+              status: 'UNDER_REVIEW',
+              currentRound: '4'
+              // Don't reset approved - keep the "Yes" decision visible in First Round tab
+            }
+          });
+
+          let emailResult;
+          try {
+            emailResult = await sendFirstRoundAcceptanceEmail(
+              application.email,
+              `${application.firstName} ${application.lastName}`,
+              active.name
+            );
+          } catch (emailError) {
+            console.error(`Error sending first round acceptance email to ${application.email}:`, emailError);
+            emailResult = { success: false, error: emailError.message };
+          }
+
+          if (emailResult.success) {
+            results.emailsSent++;
+            results.accepted.push({
+              applicationId: application.id,
+              candidateId: application.candidate.id,
+              candidateName: `${application.firstName} ${application.lastName}`,
+              email: application.email,
+              emailSent: true
+            });
+          } else {
+            results.emailsFailed++;
+            results.accepted.push({
+              applicationId: application.id,
+              candidateId: application.candidate.id,
+              candidateName: `${application.firstName} ${application.lastName}`,
+              email: application.email,
+              emailSent: false,
+              emailError: emailResult.error
+            });
+          }
+
+        } else {
+          // Keep in First Round but reset decision for reconsideration
+          await prisma.application.update({
+            where: { id: application.id },
+            data: {
+              status: 'UNDER_REVIEW',
+              currentRound: '3',
+              approved: null // reset for reconsideration
+            }
+          });
+
+          // Don't send rejection email - they remain in the process for reconsideration
+          results.rejected.push({
+            applicationId: application.id,
+            candidateId: application.candidate.id,
+            candidateName: `${application.firstName} ${application.lastName}`,
+            email: application.email,
+            emailSent: false,
+            note: 'Remains in First Round for reconsideration'
+          });
+        }
+
+      } catch (error) {
+        console.error(`Error processing application ${application.id}:`, error);
+        results.errors.push({
+          applicationId: application.id,
+          candidateId: application.candidate?.id,
+          candidateName: `${application.firstName} ${application.lastName}`,
+          error: error.message
+        });
+      }
+    }
+
+    console.log('First round decision processing completed:', results);
+
+    res.json({
+      success: true,
+      summary: {
+        totalApplications: applications.length,
+        accepted: results.accepted.length,
+        rejected: results.rejected.length,
+        errors: results.errors.length,
+        emailsSent: results.emailsSent,
+        emailsFailed: results.emailsFailed
+      },
+      note: 'Accepted candidates moved to Final Round (round 4) and remain visible in First Round with "Yes" decision. "No" candidates remain in First Round (round 3) for reconsideration.'
+    });
+  } catch (error) {
+    console.error('[POST /api/admin/process-first-round-decisions]', error);
+    res.status(500).json({ error: 'Failed to process first round decisions', details: error.message });
   }
 });
 

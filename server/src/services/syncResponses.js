@@ -78,6 +78,7 @@ export default async function syncFormResponses() {
         const dataToCreate = {
           ...dbRecord,
           candidateId: candidate.id,
+          currentRound: '1', // Set to Resume Review round for new applications
           ...(activeCycle ? { cycleId: activeCycle.id } : {})
         };
         

@@ -39,7 +39,9 @@ export default function FirstRoundInterviewInterface() {
     const loadData = async () => {
       try {
         setLoading(true);
+        console.log('=== FIRST ROUND INTERVIEW INTERFACE LOADING ===');
         console.log('Loading first round interview data for:', { interviewId, groupIds });
+        console.log('Current URL:', window.location.href);
         
         if (!interviewId) {
           throw new Error('No interview ID provided');
@@ -51,22 +53,39 @@ export default function FirstRoundInterviewInterface() {
           return;
         }
         
-        // Load current user
+        // Load current user (try both admin and member endpoints)
         console.log('Loading current user...');
-        const userRes = await apiClient.get('/member/profile');
-        console.log('Current user:', userRes);
+        let userRes;
+        let isAdmin = false;
+        try {
+          userRes = await apiClient.get('/admin/profile');
+          isAdmin = true;
+          console.log('Current user (admin):', userRes);
+        } catch (adminError) {
+          try {
+            userRes = await apiClient.get('/member/profile');
+            isAdmin = false;
+            console.log('Current user (member):', userRes);
+          } catch (memberError) {
+            throw new Error('Failed to load user profile');
+          }
+        }
         setCurrentUser(userRes);
         
         // Load interview details
         console.log('Loading interview details...');
-        const interviewRes = await apiClient.get(`/member/interviews/${interviewId}`);
+        const interviewRes = isAdmin 
+          ? await apiClient.get(`/admin/interviews/${interviewId}`)
+          : await apiClient.get(`/member/interviews/${interviewId}`);
         console.log('Interview data loaded:', interviewRes);
         setInterview(interviewRes);
         
         // Load applications for selected groups
         console.log('Loading applications for groups:', groupIds);
         try {
-          const applicationsRes = await apiClient.get(`/member/interviews/${interviewId}/applications?groupIds=${groupIds.join(',')}`);
+          const applicationsRes = isAdmin
+            ? await apiClient.get(`/admin/interviews/${interviewId}/applications?groupIds=${groupIds.join(',')}`)
+            : await apiClient.get(`/member/interviews/${interviewId}/applications?groupIds=${groupIds.join(',')}`);
           console.log('Applications loaded:', applicationsRes);
           setApplications(applicationsRes);
         } catch (appError) {
@@ -77,7 +96,9 @@ export default function FirstRoundInterviewInterface() {
         // Load existing evaluations
         console.log('Loading existing evaluations...');
         try {
-          const evaluationsRes = await apiClient.get(`/member/evaluations?interviewId=${interviewId}`);
+          const evaluationsRes = isAdmin
+            ? await apiClient.get(`/admin/evaluations?interviewId=${interviewId}`)
+            : await apiClient.get(`/member/evaluations?interviewId=${interviewId}`);
           console.log('Evaluations loaded:', evaluationsRes);
           
           const evaluationsObj = {};
@@ -110,34 +131,20 @@ export default function FirstRoundInterviewInterface() {
   const getEvaluation = (applicationId) => {
     const evaluation = evaluations[applicationId] || {};
     
-    // Try to parse first round data from notes field
-    let firstRoundData = {};
-    if (evaluation.notes) {
-      try {
-        const parsed = JSON.parse(evaluation.notes);
-        if (parsed.basicNotes !== undefined) {
-          // This is first round data stored in notes
-          firstRoundData = parsed;
-        }
-      } catch (e) {
-        // Not JSON, treat as regular notes
-      }
-    }
-    
     return {
-      notes: firstRoundData.basicNotes || evaluation.notes || '',
+      notes: evaluation.notes || '',
       decision: evaluation.decision || null,
-      behavioralLeadership: firstRoundData.behavioralLeadership || null,
-      behavioralProblemSolving: firstRoundData.behavioralProblemSolving || null,
-      behavioralInterest: firstRoundData.behavioralInterest || null,
-      behavioralTotal: firstRoundData.behavioralTotal || null,
-      marketSizingTeamwork: firstRoundData.marketSizingTeamwork || null,
-      marketSizingLogic: firstRoundData.marketSizingLogic || null,
-      marketSizingCreativity: firstRoundData.marketSizingCreativity || null,
-      marketSizingTotal: firstRoundData.marketSizingTotal || null,
-      behavioralNotes: firstRoundData.behavioralNotes || '',
-      marketSizingNotes: firstRoundData.marketSizingNotes || '',
-      additionalNotes: firstRoundData.additionalNotes || ''
+      behavioralLeadership: evaluation.behavioralLeadership || null,
+      behavioralProblemSolving: evaluation.behavioralProblemSolving || null,
+      behavioralInterest: evaluation.behavioralInterest || null,
+      behavioralTotal: evaluation.behavioralTotal || null,
+      marketSizingTeamwork: evaluation.marketSizingTeamwork || null,
+      marketSizingLogic: evaluation.marketSizingLogic || null,
+      marketSizingCreativity: evaluation.marketSizingCreativity || null,
+      marketSizingTotal: evaluation.marketSizingTotal || null,
+      behavioralNotes: evaluation.behavioralNotes || '',
+      marketSizingNotes: evaluation.marketSizingNotes || '',
+      additionalNotes: evaluation.additionalNotes || ''
     };
   };
 
@@ -203,11 +210,26 @@ export default function FirstRoundInterviewInterface() {
     try {
       const evaluation = getEvaluation(applicationId);
       
-      await apiClient.post('/member/evaluations', {
+      // Determine if user is admin or member based on current user data
+      const isAdmin = currentUser?.role === 'ADMIN';
+      const endpoint = isAdmin ? `/admin/interviews/${interviewId}/evaluations` : '/member/evaluations';
+      
+      await apiClient.post(endpoint, {
         interviewId,
         applicationId,
-        ...evaluation,
-        evaluatorId: currentUser.id
+        decision: evaluation.decision,
+        notes: evaluation.notes,
+        behavioralLeadership: evaluation.behavioralLeadership,
+        behavioralProblemSolving: evaluation.behavioralProblemSolving,
+        behavioralInterest: evaluation.behavioralInterest,
+        behavioralTotal: evaluation.behavioralTotal,
+        marketSizingTeamwork: evaluation.marketSizingTeamwork,
+        marketSizingLogic: evaluation.marketSizingLogic,
+        marketSizingCreativity: evaluation.marketSizingCreativity,
+        marketSizingTotal: evaluation.marketSizingTotal,
+        behavioralNotes: evaluation.behavioralNotes,
+        marketSizingNotes: evaluation.marketSizingNotes,
+        additionalNotes: evaluation.additionalNotes
       });
       
       // Auto-save completed successfully - no visual feedback needed
@@ -225,11 +247,26 @@ export default function FirstRoundInterviewInterface() {
       setSaving(true);
       const evaluation = getEvaluation(applicationId);
       
-      await apiClient.post('/member/evaluations', {
+      // Determine if user is admin or member based on current user data
+      const isAdmin = currentUser?.role === 'ADMIN';
+      const endpoint = isAdmin ? `/admin/interviews/${interviewId}/evaluations` : '/member/evaluations';
+      
+      await apiClient.post(endpoint, {
         interviewId,
         applicationId,
-        ...evaluation,
-        evaluatorId: currentUser.id
+        decision: evaluation.decision,
+        notes: evaluation.notes,
+        behavioralLeadership: evaluation.behavioralLeadership,
+        behavioralProblemSolving: evaluation.behavioralProblemSolving,
+        behavioralInterest: evaluation.behavioralInterest,
+        behavioralTotal: evaluation.behavioralTotal,
+        marketSizingTeamwork: evaluation.marketSizingTeamwork,
+        marketSizingLogic: evaluation.marketSizingLogic,
+        marketSizingCreativity: evaluation.marketSizingCreativity,
+        marketSizingTotal: evaluation.marketSizingTotal,
+        behavioralNotes: evaluation.behavioralNotes,
+        marketSizingNotes: evaluation.marketSizingNotes,
+        additionalNotes: evaluation.additionalNotes
       });
       
       alert('Evaluation saved successfully');
@@ -244,13 +281,29 @@ export default function FirstRoundInterviewInterface() {
   const saveAllEvaluations = async () => {
     try {
       setSaving(true);
+      
+      // Determine if user is admin or member based on current user data
+      const isAdmin = currentUser?.role === 'ADMIN';
+      const endpoint = isAdmin ? `/admin/interviews/${interviewId}/evaluations` : '/member/evaluations';
+      
       const promises = applications.map(app => {
         const evaluation = getEvaluation(app.id);
-        return apiClient.post('/member/evaluations', {
+        return apiClient.post(endpoint, {
           interviewId,
           applicationId: app.id,
-          ...evaluation,
-          evaluatorId: currentUser.id
+          decision: evaluation.decision,
+          notes: evaluation.notes,
+          behavioralLeadership: evaluation.behavioralLeadership,
+          behavioralProblemSolving: evaluation.behavioralProblemSolving,
+          behavioralInterest: evaluation.behavioralInterest,
+          behavioralTotal: evaluation.behavioralTotal,
+          marketSizingTeamwork: evaluation.marketSizingTeamwork,
+          marketSizingLogic: evaluation.marketSizingLogic,
+          marketSizingCreativity: evaluation.marketSizingCreativity,
+          marketSizingTotal: evaluation.marketSizingTotal,
+          behavioralNotes: evaluation.behavioralNotes,
+          marketSizingNotes: evaluation.marketSizingNotes,
+          additionalNotes: evaluation.additionalNotes
         });
       });
       
@@ -578,7 +631,7 @@ export default function FirstRoundInterviewInterface() {
 
                     {/* Decision Section */}
                     <div className="decision-section">
-                      <h4 className="section-title">Final Decision</h4>
+                      <h4 className="section-title">Initial Decision</h4>
                       <div className="decision-buttons">
                         {decisionOptions.map((option) => (
                           <button

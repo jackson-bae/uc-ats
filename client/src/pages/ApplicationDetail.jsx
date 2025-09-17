@@ -173,10 +173,6 @@ export default function ApplicationDetail() {
     
     let overallAvg = averages.length > 0 ? averages.reduce((sum, avg) => sum + avg, 0) / averages.length : 0;
     
-    // Add referral bonus if referral exists
-    const referralBonus = referral ? 5 : 0;
-    overallAvg += referralBonus;
-    
     // Add event points directly (raw points, not scaled)
     const eventPointsContribution = eventData.totalPoints || 0;
     overallAvg += eventPointsContribution;
@@ -187,7 +183,7 @@ export default function ApplicationDetail() {
       cover_letter: coverLetterAvg,
       total: overallAvg,
       count: resumeScores.length + videoScores.length + coverLetterScores.length,
-      referralBonus: referralBonus,
+      referralBonus: 0, // Referrals no longer contribute to overall score
       eventPointsContribution: eventPointsContribution
     };
     
@@ -197,7 +193,7 @@ export default function ApplicationDetail() {
       video: { avg: videoAvg, count: videoScores.length },
       cover_letter: { avg: coverLetterAvg, count: coverLetterScores.length },
       overall: overallAvg,
-      referralBonus: referralBonus,
+      referralBonus: 0,
       eventPointsContribution: eventPointsContribution,
       totalCount: result.count
     });
@@ -446,11 +442,9 @@ export default function ApplicationDetail() {
                             from {calculatedAverages.count} {calculatedAverages.count === 1 ? 'review' : 'reviews'}
                           </div>
                         )}
-                        {(calculatedAverages.referralBonus > 0 || calculatedAverages.eventPointsContribution > 0) && (
+                        {calculatedAverages.eventPointsContribution > 0 && (
                           <div className="average-grade-count" style={{ color: '#059669', fontWeight: '600' }}>
-                            {calculatedAverages.referralBonus > 0 && `+${calculatedAverages.referralBonus} referral`}
-                            {calculatedAverages.referralBonus > 0 && calculatedAverages.eventPointsContribution > 0 && ' + '}
-                            {calculatedAverages.eventPointsContribution > 0 && `+${Math.floor(calculatedAverages.eventPointsContribution / 5)} events`}
+                            +{Math.floor(calculatedAverages.eventPointsContribution / 5)} events
                           </div>
                         )}
                       </div>
@@ -1008,7 +1002,7 @@ export default function ApplicationDetail() {
             </div>
           ) : (
             <div style={{ color: '#6b7280', fontSize: '0.875rem', fontStyle: 'italic' }}>
-              No referral added yet. Adding a referral will automatically add 5 points to the overall score.
+              No referral added yet.
             </div>
           )}
         </div>
@@ -1485,17 +1479,6 @@ export default function ApplicationDetail() {
               />
             </div>
 
-            <div style={{ 
-              padding: '12px', 
-              backgroundColor: '#f0f9ff', 
-              borderRadius: '6px', 
-              marginBottom: '20px',
-              border: '1px solid #bae6fd'
-            }}>
-              <div style={{ fontSize: '0.875rem', color: '#0369a1' }}>
-                <strong>Note:</strong> Adding a referral will automatically add 5 points to the overall score.
-              </div>
-            </div>
 
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
               <button

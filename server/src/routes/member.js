@@ -474,12 +474,48 @@ router.get('/evaluations', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Interview ID is required' });
     }
     
-    const evaluations = await prisma.interviewEvaluation.findMany({
-      where: {
-        interviewId,
-        evaluatorId: userId
-      }
+    // Check if this is a first round interview
+    const interview = await prisma.interview.findUnique({
+      where: { id: interviewId }
     });
+    
+    if (!interview) {
+      return res.status(404).json({ error: 'Interview not found' });
+    }
+    
+    let evaluations = [];
+    
+    if (interview.interviewType === 'ROUND_ONE') {
+      // Get first round evaluations
+      evaluations = await prisma.firstRoundInterviewEvaluation.findMany({
+        where: {
+          interviewId,
+          evaluatorId: userId
+        },
+        include: {
+          application: {
+            include: {
+              candidate: true
+            }
+          }
+        }
+      });
+    } else {
+      // Get regular evaluations
+      evaluations = await prisma.interviewEvaluation.findMany({
+        where: {
+          interviewId,
+          evaluatorId: userId
+        },
+        include: {
+          application: {
+            include: {
+              candidate: true
+            }
+          }
+        }
+      });
+    }
     
     res.json(evaluations);
   } catch (error) {
@@ -515,33 +551,31 @@ router.post('/evaluations', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Interview ID and application ID are required' });
     }
     
-    // Check if evaluation already exists
-    const existingEvaluation = await prisma.interviewEvaluation.findFirst({
-      where: {
-        interviewId,
-        applicationId,
-        evaluatorId
-      }
+    // Check if this is a first round interview
+    const interview = await prisma.interview.findUnique({
+      where: { id: interviewId }
     });
     
-    // Prepare data object with only provided fields
-    const evaluationData = {
-      updatedAt: new Date()
-    };
+    if (!interview) {
+      return res.status(404).json({ error: 'Interview not found' });
+    }
     
-    // Add basic fields
-    if (decision !== undefined) evaluationData.decision = decision;
-    
-    // For first round interviews, store all data in notes as JSON until migration is applied
-    if (behavioralLeadership !== undefined || behavioralProblemSolving !== undefined || 
-        behavioralInterest !== undefined || marketSizingTeamwork !== undefined ||
-        marketSizingLogic !== undefined || marketSizingCreativity !== undefined ||
-        behavioralNotes !== undefined || marketSizingNotes !== undefined || 
-        additionalNotes !== undefined) {
+    // Handle first round interviews with dedicated table
+    if (interview.interviewType === 'ROUND_ONE') {
+      // Check if first round evaluation already exists
+      const existingFirstRoundEvaluation = await prisma.firstRoundInterviewEvaluation.findFirst({
+        where: {
+          interviewId,
+          applicationId,
+          evaluatorId
+        }
+      });
       
-      // Create a comprehensive notes object with all first round data
       const firstRoundData = {
-        basicNotes: notes || '',
+        interviewId,
+        applicationId,
+        evaluatorId,
+        decision,
         behavioralLeadership,
         behavioralProblemSolving,
         behavioralInterest,
@@ -552,35 +586,62 @@ router.post('/evaluations', requireAuth, async (req, res) => {
         marketSizingTotal,
         behavioralNotes,
         marketSizingNotes,
-        additionalNotes
+        additionalNotes,
+        updatedAt: new Date()
       };
       
-      evaluationData.notes = JSON.stringify(firstRoundData);
+      let evaluation;
+      if (existingFirstRoundEvaluation) {
+        // Update existing first round evaluation
+        evaluation = await prisma.firstRoundInterviewEvaluation.update({
+          where: { id: existingFirstRoundEvaluation.id },
+          data: firstRoundData
+        });
+      } else {
+        // Create new first round evaluation
+        evaluation = await prisma.firstRoundInterviewEvaluation.create({
+          data: firstRoundData
+        });
+      }
+      
+      res.json(evaluation);
     } else {
-      // Regular notes for non-first-round interviews
-      if (notes !== undefined) evaluationData.notes = notes;
-    }
-    
-    let evaluation;
-    if (existingEvaluation) {
-      // Update existing evaluation
-      evaluation = await prisma.interviewEvaluation.update({
-        where: { id: existingEvaluation.id },
-        data: evaluationData
-      });
-    } else {
-      // Create new evaluation
-      evaluation = await prisma.interviewEvaluation.create({
-        data: {
+      // Handle regular interviews with standard evaluation table
+      const existingEvaluation = await prisma.interviewEvaluation.findFirst({
+        where: {
           interviewId,
           applicationId,
-          evaluatorId,
-          ...evaluationData
+          evaluatorId
         }
       });
+      
+      const evaluationData = {
+        decision,
+        notes,
+        updatedAt: new Date()
+      };
+      
+      let evaluation;
+      if (existingEvaluation) {
+        // Update existing evaluation
+        evaluation = await prisma.interviewEvaluation.update({
+          where: { id: existingEvaluation.id },
+          data: evaluationData
+        });
+      } else {
+        // Create new evaluation
+        evaluation = await prisma.interviewEvaluation.create({
+          data: {
+            interviewId,
+            applicationId,
+            evaluatorId,
+            ...evaluationData
+          }
+        });
+      }
+      
+      res.json(evaluation);
     }
-    
-    res.json(evaluation);
   } catch (error) {
     console.error('[POST /api/member/evaluations]', error);
     res.status(500).json({ error: 'Failed to save evaluation' });

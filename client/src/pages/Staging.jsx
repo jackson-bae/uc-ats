@@ -152,6 +152,10 @@ const stagingAPI = {
     return await apiClient.post('/admin/process-coffee-decisions', {});
   },
 
+  async processFirstRoundDecisions() {
+    return await apiClient.post('/admin/process-first-round-decisions', {});
+  },
+
   async processFinalDecisions() {
     return await apiClient.post('/admin/process-final-decisions', {});
   },
@@ -476,6 +480,7 @@ export default function Staging() {
     decision: 'all',
     attendance: 'all',
     reviewTeam: 'all',
+    referral: 'all',
     search: ''
   });
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
@@ -604,11 +609,12 @@ export default function Staging() {
 
   const fetchCandidates = async () => {
     try {
-      const [data, adminApplicationsData, eventsData, reviewTeamsData] = await Promise.all([
+      const [data, adminApplicationsData, eventsData, reviewTeamsData, existingDecisionsData] = await Promise.all([
         stagingAPI.fetchCandidates(),
         stagingAPI.fetchAdminApplications(),
         stagingAPI.fetchEventAttendance(),
-        stagingAPI.fetchReviewTeams()
+        stagingAPI.fetchReviewTeams(),
+        stagingAPI.loadExistingDecisions()
       ]);
       setCandidates(data);
       setAdminApplications(adminApplicationsData || []); // Update admin applications data
@@ -617,6 +623,12 @@ export default function Staging() {
       console.log('fetchCandidates - adminApplicationsData approved=true count:', adminApplicationsData?.filter(app => app.approved === true).length);
       setEvents(eventsData || []); // Update events data
       setReviewTeams(reviewTeamsData || []); // Update review teams data
+      
+      // Update inline decisions with fresh data from database
+      if (existingDecisionsData && existingDecisionsData.decisions) {
+        setInlineDecisions(existingDecisionsData.decisions);
+      }
+      
       const gradingMap = {};
       (adminApplicationsData || []).forEach(app => {
         // Check which documents the candidate has
@@ -869,6 +881,34 @@ export default function Staging() {
     setPushAllDialogOpen(true);
   };
 
+  const openPushAllFirstRound = async () => {
+    try {
+      const firstRoundApps = (adminApplications || []).filter(app => String(app.currentRound) === '3');
+      
+      const invalidDecisions = firstRoundApps.filter(app => {
+        const decision = app.approved;
+        return decision === null || (decision !== true && decision !== false);
+      });
+
+      setPushAllPreview({
+        totalCandidates: firstRoundApps.length,
+        validDecisions: firstRoundApps.length - invalidDecisions.length,
+        invalidDecisions: invalidDecisions.length,
+        invalidCandidates: invalidDecisions.map(app => ({
+          name: `${app.firstName} ${app.lastName}`,
+          issue: app.approved === null ? 'No decision' : 'Unclear decision'
+        }))
+      });
+
+      setPushAllConfirmText('');
+      setPushAllAcknowledge(false);
+      setPushAllDialogOpen(true);
+    } catch (error) {
+      console.error('Error preparing first round push all:', error);
+      setSnackbar({ open: true, message: 'Failed to prepare first round processing', severity: 'error' });
+    }
+  };
+
   const openPushAllFinal = async () => {
     try {
       const adminCandidates = await stagingAPI.fetchAdminCandidates();
@@ -903,6 +943,8 @@ export default function Staging() {
       let result;
       if (currentTab === 1) {
         result = await stagingAPI.processCoffeeDecisions();
+      } else if (currentTab === 2) {
+        result = await stagingAPI.processFirstRoundDecisions();
       } else if (currentTab === 3) {
         result = await stagingAPI.processFinalDecisions();
       } else {
@@ -1019,11 +1061,21 @@ export default function Staging() {
       }
     }
     
+    // Referral filtering
+    let matchesReferral = true;
+    if (filters.referral !== 'all') {
+      if (filters.referral === 'yes') {
+        matchesReferral = candidate.hasReferral === true;
+      } else if (filters.referral === 'no') {
+        matchesReferral = candidate.hasReferral === false;
+      }
+    }
+    
     const matchesSearch = filters.search === '' || 
       `${candidate.firstName} ${candidate.lastName}`.toLowerCase().includes(filters.search.toLowerCase()) ||
       candidate.email.toLowerCase().includes(filters.search.toLowerCase());
 
-    return matchesStatus && matchesRound && matchesDecision && matchesAttendance && matchesReviewTeam && matchesSearch;
+    return matchesStatus && matchesRound && matchesDecision && matchesAttendance && matchesReviewTeam && matchesReferral && matchesSearch;
   });
 
   if (loading) {
@@ -1181,6 +1233,20 @@ export default function Staging() {
                   </Select>
                 </FormControl>
               </Grid>
+              <Grid item xs={12} md={2}>
+                <FormControl fullWidth>
+                  <InputLabel>Referral</InputLabel>
+                  <Select
+                    value={filters.referral}
+                    onChange={(e) => setFilters({ ...filters, referral: e.target.value })}
+                    label="Referral"
+                  >
+                    <MenuItem value="all">All Referrals</MenuItem>
+                    <MenuItem value="yes">Has Referral</MenuItem>
+                    <MenuItem value="no">No Referral</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
               <Grid item xs={12} md={1}>
                 <Stack direction="row" spacing={1}>
                   <Button
@@ -1199,6 +1265,7 @@ export default function Staging() {
                       decision: 'all',
                       attendance: 'all',
                       reviewTeam: 'all',
+                      referral: 'all',
                       search: ''
                     })}
                   >
@@ -1239,9 +1306,9 @@ export default function Staging() {
                   <TableRow>
                     <TableCell>Candidate</TableCell>
                     <TableCell>Grading Status</TableCell>
-                    <TableCell>Current Round</TableCell>
                     <TableCell>Scores</TableCell>
                     <TableCell>Review Team</TableCell>
+                    <TableCell>Referral</TableCell>
                     <TableCell>Attendance</TableCell>
                     <TableCell>Decisions</TableCell>
                   </TableRow>
@@ -1295,61 +1362,90 @@ export default function Staging() {
                         <GradingStatusDisplay candidate={candidate} gradingData={gradingCompleteByCandidate[candidate.candidateId]} />
                       </TableCell>
                       <TableCell>
-                        <Typography variant="body2" fontWeight="bold">
-                          Round {candidate.currentRound}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {parseInt(candidate.currentRound) === 1 ? 'Resume Review' : 
-                           parseInt(candidate.currentRound) === 2 ? 'Coffee Chats' : 
-                           parseInt(candidate.currentRound) === 3 ? 'First Round Interviews' : 
-                           parseInt(candidate.currentRound) === 4 ? 'Final Decision' : 
-                           `Round ${candidate.currentRound}`}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Box>
-                          <Typography variant="caption" display="block">
-                            Overall: {candidate.scores.overall}
-                          </Typography>
-                          <Typography variant="caption" display="block">
-                            Resume: {candidate.scores.resume}
-                          </Typography>
-                          <Typography variant="caption" display="block">
-                            Cover: {candidate.scores.coverLetter}
-                          </Typography>
-                          <Typography variant="caption" display="block">
-                            Video: {candidate.scores.video}
-                          </Typography>
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Box>
-                          {candidate.reviewTeam ? (
-                            <Tooltip 
-                              title={`${candidate.reviewTeam.name}
-Members: ${candidate.reviewTeam.members.map(m => m.fullName).join(', ')}`}
-                              arrow
-                            >
-                              <Box>
-                                <Typography variant="caption" fontWeight="bold" color="primary">
-                                  {candidate.reviewTeam.name}
-                                </Typography>
-                                <Typography variant="caption" display="block" color="text.secondary">
-                                  {candidate.reviewTeam.memberCount} member{candidate.reviewTeam.memberCount !== 1 ? 's' : ''}
-                                </Typography>
-                                <Typography variant="caption" display="block" color="text.secondary">
-                                  {candidate.reviewTeam.members.map(m => m.fullName.split(' ')[0]).join(', ')}
-                                </Typography>
-                              </Box>
-                            </Tooltip>
-                          ) : (
+                        <Tooltip 
+                          title={
                             <Box>
-                              <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-                                Unassigned
+                              <Typography variant="body2" fontWeight="bold" sx={{ mb: 0.5 }}>
+                                Score Breakdown:
+                              </Typography>
+                              <Typography variant="body2" display="block">
+                                Overall: {candidate.scores.overall}
+                              </Typography>
+                              <Typography variant="body2" display="block">
+                                Resume: {candidate.scores.resume}
+                              </Typography>
+                              <Typography variant="body2" display="block">
+                                Cover: {candidate.scores.coverLetter}
+                              </Typography>
+                              <Typography variant="body2" display="block">
+                                Video: {candidate.scores.video}
                               </Typography>
                             </Box>
-                          )}
-                        </Box>
+                          }
+                          arrow
+                          placement="top"
+                        >
+                          <Typography variant="body2" fontWeight="bold" sx={{ cursor: 'help' }}>
+                            {candidate.scores.overall}
+                          </Typography>
+                        </Tooltip>
+                      </TableCell>
+                      <TableCell>
+                        {candidate.reviewTeam ? (
+                          <Tooltip 
+                            title={
+                              <Box>
+                                <Typography variant="body2" fontWeight="bold" sx={{ mb: 0.5 }}>
+                                  Team Members:
+                                </Typography>
+                                {candidate.reviewTeam.members.map((member, index) => (
+                                  <Typography key={index} variant="body2" display="block">
+                                    {member.fullName}
+                                  </Typography>
+                                ))}
+                              </Box>
+                            }
+                            arrow
+                            placement="top"
+                          >
+                            <Typography variant="body2" fontWeight="bold" color="primary" sx={{ cursor: 'help' }}>
+                              {candidate.reviewTeam.name}
+                            </Typography>
+                          </Tooltip>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                            Unassigned
+                          </Typography>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {candidate.hasReferral ? (
+                          <Tooltip 
+                            title={
+                              <Box>
+                                <Typography variant="body2" fontWeight="bold" sx={{ mb: 0.5 }}>
+                                  Referral Details:
+                                </Typography>
+                                <Typography variant="body2" display="block">
+                                  Referrer: {candidate.referral.referrerName}
+                                </Typography>
+                                <Typography variant="body2" display="block">
+                                  Relationship: {candidate.referral.relationship}
+                                </Typography>
+                              </Box>
+                            }
+                            arrow
+                            placement="top"
+                          >
+                            <Typography variant="body2" fontWeight="bold" color="success.main" sx={{ cursor: 'help' }}>
+                              Yes
+                            </Typography>
+                          </Tooltip>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">
+                            No
+                          </Typography>
+                        )}
                       </TableCell>
                       <TableCell>
                         <AttendanceDisplay attendance={candidate.attendance} events={events} />
@@ -1442,7 +1538,7 @@ Members: ${candidate.reviewTeam.members.map(m => m.fullName).join(', ')}`}
             </Typography>
             <Box mb={2}>
               <Typography variant="body2" color="text.secondary">
-                ℹ️ Coffee Chat Round: Previously accepted candidates need new decisions. "Yes" advances to First Round Interviews, "No" keeps rejection status.
+                ℹ️ Coffee Chat Round: Previously accepted candidates need new decisions. "Yes" advances to First Round Interviews, "No" remains in Coffee Chats for reconsideration.
               </Typography>
               <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
                 <Button 
@@ -1681,19 +1777,20 @@ Members: ${candidate.reviewTeam.members.map(m => m.fullName).join(', ')}`}
             <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
               First Round — Applications
             </Typography>
-            <Box mb={2}>
+            <Box mb={2} display="flex" justifyContent="space-between" alignItems="center">
               <Typography variant="body2" color="text.secondary">
-                ℹ️ First Round: Coffee Chat-advanced candidates need new decisions. "Yes" advances to next round.
+                ℹ️ First Round: Coffee Chat-advanced candidates need new decisions. "Yes" advances to Final Round (stays visible here with "Yes"), "No" remains in First Round for reconsideration.
               </Typography>
-              <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-                <Button 
-                  variant="outlined" 
-                  size="small" 
-                  onClick={fetchCandidates}
-                >
-                  Refresh Data
-                </Button>
-              </Stack>
+              <Button variant="contained" color="primary" startIcon={<SkipNextIcon />} onClick={openPushAllFirstRound}>
+                Process All Decisions
+                {(() => {
+                  const firstRoundApps = (adminApplications || []).filter(app => String(app.currentRound) === '3');
+                  const invalidCount = firstRoundApps.filter(app => 
+                    app.approved === null || (app.approved !== true && app.approved !== false)
+                  ).length;
+                  return invalidCount > 0 ? ` (${invalidCount} issues)` : '';
+                })()}
+              </Button>
             </Box>
             <TableContainer>
               <Table>
