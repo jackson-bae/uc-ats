@@ -423,6 +423,105 @@ const createCoffeeChatRejectionEmail = (candidateName, currentCycleName) => {
   };
 };
 
+// First Round specific email templates
+
+// Create first round acceptance email template (advancing to final round)
+const createFirstRoundAcceptanceEmail = (candidateName, currentCycleName) => {
+  return {
+    subject: `Congratulations! You've Advanced to Final Round - ${currentCycleName}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background-color: #007bff; padding: 20px; text-align: center; color: white;">
+          <h2 style="color: white; margin: 0;">UC Consulting ATS</h2>
+        </div>
+        
+        <div style="padding: 30px 20px;">
+          <h3 style="color: #333; margin-bottom: 20px;">🎉 Congratulations! You've Advanced to Final Round!</h3>
+          
+          <p style="color: #555; line-height: 1.6; margin-bottom: 20px;">
+            Dear ${candidateName},
+          </p>
+          
+          <p style="color: #555; line-height: 1.6; margin-bottom: 20px;">
+            We are excited to inform you that you have successfully advanced to the Final Round of our recruitment process for ${currentCycleName}!
+          </p>
+          
+          <p style="color: #555; line-height: 1.6; margin-bottom: 20px;">
+            Your performance in the First Round interviews was impressive, and we look forward to learning more about you in the final stage of our selection process.
+          </p>
+          
+          <p style="color: #555; line-height: 1.6; margin-bottom: 20px;">
+            <strong>Next Steps:</strong><br>
+            • You will receive further instructions about the Final Round process<br>
+            • Please keep an eye on your email for scheduling details<br>
+            • Continue to prepare for the final stage of interviews
+          </p>
+          
+          <p style="color: #555; line-height: 1.6; margin-bottom: 20px;">
+            Congratulations on making it this far! We're excited to see what you bring to the Final Round.
+          </p>
+          
+          <p style="color: #555; line-height: 1.6; margin-bottom: 20px;">
+            Best regards,<br>
+            The UC Consulting Recruitment Team
+          </p>
+        </div>
+        
+        <div style="background-color: #f8f9fa; padding: 20px; text-align: center; color: #6c757d; font-size: 12px;">
+          <p style="margin: 0;">This is an automated message. Please do not reply to this email.</p>
+        </div>
+      </div>
+    `
+  };
+};
+
+// Create first round rejection email template
+const createFirstRoundRejectionEmail = (candidateName, currentCycleName) => {
+  return {
+    subject: `Update on Your Application - ${currentCycleName}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background-color: #dc3545; padding: 20px; text-align: center; color: white;">
+          <h2 style="color: white; margin: 0;">UC Consulting ATS</h2>
+        </div>
+        
+        <div style="padding: 30px 20px;">
+          <h3 style="color: #333; margin-bottom: 20px;">Application Update</h3>
+          
+          <p style="color: #555; line-height: 1.6; margin-bottom: 20px;">
+            Dear ${candidateName},
+          </p>
+          
+          <p style="color: #555; line-height: 1.6; margin-bottom: 20px;">
+            Thank you for your interest in joining UC Consulting and for participating in our recruitment process for ${currentCycleName}.
+          </p>
+          
+          <p style="color: #555; line-height: 1.6; margin-bottom: 20px;">
+            After careful consideration of your First Round interview performance, we have decided not to advance your application to the Final Round at this time.
+          </p>
+          
+          <p style="color: #555; line-height: 1.6; margin-bottom: 20px;">
+            This decision was not made lightly, and we appreciate the time and effort you invested in our process. We encourage you to apply again in future recruitment cycles.
+          </p>
+          
+          <p style="color: #555; line-height: 1.6; margin-bottom: 20px;">
+            We wish you the best of luck in your future endeavors.
+          </p>
+          
+          <p style="color: #555; line-height: 1.6; margin-bottom: 20px;">
+            Best regards,<br>
+            The UC Consulting Recruitment Team
+          </p>
+        </div>
+        
+        <div style="background-color: #f8f9fa; padding: 20px; text-align: center; color: #6c757d; font-size: 12px;">
+          <p style="margin: 0;">This is an automated message. Please do not reply to this email.</p>
+        </div>
+      </div>
+    `
+  };
+};
+
 // Send coffee chat acceptance email (advancing to first round)
 export const sendCoffeeChatAcceptanceEmail = async (candidateEmail, candidateName, currentCycleName) => {
   try {
@@ -571,6 +670,44 @@ const createFinalRejectionEmail = (candidateName, currentCycleName) => {
       </div>
     `
   };
+};
+
+// Send first round acceptance email (advancing to final round)
+export const sendFirstRoundAcceptanceEmail = async (candidateEmail, candidateName, currentCycleName) => {
+  try {
+    const emailContent = createFirstRoundAcceptanceEmail(candidateName, currentCycleName);
+    const result = await sendEmail(candidateEmail, emailContent.subject, emailContent.html);
+    
+    if (result.success) {
+      console.log(`First round acceptance email sent to ${candidateEmail} for cycle: ${currentCycleName}`);
+    } else {
+      console.error(`Failed to send first round acceptance email to ${candidateEmail}:`, result.error);
+    }
+    
+    return result;
+  } catch (error) {
+    console.error('Error in sendFirstRoundAcceptanceEmail:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+// Send first round rejection email
+export const sendFirstRoundRejectionEmail = async (candidateEmail, candidateName, currentCycleName) => {
+  try {
+    const emailContent = createFirstRoundRejectionEmail(candidateName, currentCycleName);
+    const result = await sendEmail(candidateEmail, emailContent.subject, emailContent.html);
+    
+    if (result.success) {
+      console.log(`First round rejection email sent to ${candidateEmail} for cycle: ${currentCycleName}`);
+    } else {
+      console.error(`Failed to send first round rejection email to ${candidateEmail}:`, result.error);
+    }
+    
+    return result;
+  } catch (error) {
+    console.error('Error in sendFirstRoundRejectionEmail:', error);
+    return { success: false, error: error.message };
+  }
 };
 
 // Send final round acceptance email

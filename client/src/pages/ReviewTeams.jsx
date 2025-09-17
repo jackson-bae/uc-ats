@@ -342,6 +342,23 @@ export default function ReviewTeams() {
     }
   };
 
+  const handleRemoveMemberFromTeam = async (teamId, memberId) => {
+    try {
+      // Call the API to remove the member
+      await apiClient.delete(`/review-teams/${teamId}/members/${memberId}`);
+
+      // Refresh the data
+      await refreshData();
+      
+      setSuccess('Team member removed successfully!');
+      setTimeout(() => setSuccess(''), 3000);
+      
+    } catch (error) {
+      console.error('Error removing team member:', error);
+      setError('Failed to remove team member');
+    }
+  };
+
     const handleAddApplicationToTeam = async (applicationId) => {
     try {
       const newApplication = await apiClient.post(`/review-teams/${selectedTeam}/assign-application`, {
@@ -787,21 +804,44 @@ export default function ReviewTeams() {
                 </Typography>
                 <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                   {team.members.map((member) => (
-                    <Avatar
-                      key={member.id}
-                      sx={{ 
-                        width: 40, 
-                        height: 40, 
-                        bgcolor: 'primary.main',
-                        fontSize: '0.875rem'
-                      }}
-                    >
-                      {member.avatar ? (
-                        <img src={member.avatar} alt={member.name} />
-                      ) : (
-                        member.name.split(' ').map(n => n[0]).join('')
+                    <Box key={member.id} sx={{ position: 'relative' }}>
+                      <Avatar
+                        sx={{ 
+                          width: 40, 
+                          height: 40, 
+                          bgcolor: 'primary.main',
+                          fontSize: '0.875rem'
+                        }}
+                      >
+                        {member.avatar ? (
+                          <img src={member.avatar} alt={member.name} />
+                        ) : (
+                          member.name.split(' ').map(n => n[0]).join('')
+                        )}
+                      </Avatar>
+                      {editMode && (
+                        <IconButton
+                          size="small"
+                          onClick={() => handleRemoveMemberFromTeam(team.id, member.id)}
+                          sx={{
+                            position: 'absolute',
+                            top: -8,
+                            right: -8,
+                            width: 20,
+                            height: 20,
+                            backgroundColor: 'error.main',
+                            color: 'error.contrastText',
+                            '&:hover': {
+                              backgroundColor: 'error.dark'
+                            },
+                            fontSize: '0.75rem'
+                          }}
+                          title="Remove team member"
+                        >
+                          <TrashIcon style={{ width: '0.75rem', height: '0.75rem' }} />
+                        </IconButton>
                       )}
-                    </Avatar>
+                    </Box>
                   ))}
                   <IconButton
                     size="small"

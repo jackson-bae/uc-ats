@@ -266,9 +266,10 @@ export default function Dashboard() {
     setTimelineScrollPosition(scrollLeft);
   };
 
-  // Color schemes for charts
+  // Enhanced color schemes for charts
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D', '#FFC658', '#FF7C7C'];
-  const PIE_COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
+  const PIE_COLORS = ['#667eea', '#f093fb', '#4facfe', '#43e97b', '#fa709a', '#a8edea', '#ff9a9e', '#ffecd2'];
+  const BAR_COLORS = ['#667eea', '#f093fb', '#4facfe', '#43e97b', '#fa709a'];
 
   if (!user) {
     return (
@@ -468,37 +469,102 @@ export default function Dashboard() {
         )}
       </Paper>
 
-      {/* Demographic Charts Section */}
-      <Typography variant="h5" component="h2" sx={{ fontWeight: 700, color: 'primary.dark', mb: 3 }}>
+      {/* Enhanced Demographic Charts Section */}
+      <Typography variant="h5" component="h2" sx={{ 
+        fontWeight: 700, 
+        color: 'primary.dark', 
+        mb: 4,
+        textAlign: 'center',
+        position: 'relative',
+        '&::after': {
+          content: '""',
+          position: 'absolute',
+          bottom: -8,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: 60,
+          height: 3,
+          background: 'linear-gradient(90deg, #667eea, #764ba2)',
+          borderRadius: 2
+        }
+      }}>
         Application Demographics
       </Typography>
 
       {demographicsLoading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-          <CircularProgress />
+          <CircularProgress size={60} sx={{ color: '#667eea' }} />
         </Box>
       ) : (
-        <Grid container spacing={3}>
+        <Grid container spacing={4}>
           {/* Majors Chart */}
           <Grid item xs={12} md={6}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
+            <Card sx={{ 
+              borderRadius: 3,
+              boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
+              transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+              '&:hover': {
+                transform: 'translateY(-4px)',
+                boxShadow: '0 12px 40px rgba(0,0,0,0.15)'
+              }
+            }}>
+              <CardContent sx={{ p: 3 }}>
+                <Typography variant="h6" gutterBottom sx={{ 
+                  fontWeight: 600, 
+                  color: '#667eea',
+                  mb: 3,
+                  display: 'flex',
+                  alignItems: 'center',
+                  '&::before': {
+                    content: '""',
+                    width: 4,
+                    height: 24,
+                    background: 'linear-gradient(135deg, #667eea, #764ba2)',
+                    borderRadius: 2,
+                    mr: 2
+                  }
+                }}>
                   Applications by Major
                 </Typography>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={demographicData.majors.slice(0, 8)}>
-                    <CartesianGrid strokeDasharray="3 3" />
+                <ResponsiveContainer width="100%" height={320}>
+                  <BarChart data={demographicData.majors.slice(0, 8)} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                     <XAxis 
                       dataKey="name" 
                       angle={-45}
                       textAnchor="end"
                       height={80}
-                      fontSize={12}
+                      fontSize={11}
+                      stroke="#666"
+                      tick={{ fill: '#666' }}
                     />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="value" fill="#0088FE" />
+                    <YAxis 
+                      stroke="#666"
+                      tick={{ fill: '#666' }}
+                    />
+                    <Tooltip 
+                      contentStyle={{
+                        backgroundColor: 'rgba(255,255,255,0.95)',
+                        border: 'none',
+                        borderRadius: 12,
+                        boxShadow: '0 8px 32px rgba(0,0,0,0.1)'
+                      }}
+                    />
+                    <Bar 
+                      dataKey="value" 
+                      radius={[4, 4, 0, 0]}
+                      fill="url(#majorGradient)"
+                    >
+                      {demographicData.majors.slice(0, 8).map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={BAR_COLORS[index % BAR_COLORS.length]} />
+                      ))}
+                    </Bar>
+                    <defs>
+                      <linearGradient id="majorGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#667eea" />
+                        <stop offset="100%" stopColor="#764ba2" />
+                      </linearGradient>
+                    </defs>
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -507,12 +573,34 @@ export default function Dashboard() {
 
           {/* GPA Distribution Chart */}
           <Grid item xs={12} md={6}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
+            <Card sx={{ 
+              borderRadius: 3,
+              boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
+              transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+              '&:hover': {
+                transform: 'translateY(-4px)',
+                boxShadow: '0 12px 40px rgba(0,0,0,0.15)'
+              }
+            }}>
+              <CardContent sx={{ p: 3 }}>
+                <Typography variant="h6" gutterBottom sx={{ 
+                  fontWeight: 600, 
+                  color: '#f093fb',
+                  mb: 3,
+                  display: 'flex',
+                  alignItems: 'center',
+                  '&::before': {
+                    content: '""',
+                    width: 4,
+                    height: 24,
+                    background: 'linear-gradient(135deg, #f093fb, #f5576c)',
+                    borderRadius: 2,
+                    mr: 2
+                  }
+                }}>
                   GPA Distribution
                 </Typography>
-                <ResponsiveContainer width="100%" height={300}>
+                <ResponsiveContainer width="100%" height={320}>
                   <PieChart>
                     <Pie
                       data={demographicData.gpaRanges}
@@ -520,15 +608,25 @@ export default function Dashboard() {
                       cy="50%"
                       labelLine={false}
                       label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
-                      outerRadius={80}
+                      outerRadius={100}
+                      innerRadius={40}
                       fill="#8884d8"
                       dataKey="value"
+                      stroke="#fff"
+                      strokeWidth={2}
                     >
                       {demographicData.gpaRanges.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip />
+                    <Tooltip 
+                      contentStyle={{
+                        backgroundColor: 'rgba(255,255,255,0.95)',
+                        border: 'none',
+                        borderRadius: 12,
+                        boxShadow: '0 8px 32px rgba(0,0,0,0.1)'
+                      }}
+                    />
                   </PieChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -537,12 +635,34 @@ export default function Dashboard() {
 
           {/* Gender Distribution */}
           <Grid item xs={12} md={6}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
+            <Card sx={{ 
+              borderRadius: 3,
+              boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
+              transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+              '&:hover': {
+                transform: 'translateY(-4px)',
+                boxShadow: '0 12px 40px rgba(0,0,0,0.15)'
+              }
+            }}>
+              <CardContent sx={{ p: 3 }}>
+                <Typography variant="h6" gutterBottom sx={{ 
+                  fontWeight: 600, 
+                  color: '#4facfe',
+                  mb: 3,
+                  display: 'flex',
+                  alignItems: 'center',
+                  '&::before': {
+                    content: '""',
+                    width: 4,
+                    height: 24,
+                    background: 'linear-gradient(135deg, #4facfe, #00f2fe)',
+                    borderRadius: 2,
+                    mr: 2
+                  }
+                }}>
                   Gender Distribution
                 </Typography>
-                <ResponsiveContainer width="100%" height={300}>
+                <ResponsiveContainer width="100%" height={320}>
                   <PieChart>
                     <Pie
                       data={demographicData.genders}
@@ -550,15 +670,25 @@ export default function Dashboard() {
                       cy="50%"
                       labelLine={false}
                       label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
-                      outerRadius={80}
+                      outerRadius={100}
+                      innerRadius={40}
                       fill="#8884d8"
                       dataKey="value"
+                      stroke="#fff"
+                      strokeWidth={2}
                     >
                       {demographicData.genders.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip />
+                    <Tooltip 
+                      contentStyle={{
+                        backgroundColor: 'rgba(255,255,255,0.95)',
+                        border: 'none',
+                        borderRadius: 12,
+                        boxShadow: '0 8px 32px rgba(0,0,0,0.1)'
+                      }}
+                    />
                   </PieChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -567,18 +697,64 @@ export default function Dashboard() {
 
           {/* Graduation Years */}
           <Grid item xs={12} md={6}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
+            <Card sx={{ 
+              borderRadius: 3,
+              boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
+              transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+              '&:hover': {
+                transform: 'translateY(-4px)',
+                boxShadow: '0 12px 40px rgba(0,0,0,0.15)'
+              }
+            }}>
+              <CardContent sx={{ p: 3 }}>
+                <Typography variant="h6" gutterBottom sx={{ 
+                  fontWeight: 600, 
+                  color: '#43e97b',
+                  mb: 3,
+                  display: 'flex',
+                  alignItems: 'center',
+                  '&::before': {
+                    content: '""',
+                    width: 4,
+                    height: 24,
+                    background: 'linear-gradient(135deg, #43e97b, #38f9d7)',
+                    borderRadius: 2,
+                    mr: 2
+                  }
+                }}>
                   Graduation Years
                 </Typography>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={demographicData.graduationYears}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="value" fill="#00C49F" />
+                <ResponsiveContainer width="100%" height={320}>
+                  <BarChart data={demographicData.graduationYears} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis 
+                      dataKey="name" 
+                      stroke="#666"
+                      tick={{ fill: '#666' }}
+                    />
+                    <YAxis 
+                      stroke="#666"
+                      tick={{ fill: '#666' }}
+                    />
+                    <Tooltip 
+                      contentStyle={{
+                        backgroundColor: 'rgba(255,255,255,0.95)',
+                        border: 'none',
+                        borderRadius: 12,
+                        boxShadow: '0 8px 32px rgba(0,0,0,0.1)'
+                      }}
+                    />
+                    <Bar 
+                      dataKey="value" 
+                      radius={[4, 4, 0, 0]}
+                      fill="url(#yearGradient)"
+                    />
+                    <defs>
+                      <linearGradient id="yearGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#43e97b" />
+                        <stop offset="100%" stopColor="#38f9d7" />
+                      </linearGradient>
+                    </defs>
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -587,12 +763,34 @@ export default function Dashboard() {
 
           {/* Transfer Students */}
           <Grid item xs={12} md={6}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
+            <Card sx={{ 
+              borderRadius: 3,
+              boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
+              transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+              '&:hover': {
+                transform: 'translateY(-4px)',
+                boxShadow: '0 12px 40px rgba(0,0,0,0.15)'
+              }
+            }}>
+              <CardContent sx={{ p: 3 }}>
+                <Typography variant="h6" gutterBottom sx={{ 
+                  fontWeight: 600, 
+                  color: '#fa709a',
+                  mb: 3,
+                  display: 'flex',
+                  alignItems: 'center',
+                  '&::before': {
+                    content: '""',
+                    width: 4,
+                    height: 24,
+                    background: 'linear-gradient(135deg, #fa709a, #fee140)',
+                    borderRadius: 2,
+                    mr: 2
+                  }
+                }}>
                   Transfer Students
                 </Typography>
-                <ResponsiveContainer width="100%" height={300}>
+                <ResponsiveContainer width="100%" height={320}>
                   <PieChart>
                     <Pie
                       data={demographicData.transferStudents}
@@ -600,15 +798,25 @@ export default function Dashboard() {
                       cy="50%"
                       labelLine={false}
                       label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
-                      outerRadius={80}
+                      outerRadius={100}
+                      innerRadius={40}
                       fill="#8884d8"
                       dataKey="value"
+                      stroke="#fff"
+                      strokeWidth={2}
                     >
                       {demographicData.transferStudents.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip />
+                    <Tooltip 
+                      contentStyle={{
+                        backgroundColor: 'rgba(255,255,255,0.95)',
+                        border: 'none',
+                        borderRadius: 12,
+                        boxShadow: '0 8px 32px rgba(0,0,0,0.1)'
+                      }}
+                    />
                   </PieChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -617,12 +825,34 @@ export default function Dashboard() {
 
           {/* First Generation */}
           <Grid item xs={12} md={6}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
+            <Card sx={{ 
+              borderRadius: 3,
+              boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
+              transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+              '&:hover': {
+                transform: 'translateY(-4px)',
+                boxShadow: '0 12px 40px rgba(0,0,0,0.15)'
+              }
+            }}>
+              <CardContent sx={{ p: 3 }}>
+                <Typography variant="h6" gutterBottom sx={{ 
+                  fontWeight: 600, 
+                  color: '#a8edea',
+                  mb: 3,
+                  display: 'flex',
+                  alignItems: 'center',
+                  '&::before': {
+                    content: '""',
+                    width: 4,
+                    height: 24,
+                    background: 'linear-gradient(135deg, #a8edea, #fed6e3)',
+                    borderRadius: 2,
+                    mr: 2
+                  }
+                }}>
                   First Generation Students
                 </Typography>
-                <ResponsiveContainer width="100%" height={300}>
+                <ResponsiveContainer width="100%" height={320}>
                   <PieChart>
                     <Pie
                       data={demographicData.firstGeneration}
@@ -630,15 +860,25 @@ export default function Dashboard() {
                       cy="50%"
                       labelLine={false}
                       label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
-                      outerRadius={80}
+                      outerRadius={100}
+                      innerRadius={40}
                       fill="#8884d8"
                       dataKey="value"
+                      stroke="#fff"
+                      strokeWidth={2}
                     >
                       {demographicData.firstGeneration.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip />
+                    <Tooltip 
+                      contentStyle={{
+                        backgroundColor: 'rgba(255,255,255,0.95)',
+                        border: 'none',
+                        borderRadius: 12,
+                        boxShadow: '0 8px 32px rgba(0,0,0,0.1)'
+                      }}
+                    />
                   </PieChart>
                 </ResponsiveContainer>
               </CardContent>

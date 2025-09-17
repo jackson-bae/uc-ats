@@ -150,14 +150,19 @@ export default function AssignedInterviews() {
     console.log('Interview found:', interview);
     console.log('Interview type:', interview?.interviewType);
     console.log('Is ROUND_ONE?', interview?.interviewType === 'ROUND_ONE');
+    console.log('All interviews for debugging:', interviews.map(i => ({ id: i.id, title: i.title, type: i.interviewType })));
     
     // Route to appropriate interface based on interview type
     if (interview?.interviewType === 'ROUND_ONE') {
       console.log('Routing to first round interview interface');
-      navigate(`/member/first-round-interview?interviewId=${selectedInterviewForStart}&groupIds=${groupIdsParam}`);
+      const url = `/member/first-round-interview?interviewId=${selectedInterviewForStart}&groupIds=${groupIdsParam}`;
+      console.log('Navigating to:', url);
+      navigate(url);
     } else {
       console.log('Routing to regular interview interface');
-      navigate(`/member/interview-interface?interviewId=${selectedInterviewForStart}&groupIds=${groupIdsParam}`);
+      const url = `/member/interview-interface?interviewId=${selectedInterviewForStart}&groupIds=${groupIdsParam}`;
+      console.log('Navigating to:', url);
+      navigate(url);
     }
     
     setGroupSelectionOpen(false);

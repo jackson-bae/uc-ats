@@ -388,6 +388,86 @@ router.put('/:groupId/members', requireAuth, async (req, res) => {
   }
 });
 
+// Remove a specific member from a group
+router.delete('/:groupId/members/:memberId', requireAuth, async (req, res) => {
+  try {
+    const { groupId, memberId } = req.params;
+
+    // Get the current group to see which member fields are set
+    const group = await prisma.groups.findUnique({
+      where: { id: groupId },
+      select: {
+        memberOne: true,
+        memberTwo: true,
+        memberThree: true
+      }
+    });
+
+    if (!group) {
+      return res.status(404).json({ error: 'Group not found' });
+    }
+
+    // Determine which member field to clear
+    let updateData = {};
+    if (group.memberOne === memberId) {
+      updateData.memberOne = null;
+    } else if (group.memberTwo === memberId) {
+      updateData.memberTwo = null;
+    } else if (group.memberThree === memberId) {
+      updateData.memberThree = null;
+    } else {
+      return res.status(404).json({ error: 'Member not found in this group' });
+    }
+
+    // Update the group to remove the member
+    const updatedGroup = await prisma.groups.update({
+      where: { id: groupId },
+      data: updateData,
+      include: {
+        memberOneUser: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true
+          }
+        },
+        memberTwoUser: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true
+          }
+        },
+        memberThreeUser: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true
+          }
+        }
+      }
+    });
+
+    const members = [
+      updatedGroup.memberOneUser,
+      updatedGroup.memberTwoUser,
+      updatedGroup.memberThreeUser
+    ].filter(Boolean);
+
+    const transformedMembers = members.map(member => ({
+      id: member.id,
+      name: member.fullName,
+      email: member.email,
+      avatar: null
+    }));
+
+    res.json(transformedMembers);
+  } catch (error) {
+    console.error('Error removing group member:', error);
+    res.status(500).json({ error: 'Failed to remove group member' });
+  }
+});
+
 // Get available applications (not assigned to any group)
 router.get('/available-applications', requireAuth, async (req, res) => {
   try {
