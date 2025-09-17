@@ -8,11 +8,7 @@ client/.env
 server/.env
 .vscode/
 .env
-.env.example
 server/google-cloud-key.json
-server/form-config.json
 
 
-
-server/google-cloud-key.json
 
