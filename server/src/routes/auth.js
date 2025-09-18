@@ -34,7 +34,7 @@ router.post('/register', async (req, res) => {
     
     // Check if student ID is already taken
     const existingStudentId = await prisma.user.findFirst({
-      where: { studentId: parseInt(studentId, 10) }
+      where: { studentId: studentId }
     });
     
     if (existingStudentId) {
@@ -51,7 +51,7 @@ router.post('/register', async (req, res) => {
         password: hashedPassword,
         fullName,
         graduationClass,
-        studentId: parseInt(studentId, 10),
+        studentId: studentId,
       }
     });
     
@@ -65,7 +65,7 @@ router.post('/register', async (req, res) => {
         
         await prisma.candidate.create({
           data: {
-            studentId: parseInt(studentId, 10),
+            studentId: studentId,
             firstName,
             lastName,
             email,
@@ -298,7 +298,7 @@ router.post('/register-member', async (req, res) => {
     
     // Check if student ID is already taken
     const existingStudentId = await prisma.user.findFirst({
-      where: { studentId: parseInt(studentId, 10) }
+      where: { studentId: studentId }
     });
     
     if (existingStudentId) {
@@ -315,7 +315,7 @@ router.post('/register-member', async (req, res) => {
         password: hashedPassword,
         fullName,
         graduationClass,
-        studentId: parseInt(studentId, 10),
+        studentId: studentId,
         role: 'MEMBER', // Automatically set as MEMBER
       }
     });

@@ -53,7 +53,7 @@ export default async function syncFormResponses() {
         const dbRecord = transformFormResponse(response);
         
         // Extract candidate information from the application data
-        const studentId = parseInt(dbRecord.studentId);
+        const studentId = dbRecord.studentId;
         const candidateData = {
           studentId,
           firstName: dbRecord.firstName,

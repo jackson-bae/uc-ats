@@ -351,7 +351,7 @@ router.patch('/meeting-signups/:id/attendance', requireAuth, async (req, res) =>
       try {
         // Find the candidate by studentId
         const candidate = await prisma.candidate.findUnique({
-          where: { studentId: parseInt(signup.studentId) },
+          where: { studentId: signup.studentId },
           include: { applications: true }
         });
 
