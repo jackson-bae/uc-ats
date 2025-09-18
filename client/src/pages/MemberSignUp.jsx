@@ -82,7 +82,7 @@ const MemberSignUp = () => {
       password,
       fullName,
       graduationClass,
-      studentId: parseInt(studentId, 10),
+      studentId: studentId,
       accessToken: token
     });
 

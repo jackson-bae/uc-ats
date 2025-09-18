@@ -65,7 +65,7 @@ const SignUp = () => {
       password,
       fullName,
       graduationClass,
-      studentId: parseInt(studentId, 10)
+      studentId: studentId
     });
 
     if (result.success) {

@@ -165,7 +165,7 @@ export function createDynamicEventMapping(formResponse, eventId, configType) {
     
     // Student ID detection (9 digits)
     if (/^\d{9}$/.test(stringValue) && !mappedData.studentId) {
-      mappedData.studentId = parseInt(stringValue);
+      mappedData.studentId = stringValue;
       console.log(`Found student ID: ${stringValue}`);
     }
     

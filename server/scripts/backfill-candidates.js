@@ -31,7 +31,7 @@ async function backfillCandidates() {
     const applicationsByStudentId = new Map();
     
     applicationsWithoutCandidates.forEach(app => {
-      const studentId = parseInt(app.studentId);
+      const studentId = app.studentId;
       if (!applicationsByStudentId.has(studentId)) {
         applicationsByStudentId.set(studentId, []);
       }
