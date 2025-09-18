@@ -45,6 +45,7 @@ export default function MemberMeetingSlots() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [dateError, setDateError] = useState('');
 
   useEffect(() => {
     api.setToken(token);
@@ -67,11 +68,60 @@ export default function MemberMeetingSlots() {
     load();
   }, []);
 
+  const validateDate = (dateString) => {
+    if (!dateString) return null;
+    
+    const date = new Date(dateString);
+    const year = date.getFullYear();
+    
+    // Check if year is within reasonable bounds (1900-2100)
+    if (year < 1900 || year > 2100) {
+      return 'Year must be between 1900 and 2100';
+    }
+    
+    // Check if the date is valid
+    if (isNaN(date.getTime())) {
+      return 'Invalid date format';
+    }
+    
+    // Check if date is not too far in the past
+    const now = new Date();
+    const oneYearAgo = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+    if (date < oneYearAgo) {
+      return 'Date cannot be more than 1 year in the past';
+    }
+    
+    return null;
+  };
+
+  const handleDateChange = (field, value) => {
+    const error = validateDate(value);
+    setDateError(error || '');
+    setForm({ ...form, [field]: value });
+  };
+
   const onCreate = async (e) => {
     e.preventDefault();
+    
+    // Validate dates before submitting
+    const startTimeError = validateDate(form.startTime);
+    const endTimeError = validateDate(form.endTime);
+    
+    if (startTimeError || endTimeError) {
+      setDateError(startTimeError || endTimeError);
+      return;
+    }
+    
+    // Check if end time is after start time
+    if (form.endTime && form.startTime && new Date(form.endTime) <= new Date(form.startTime)) {
+      setDateError('End time must be after start time');
+      return;
+    }
+    
     try {
       setSubmitting(true);
       setError('');
+      setDateError('');
       await api.post('/member/meeting-slots', form);
       setForm({ location: '', startTime: '', endTime: '', capacity: 2 });
       await load();
@@ -236,8 +286,14 @@ export default function MemberMeetingSlots() {
                 label="Start Time"
                 type="datetime-local"
                 value={form.startTime}
-                onChange={(e) => setForm({ ...form, startTime: e.target.value })}
+                onChange={(e) => handleDateChange('startTime', e.target.value)}
                 required
+                error={!!dateError}
+                helperText={dateError}
+                inputProps={{
+                  min: new Date().toISOString().slice(0, 16), // Prevent past dates
+                  max: new Date(new Date().getFullYear() + 1, 11, 31).toISOString().slice(0, 16) // Max 1 year in future
+                }}
                 InputProps={{
                   startAdornment: <ScheduleIcon sx={{ color: 'text.secondary', mr: 1 }} />
                 }}
@@ -250,7 +306,11 @@ export default function MemberMeetingSlots() {
                 label="End Time (Optional)"
                 type="datetime-local"
                 value={form.endTime}
-                onChange={(e) => setForm({ ...form, endTime: e.target.value })}
+                onChange={(e) => handleDateChange('endTime', e.target.value)}
+                inputProps={{
+                  min: form.startTime || new Date().toISOString().slice(0, 16),
+                  max: new Date(new Date().getFullYear() + 1, 11, 31).toISOString().slice(0, 16)
+                }}
                 InputProps={{
                   startAdornment: <ScheduleIcon sx={{ color: 'text.secondary', mr: 1 }} />
                 }}
@@ -265,7 +325,25 @@ export default function MemberMeetingSlots() {
                 min={1}
                 max={10}
                 value={form.capacity}
-                onChange={(e) => setForm({ ...form, capacity: parseInt(e.target.value || '2', 10) })}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  // Allow empty string during editing, but default to 2 when form is reset
+                  if (value === '') {
+                    setForm({ ...form, capacity: '' });
+                  } else {
+                    const numValue = parseInt(value, 10);
+                    if (!isNaN(numValue) && numValue >= 1 && numValue <= 10) {
+                      setForm({ ...form, capacity: numValue });
+                    }
+                  }
+                }}
+                onBlur={(e) => {
+                  // Ensure we have a valid number when field loses focus
+                  const value = e.target.value;
+                  if (value === '' || isNaN(parseInt(value, 10))) {
+                    setForm({ ...form, capacity: 2 });
+                  }
+                }}
                 InputProps={{
                   startAdornment: <PeopleIcon sx={{ color: 'text.secondary', mr: 1 }} />
                 }}
@@ -276,7 +354,7 @@ export default function MemberMeetingSlots() {
                 type="submit"
                 variant="contained"
                 fullWidth
-                disabled={submitting}
+                disabled={submitting || !!dateError || !form.location || !form.startTime || !form.capacity || form.capacity < 1 || form.capacity > 10}
                 startIcon={<AddIcon />}
                 sx={{ height: '56px' }}
               >

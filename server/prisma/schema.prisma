@@ -18,7 +18,7 @@ model User {
   resetToken           String?
   resetTokenExpiry     DateTime?
   profileImage         String?
-  studentId            Int?
+  studentId            String?
   comments             Comment[]
   coverLetterScores    CoverLetterScore[]
   evaluations          Evaluation[]
@@ -43,7 +43,7 @@ model User {
 
 model Candidate {
   id                String             @id @default(uuid())
-  studentId         Int                @unique
+  studentId         String             @unique
   firstName         String
   lastName          String
   email             String             @unique

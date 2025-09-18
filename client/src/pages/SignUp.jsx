@@ -10,6 +10,10 @@ import {
   CssBaseline,
   Alert,
   Container,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from '@mui/material';
 import { useAuth } from '../context/AuthContext';
 import authTheme from '../styles/authTheme';
@@ -113,14 +117,19 @@ const SignUp = () => {
                 sx={{ mb: 3 }}
               />
 
-              <TextField
-                fullWidth
-                label="Graduation Class"
-                value={graduationClass}
-                onChange={(e) => setGraduationClass(e.target.value)}
-                required
-                sx={{ mb: 3 }}
-              />
+              <FormControl fullWidth required sx={{ mb: 3 }}>
+                <InputLabel>Graduation Year</InputLabel>
+                <Select
+                  value={graduationClass}
+                  label="Graduation Year"
+                  onChange={(e) => setGraduationClass(e.target.value)}
+                >
+                  <MenuItem value="2026">2026</MenuItem>
+                  <MenuItem value="2027">2027</MenuItem>
+                  <MenuItem value="2028">2028</MenuItem>
+                  <MenuItem value="2029">2029</MenuItem>
+                </Select>
+              </FormControl>
 
               <TextField
                 fullWidth
