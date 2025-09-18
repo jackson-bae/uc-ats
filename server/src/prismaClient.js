@@ -98,12 +98,21 @@ prisma.$use(async (params, next) => {
     } catch (error) {
       attempt++;
       
-      // Handle connection errors and timeouts
-      if ((error.code === 'P1001' || error.code === 'P1008' || error.message?.includes('timeout')) && attempt < maxRetries) {
+      // Handle connection errors, timeouts, and cached plan errors
+      if ((error.code === 'P1001' || error.code === 'P1008' || error.message?.includes('timeout') || error.message?.includes('cached plan must not change result type')) && attempt < maxRetries) {
         const backoffDelay = Math.min(2000 * Math.pow(2, attempt - 1), 8000); // Increased base delay, max 8s
         console.error(`Database error (attempt ${attempt}/${maxRetries}): ${error.message}. Retrying in ${backoffDelay}ms...`);
         
         try {
+          // For cached plan errors, force a complete reconnection
+          if (error.message?.includes('cached plan must not change result type')) {
+            console.log('🔄 Cached plan error detected, forcing complete reconnection...');
+            await prisma.$disconnect();
+            await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+            await prisma.$connect();
+            console.log('✅ Database reconnected after cached plan error');
+          }
+          
           // Graceful reconnection attempt without $queryRaw to avoid cascade failures
           await new Promise(resolve => setTimeout(resolve, backoffDelay));
           
