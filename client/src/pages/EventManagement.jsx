@@ -286,6 +286,55 @@ export default function EventManagement() {
     return cycle ? cycle.name : 'Unknown Cycle';
   };
 
+  const handleAddToCalendar = (event) => {
+    try {
+      // Format dates for Google Calendar
+      const startDate = new Date(event.eventStartDate);
+      const endDate = event.eventEndDate ? new Date(event.eventEndDate) : new Date(startDate.getTime() + 2 * 60 * 60 * 1000); // Default 2 hours if no end date
+      
+      // Format dates to YYYYMMDDTHHMMSSZ format (UTC)
+      const formatDateForGoogle = (date) => {
+        return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+      };
+
+      const startTime = formatDateForGoogle(startDate);
+      const endTime = formatDateForGoogle(endDate);
+
+      // Create event details with time information
+      const eventTitle = event.eventName;
+      const timeString = startDate.toLocaleTimeString('en-US', { 
+        hour: 'numeric', 
+        minute: '2-digit',
+        hour12: true 
+      });
+      const dateString = startDate.toLocaleDateString('en-US', { 
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+      
+      const eventDescription = `UConsulting Event: ${event.eventName}\n\nEvent Details:\nDate: ${dateString}\nTime: ${timeString}\nLocation: ${event.eventLocation || 'Location TBD'}\nCycle: ${getCycleName(event.cycleId)}\n\nThis is a UConsulting recruitment event.`;
+      const eventLocation = event.eventLocation || 'Location TBD';
+
+      // Create Google Calendar URL
+      const googleCalendarUrl = new URL('https://calendar.google.com/calendar/render');
+      googleCalendarUrl.searchParams.set('action', 'TEMPLATE');
+      googleCalendarUrl.searchParams.set('text', eventTitle);
+      googleCalendarUrl.searchParams.set('dates', `${startTime}/${endTime}`);
+      googleCalendarUrl.searchParams.set('details', eventDescription);
+      googleCalendarUrl.searchParams.set('location', eventLocation);
+      googleCalendarUrl.searchParams.set('sf', 'true'); // Show form
+      googleCalendarUrl.searchParams.set('output', 'xml'); // Open in new tab
+
+      // Open Google Calendar in a new tab
+      window.open(googleCalendarUrl.toString(), '_blank');
+    } catch (error) {
+      console.error('Error adding to calendar:', error);
+      alert('Failed to open calendar. Please try again.');
+    }
+  };
+
   return (
     <Box sx={{ 
       width: '100%', 
@@ -480,22 +529,35 @@ export default function EventManagement() {
                   </TableCell>
                   <TableCell align="right">
                     <Stack direction="row" spacing={1}>
-                      <IconButton
-                        size="small"
-                        color="primary"
-                        onClick={() => openEditDialog(event)}
-                        title="Edit Event"
-                      >
-                        <PencilIcon style={{ width: '1rem', height: '1rem' }} />
-                      </IconButton>
-                      <IconButton
-                        size="small"
-                        color="error"
-                        onClick={() => deleteEvent(event.id)}
-                        title="Delete Event"
-                      >
-                        <TrashIcon style={{ width: '1rem', height: '1rem' }} />
-                      </IconButton>
+                      <Tooltip title="Add to Google Calendar">
+                        <IconButton
+                          size="small"
+                          color="info"
+                          onClick={() => handleAddToCalendar(event)}
+                        >
+                          <svg viewBox="0 0 24 24" width="16" height="16" fill="#4285F4">
+                            <path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/>
+                          </svg>
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Edit Event">
+                        <IconButton
+                          size="small"
+                          color="primary"
+                          onClick={() => openEditDialog(event)}
+                        >
+                          <PencilIcon style={{ width: '1rem', height: '1rem' }} />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Delete Event">
+                        <IconButton
+                          size="small"
+                          color="error"
+                          onClick={() => deleteEvent(event.id)}
+                        >
+                          <TrashIcon style={{ width: '1rem', height: '1rem' }} />
+                        </IconButton>
+                      </Tooltip>
                     </Stack>
                   </TableCell>
                 </TableRow>

@@ -59,8 +59,10 @@ export async function syncEventAttendance(eventId) {
 
     let successCount = 0;
     let errorCount = 0;
+    let totalProcessed = 0;
 
     for (const response of newResponses) {
+      totalProcessed++; // Count every response we attempt to process
       try {
         const transformedData = transformEventResponse(response, eventId, 'attendance');
         
@@ -136,8 +138,8 @@ export async function syncEventAttendance(eventId) {
       }
     }
 
-    console.log(`Attendance sync complete for event ${eventId}: ${successCount} processed, ${errorCount} errors`);
-    return { processed: successCount, errors: errorCount };
+    console.log(`Attendance sync complete for event ${eventId}: ${totalProcessed} processed, ${errorCount} errors`);
+    return { processed: totalProcessed, errors: errorCount };
     
   } catch (error) {
     console.error(`Error syncing attendance for event ${eventId}:`, error);
@@ -187,8 +189,10 @@ export async function syncEventRSVP(eventId) {
 
     let successCount = 0;
     let errorCount = 0;
+    let totalProcessed = 0;
 
     for (const response of newResponses) {
+      totalProcessed++; // Count every response we attempt to process
       try {
         const transformedData = transformEventResponse(response, eventId, 'rsvp');
         
@@ -266,8 +270,8 @@ export async function syncEventRSVP(eventId) {
       }
     }
 
-    console.log(`RSVP sync complete for event ${eventId}: ${successCount} processed, ${errorCount} errors`);
-    return { processed: successCount, errors: errorCount };
+    console.log(`RSVP sync complete for event ${eventId}: ${totalProcessed} processed, ${errorCount} errors`);
+    return { processed: totalProcessed, errors: errorCount };
     
   } catch (error) {
     console.error(`Error syncing RSVP for event ${eventId}:`, error);
@@ -317,8 +321,11 @@ export async function syncMemberEventRSVP(eventId) {
 
     let successCount = 0;
     let errorCount = 0;
+    let totalProcessed = 0;
 
     for (const response of newResponses) {
+      totalProcessed++; // Count every response we attempt to process
+      
       try {
         const transformedData = transformEventResponse(response, eventId, 'member-rsvp');
         
@@ -335,7 +342,7 @@ export async function syncMemberEventRSVP(eventId) {
         if (!member) {
           console.warn(`Member not found for RSVP response: ${transformedData.email}`);
           errorCount++;
-          continue;
+          continue; // Still count as processed, but as an error
         }
 
         // Create member RSVP record
@@ -356,8 +363,8 @@ export async function syncMemberEventRSVP(eventId) {
       }
     }
 
-    console.log(`Member RSVP sync completed for event ${eventId}: ${successCount} processed, ${errorCount} errors`);
-    return { processed: successCount, errors: errorCount };
+    console.log(`Member RSVP sync completed for event ${eventId}: ${totalProcessed} processed, ${errorCount} errors`);
+    return { processed: totalProcessed, errors: errorCount };
 
   } catch (error) {
     console.error(`Error syncing member RSVP for event ${eventId}:`, error);
