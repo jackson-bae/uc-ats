@@ -36,7 +36,6 @@ export default function CoffeeChatsPublic() {
   const [form, setForm] = useState({ fullName: '', email: '', studentId: '' });
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState('');
-  const [needsAccount, setNeedsAccount] = useState(false);
 
   const load = async () => {
     try {
@@ -62,10 +61,19 @@ export default function CoffeeChatsPublic() {
       setSubmitting(true);
       setError('');
       setSuccess('');
-      setNeedsAccount(false);
       const response = await api.post(`/meeting-slots/${selectedSlot}/signup`, form);
       setSuccess(response.message || 'Successfully signed up! You will receive a confirmation email shortly.');
-      setNeedsAccount(response.needsAccount || false);
+      
+      // If user needs an account, ask if they want to create one
+      if (response.needsAccount) {
+        const wantsAccount = window.confirm(
+          'You successfully signed up for the meeting! Would you like to create an account to track your application status and access more features?'
+        );
+        if (wantsAccount) {
+          window.open('/signup', '_blank');
+        }
+      }
+      
       setForm({ fullName: '', email: '', studentId: '' });
       setSelectedSlot(null);
       await load();
@@ -190,7 +198,7 @@ export default function CoffeeChatsPublic() {
         </Container>
       </Box>
 
-      <Container maxWidth="lg" sx={{ py: { xs: 3, md: 4 }, px: { xs: 2, md: 3 } }}>
+      <Container maxWidth="lg" sx={{ py: { xs: 3, md: 4 }, px: { xs: 1.5, md: 3 } }}>
 
       {error && (
         <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError('')}>
@@ -204,25 +212,9 @@ export default function CoffeeChatsPublic() {
         </Alert>
       )}
 
-      {needsAccount && (
-        <Alert severity="info" sx={{ mb: 3 }} onClose={() => setNeedsAccount(false)}>
-          <Typography variant="body2" sx={{ mb: 1 }}>
-            Don't have an account yet? Create one to track your application status and access more features!
-          </Typography>
-          <Button
-            variant="contained"
-            size="small"
-            onClick={() => window.open('/signup', '_blank')}
-            sx={{ mt: 1 }}
-          >
-            Create Account
-          </Button>
-        </Alert>
-      )}
-
       <Grid container spacing={{ xs: 2, md: 4 }}>
         {/* Available Slots */}
-        <Grid item xs={12} md={7}>
+        <Grid item xs={12}>
           <Paper sx={{ p: { xs: 2, md: 3 } }}>
             <Typography variant="h5" component="h2" sx={{ fontWeight: 600, mb: 3, color: 'primary.dark', fontSize: { xs: '1.5rem', md: '1.75rem' } }}>
               Available Meeting Slots
@@ -245,7 +237,7 @@ export default function CoffeeChatsPublic() {
             ) : (
               <Stack spacing={{ xs: 1.5, md: 2 }}>
                 {slots.map((slot) => (
-                  <Card 
+                    <Card 
                     key={slot.id} 
                     variant="outlined"
                     sx={{ 
@@ -253,9 +245,14 @@ export default function CoffeeChatsPublic() {
                       opacity: slot.remaining === 0 ? 0.6 : 1,
                       border: selectedSlot === slot.id ? 2 : 1,
                       borderColor: selectedSlot === slot.id ? 'primary.main' : 'divider',
+                      transition: 'all 0.2s ease-in-out',
                       '&:hover': slot.remaining > 0 ? {
                         borderColor: 'primary.main',
-                        boxShadow: 2
+                        boxShadow: 2,
+                        transform: 'translateY(-1px)'
+                      } : {},
+                      '&:active': slot.remaining > 0 ? {
+                        transform: 'translateY(0px)'
                       } : {}
                     }}
                     onClick={() => slot.remaining > 0 && setSelectedSlot(slot.id)}
@@ -333,6 +330,127 @@ export default function CoffeeChatsPublic() {
                         </Button>
                       </CardActions>
                     )}
+
+                    {/* Inline Signup Form - appears below selected slot */}
+                    {selectedSlot === slot.id && (
+                      <Box sx={{ 
+                        borderTop: 1, 
+                        borderColor: 'divider',
+                        bgcolor: 'grey.50',
+                        p: { xs: 2, md: 3 }
+                      }}>
+                        <Typography variant="h6" sx={{ 
+                          fontWeight: 600, 
+                          mb: 2, 
+                          color: 'primary.dark',
+                          fontSize: { xs: '1.1rem', md: '1.25rem' }
+                        }}>
+                          Sign Up for This Meeting
+                        </Typography>
+
+                        <Box component="form" onSubmit={onSubmit}>
+                          <Stack spacing={{ xs: 2.5, md: 3 }}>
+                            <TextField
+                              fullWidth
+                              label="Full Name"
+                              placeholder="Enter your full name"
+                              value={form.fullName}
+                              onChange={(e) => setForm({ ...form, fullName: e.target.value })}
+                              required
+                              InputProps={{
+                                startAdornment: <PersonIcon sx={{ color: 'text.secondary', mr: 1, fontSize: { xs: 20, md: 18 } }} />
+                              }}
+                              sx={{
+                                '& .MuiInputBase-input': {
+                                  fontSize: { xs: '1rem', md: '1rem' },
+                                  padding: { xs: '16px 14px 16px 0', md: '16px 14px 16px 0' },
+                                  minHeight: { xs: '24px', md: '24px' }
+                                },
+                                '& .MuiInputLabel-root': {
+                                  fontSize: { xs: '1rem', md: '1rem' }
+                                }
+                              }}
+                            />
+
+                            <TextField
+                              fullWidth
+                              label="Email Address"
+                              type="email"
+                              placeholder="your.email@ucla.edu"
+                              value={form.email}
+                              onChange={(e) => setForm({ ...form, email: e.target.value })}
+                              required
+                              InputProps={{
+                                startAdornment: <EmailIcon sx={{ color: 'text.secondary', mr: 1, fontSize: { xs: 20, md: 18 } }} />
+                              }}
+                              sx={{
+                                '& .MuiInputBase-input': {
+                                  fontSize: { xs: '1rem', md: '1rem' },
+                                  padding: { xs: '16px 14px 16px 0', md: '16px 14px 16px 0' },
+                                  minHeight: { xs: '24px', md: '24px' }
+                                },
+                                '& .MuiInputLabel-root': {
+                                  fontSize: { xs: '1rem', md: '1rem' }
+                                }
+                              }}
+                            />
+
+                            <TextField
+                              fullWidth
+                              label="UCLA Student ID"
+                              placeholder="e.g., 123456789"
+                              value={form.studentId}
+                              onChange={(e) => setForm({ ...form, studentId: e.target.value })}
+                              required
+                              InputProps={{
+                                startAdornment: <SchoolIcon sx={{ color: 'text.secondary', mr: 1, fontSize: { xs: 20, md: 18 } }} />
+                              }}
+                              sx={{
+                                '& .MuiInputBase-input': {
+                                  fontSize: { xs: '1rem', md: '1rem' },
+                                  padding: { xs: '16px 14px 16px 0', md: '16px 14px 16px 0' },
+                                  minHeight: { xs: '24px', md: '24px' }
+                                },
+                                '& .MuiInputLabel-root': {
+                                  fontSize: { xs: '1rem', md: '1rem' }
+                                }
+                              }}
+                            />
+
+                            <Button
+                              type="submit"
+                              variant="contained"
+                              fullWidth
+                              size="large"
+                              disabled={submitting}
+                              sx={{ 
+                                mt: 2,
+                                minHeight: { xs: 52, md: 44 },
+                                fontSize: { xs: '1.1rem', md: '1rem' },
+                                py: { xs: 2, md: 1.25 },
+                                fontWeight: 600,
+                                borderRadius: 2,
+                                textTransform: 'none',
+                                boxShadow: 2,
+                                '&:hover': {
+                                  boxShadow: 4,
+                                  transform: 'translateY(-1px)'
+                                },
+                                '&:active': {
+                                  transform: 'translateY(0px)'
+                                }
+                              }}
+                            >
+                              {submitting ? 'Signing Up...' : 'Confirm Signup'}
+                            </Button>
+                          </Stack>
+                        </Box>
+
+                        <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: 'block', textAlign: 'center' }}>
+                          You will receive a confirmation email with meeting details.
+                        </Typography>
+                      </Box>
+                    )}
                   </Card>
                 ))}
               </Stack>
@@ -340,156 +458,25 @@ export default function CoffeeChatsPublic() {
           </Paper>
         </Grid>
 
-        {/* Sign Up Form */}
-        <Grid item xs={12} md={5}>
-          <Paper sx={{ 
-            p: { xs: 2, md: 3 }, 
-            position: { xs: 'static', md: 'sticky' }, 
-            top: { xs: 'auto', md: 24 },
-            mb: { xs: 2, md: 0 }
-          }}>
-            <Typography variant="h5" component="h2" sx={{ 
-              fontWeight: 600, 
-              mb: 3, 
-              color: 'primary.dark',
-              fontSize: { xs: '1.5rem', md: '1.75rem' }
-            }}>
-              Sign Up
-            </Typography>
-
-            {!selectedSlot ? (
-              <Box sx={{ textAlign: 'center', p: { xs: 3, md: 4 } }}>
-                <PeopleIcon sx={{ fontSize: { xs: 48, md: 60 }, color: 'grey.400', mb: 2 }} />
-                <Typography variant="h6" color="text.secondary" sx={{ 
-                  mb: 1,
-                  fontSize: { xs: '1.1rem', md: '1.25rem' }
-                }}>
-                  Select a Meeting Slot
-                </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{
-                  fontSize: { xs: '0.9rem', md: '0.875rem' }
-                }}>
-                  Choose an available time slot from the list to sign up for a meeting.
-                </Typography>
-              </Box>
-            ) : (
-              <Box>
-                {/* Selected Slot Info */}
-                {getSelectedSlotData() && (
-                  <Box sx={{ 
-                    mb: 3, 
-                    p: { xs: 1.5, md: 2 }, 
-                    bgcolor: 'primary.50', 
-                    borderRadius: 2 
-                  }}>
-                    <Typography variant="subtitle2" sx={{ 
-                      fontWeight: 600, 
-                      mb: 1,
-                      fontSize: { xs: '0.9rem', md: '0.875rem' }
-                    }}>
-                      Selected Meeting
-                    </Typography>
-                    <Typography variant="body2" sx={{ 
-                      fontWeight: 500,
-                      fontSize: { xs: '0.9rem', md: '0.875rem' },
-                      mb: 0.5
-                    }}>
-                      {formatDateTime(getSelectedSlotData().startTime)}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{
-                      fontSize: { xs: '0.85rem', md: '0.875rem' },
-                      lineHeight: 1.4
-                    }}>
-                      with {getSelectedSlotData().memberName} • {getSelectedSlotData().location}
-                    </Typography>
-                  </Box>
-                )}
-
-                <Divider sx={{ mb: 3 }} />
-
-                {/* Sign Up Form */}
-                <Box component="form" onSubmit={onSubmit}>
-                  <Stack spacing={{ xs: 2.5, md: 3 }}>
-                    <TextField
-                      fullWidth
-                      label="Full Name"
-                      placeholder="Enter your full name"
-                      value={form.fullName}
-                      onChange={(e) => setForm({ ...form, fullName: e.target.value })}
-                      required
-                      InputProps={{
-                        startAdornment: <PersonIcon sx={{ color: 'text.secondary', mr: 1, fontSize: { xs: 20, md: 18 } }} />
-                      }}
-                      sx={{
-                        '& .MuiInputBase-input': {
-                          fontSize: { xs: '1rem', md: '1rem' },
-                          padding: { xs: '14px 14px 14px 0', md: '16px 14px 16px 0' }
-                        }
-                      }}
-                    />
-
-                    <TextField
-                      fullWidth
-                      label="Email Address"
-                      type="email"
-                      placeholder="your.email@ucla.edu"
-                      value={form.email}
-                      onChange={(e) => setForm({ ...form, email: e.target.value })}
-                      required
-                      InputProps={{
-                        startAdornment: <EmailIcon sx={{ color: 'text.secondary', mr: 1, fontSize: { xs: 20, md: 18 } }} />
-                      }}
-                      sx={{
-                        '& .MuiInputBase-input': {
-                          fontSize: { xs: '1rem', md: '1rem' },
-                          padding: { xs: '14px 14px 14px 0', md: '16px 14px 16px 0' }
-                        }
-                      }}
-                    />
-
-                    <TextField
-                      fullWidth
-                      label="UCLA Student ID"
-                      placeholder="e.g., 123456789"
-                      value={form.studentId}
-                      onChange={(e) => setForm({ ...form, studentId: e.target.value })}
-                      required
-                      InputProps={{
-                        startAdornment: <SchoolIcon sx={{ color: 'text.secondary', mr: 1, fontSize: { xs: 20, md: 18 } }} />
-                      }}
-                      sx={{
-                        '& .MuiInputBase-input': {
-                          fontSize: { xs: '1rem', md: '1rem' },
-                          padding: { xs: '14px 14px 14px 0', md: '16px 14px 16px 0' }
-                        }
-                      }}
-                    />
-
-                    <Button
-                      type="submit"
-                      variant="contained"
-                      fullWidth
-                      size="large"
-                      disabled={submitting}
-                      sx={{ 
-                        mt: 2,
-                        minHeight: { xs: 48, md: 44 },
-                        fontSize: { xs: '1rem', md: '1rem' },
-                        py: { xs: 1.5, md: 1.25 }
-                      }}
-                    >
-                      {submitting ? 'Signing Up...' : 'Confirm Signup'}
-                    </Button>
-                  </Stack>
-                </Box>
-
-                <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: 'block', textAlign: 'center' }}>
-                  You will receive a confirmation email with meeting details.
-                </Typography>
-              </Box>
-            )}
-          </Paper>
-        </Grid>
+        {/* Instructions when no slot is selected */}
+        {!selectedSlot && (
+          <Grid item xs={12}>
+            <Paper sx={{ p: { xs: 2, md: 3 }, textAlign: 'center' }}>
+              <PeopleIcon sx={{ fontSize: { xs: 48, md: 60 }, color: 'grey.400', mb: 2 }} />
+              <Typography variant="h6" color="text.secondary" sx={{ 
+                mb: 1,
+                fontSize: { xs: '1.1rem', md: '1.25rem' }
+              }}>
+                Select a Meeting Slot
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{
+                fontSize: { xs: '0.9rem', md: '0.875rem' }
+              }}>
+                Choose an available time slot from the list above to sign up for a meeting. The signup form will appear right below your selected slot.
+              </Typography>
+            </Paper>
+          </Grid>
+        )}
       </Grid>
       </Container>
     </Box>
