@@ -2,6 +2,7 @@ import express from 'express';
 import { requireAuth } from '../middleware/auth.js';
 import prisma from '../prismaClient.js';
 import { sendSlackMessage } from '../services/slackService.js';
+import { sendMeetingCancellationEmail } from '../services/emailNotifications.js';
 
 const router = express.Router();
 
@@ -430,7 +431,12 @@ router.delete('/meeting-slots/:id', requireAuth, async (req, res) => {
     // Check if the slot belongs to this member
     const existingSlot = await prisma.meetingSlot.findUnique({
       where: { id },
-      include: { signups: true }
+      include: { 
+        signups: true,
+        member: {
+          select: { fullName: true }
+        }
+      }
     });
     
     if (!existingSlot) {
@@ -441,18 +447,41 @@ router.delete('/meeting-slots/:id', requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'Not authorized to delete this meeting slot' });
     }
     
-    // Check if there are existing signups
+    // Send cancellation emails to all signups before deleting
     if (existingSlot.signups.length > 0) {
-      return res.status(400).json({ 
-        error: 'Cannot delete meeting slot with existing signups. Please contact signups first or wait for them to cancel.' 
+      const memberName = existingSlot.member?.fullName || 'UC Consulting Member';
+      
+      // Send cancellation emails to all signups
+      const emailPromises = existingSlot.signups.map(async (signup) => {
+        try {
+          await sendMeetingCancellationEmail(
+            signup.email,
+            signup.fullName,
+            memberName,
+            existingSlot.location,
+            existingSlot.startTime,
+            existingSlot.endTime
+          );
+        } catch (emailError) {
+          console.error(`Failed to send cancellation email to ${signup.email}:`, emailError);
+          // Don't fail the deletion if email fails, just log the error
+        }
       });
+      
+      // Wait for all emails to be sent (or fail)
+      await Promise.allSettled(emailPromises);
     }
     
+    // Delete the meeting slot (this will cascade delete all signups due to foreign key constraint)
     await prisma.meetingSlot.delete({
       where: { id }
     });
     
-    res.json({ message: 'Meeting slot deleted successfully' });
+    const message = existingSlot.signups.length > 0 
+      ? `Meeting slot deleted successfully. Cancellation emails sent to ${existingSlot.signups.length} signup(s).`
+      : 'Meeting slot deleted successfully.';
+    
+    res.json({ message });
   } catch (error) {
     console.error('[DELETE /api/member/meeting-slots/:id]', error);
     res.status(500).json({ error: 'Failed to delete meeting slot' });
@@ -795,15 +824,24 @@ router.post('/message-admin', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Message is required' });
     }
 
-    // Get user information
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        fullName: true,
-        email: true,
-        role: true
-      }
-    });
+    // Get user information with better error handling
+    let user;
+    try {
+      user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          fullName: true,
+          email: true,
+          role: true
+        }
+      });
+    } catch (dbError) {
+      console.error('[POST /api/member/message-admin] Database error:', dbError);
+      return res.status(503).json({ 
+        error: 'Database temporarily unavailable. Please try again later.',
+        details: 'Unable to retrieve user information'
+      });
+    }
 
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
@@ -851,12 +889,21 @@ router.post('/message-admin', requireAuth, async (req, res) => {
       ]
     };
 
-    await sendSlackMessage(slackMessage);
+    try {
+      await sendSlackMessage(slackMessage);
+    } catch (slackError) {
+      console.error('[POST /api/member/message-admin] Slack error:', slackError);
+      // Don't fail the request if Slack is down, but log the error
+      console.warn('Slack message failed, but continuing with success response');
+    }
 
     res.json({ success: true, message: 'Message sent successfully' });
   } catch (error) {
-    console.error('[POST /api/member/message-admin]', error);
-    res.status(500).json({ error: 'Failed to send message' });
+    console.error('[POST /api/member/message-admin] Unexpected error:', error);
+    res.status(500).json({ 
+      error: 'Failed to send message',
+      details: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
   }
 });
 

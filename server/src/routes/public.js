@@ -1,6 +1,6 @@
 import express from 'express';
 import prisma from '../prismaClient.js';
-import { sendMeetingSignupConfirmation } from '../services/emailNotifications.js';
+import { sendMeetingSignupConfirmation, sendMeetingSignupNotification } from '../services/emailNotifications.js';
 
 const router = express.Router();
 
@@ -60,12 +60,17 @@ router.post('/meeting-slots/:id/signup', async (req, res) => {
       });
     }
 
+    // Check if user exists in the system (has an account)
+    const existingUser = await prisma.user.findUnique({
+      where: { email }
+    });
+
     const slot = await prisma.meetingSlot.findUnique({
       where: { id },
       include: { 
         signups: true,
         member: {
-          select: { fullName: true }
+          select: { fullName: true, email: true }
         }
       }
     });
@@ -87,7 +92,7 @@ router.post('/meeting-slots/:id/signup', async (req, res) => {
       }
     });
 
-    // Send confirmation email
+    // Send confirmation email to candidate
     try {
       await sendMeetingSignupConfirmation(
         email,
@@ -102,7 +107,33 @@ router.post('/meeting-slots/:id/signup', async (req, res) => {
       // Don't fail the signup if email fails, just log the error
     }
 
-    res.json({ success: true, signup });
+    // Send notification email to member
+    try {
+      if (slot.member?.email) {
+        await sendMeetingSignupNotification(
+          slot.member.email,
+          slot.member.fullName || 'UC Consulting Member',
+          fullName,
+          email,
+          studentId,
+          slot.location,
+          slot.startTime,
+          slot.endTime
+        );
+      }
+    } catch (emailError) {
+      console.error('Failed to send notification email to member:', emailError);
+      // Don't fail the signup if email fails, just log the error
+    }
+
+    res.json({ 
+      success: true, 
+      signup,
+      needsAccount: !existingUser,
+      message: existingUser 
+        ? 'Successfully signed up! You will receive a confirmation email shortly.'
+        : 'Successfully signed up! You will receive a confirmation email shortly. We recommend creating an account to track your application status.'
+    });
   } catch (error) {
     if (error?.code === 'P2002') {
       return res.status(400).json({ error: 'You are already signed up for this slot' });

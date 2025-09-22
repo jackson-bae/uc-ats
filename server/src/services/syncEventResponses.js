@@ -382,7 +382,8 @@ export async function syncAllEventForms() {
       where: {
         OR: [
           { rsvpForm: { not: null } },
-          { attendanceForm: { not: null } }
+          { attendanceForm: { not: null } },
+          { memberRsvpUrl: { not: null } }
         ]
       }
     });
@@ -397,7 +398,8 @@ export async function syncAllEventForms() {
           eventId: event.id,
           eventName: event.eventName,
           rsvp: { processed: 0, errors: 0 },
-          attendance: { processed: 0, errors: 0 }
+          attendance: { processed: 0, errors: 0 },
+          memberRsvp: { processed: 0, errors: 0 }
         };
 
         // Sync RSVP if form URL exists
@@ -408,6 +410,11 @@ export async function syncAllEventForms() {
         // Sync attendance if form URL exists  
         if (event.attendanceForm) {
           eventResult.attendance = await syncEventAttendance(event.id);
+        }
+
+        // Sync member RSVP if form URL exists
+        if (event.memberRsvpUrl) {
+          eventResult.memberRsvp = await syncMemberEventRSVP(event.id);
         }
 
         results.push(eventResult);

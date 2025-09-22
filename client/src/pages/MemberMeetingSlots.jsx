@@ -244,7 +244,15 @@ export default function MemberMeetingSlots() {
   };
 
   const onDelete = async (slotId) => {
-    if (!window.confirm('Are you sure you want to delete this meeting slot? This action cannot be undone.')) {
+    // Find the slot to check if it has signups
+    const slot = slots.find(s => s.id === slotId);
+    const hasSignups = slot && slot.signups.length > 0;
+    
+    const confirmMessage = hasSignups 
+      ? `Are you sure you want to delete this meeting slot? This will cancel the meeting for ${slot.signups.length} signup(s) and send them cancellation emails. This action cannot be undone.`
+      : 'Are you sure you want to delete this meeting slot? This action cannot be undone.';
+    
+    if (!window.confirm(confirmMessage)) {
       return;
     }
     
@@ -710,11 +718,11 @@ export default function MemberMeetingSlots() {
                             <EditIcon />
                           </IconButton>
                         </Tooltip>
-                        <Tooltip title="Delete slot">
+                        <Tooltip title={slot.signups.length > 0 ? "Delete slot (will send cancellation emails)" : "Delete slot"}>
                           <IconButton 
                             size="small"
                             onClick={() => onDelete(slot.id)}
-                            disabled={slot.signups.length > 0 || editingSlot !== null}
+                            disabled={editingSlot !== null}
                             sx={{ color: 'error.main' }}
                           >
                             <CancelIcon />

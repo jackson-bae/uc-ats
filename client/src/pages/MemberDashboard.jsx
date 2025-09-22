@@ -439,7 +439,7 @@ export default function MemberDashboard() {
       {/* Tasks and Resources Container */}
       <Grid container spacing={3}>
         {/* Your Tasks Section */}
-        <Grid item xs={12} md={6}>
+        <Grid size={{ xs: 12, md: 6 }}>
           <Paper sx={{ height: 'fit-content' }}>
             <Box
               sx={{
@@ -518,7 +518,7 @@ export default function MemberDashboard() {
         </Grid>
 
         {/* Resources Section */}
-        <Grid item xs={12} md={6}>
+        <Grid size={{ xs: 12, md: 6 }}>
           <Paper sx={{ height: 'fit-content', mr: -8.5 }}>
             <Box
               sx={{
@@ -625,7 +625,7 @@ export default function MemberDashboard() {
           ) : (
             <Grid container spacing={3}>
               {/* Team Members */}
-              <Grid item xs={12} md={6}>
+              <Grid size={{ xs: 12, md: 6 }}>
                 <Box>
                   <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
                     <PersonIcon sx={{ fontSize: 20 }} />
@@ -686,7 +686,7 @@ export default function MemberDashboard() {
               </Grid>
 
               {/* Team Progress */}
-              <Grid item xs={12} md={6}>
+              <Grid size={{ xs: 12, md: 6 }}>
                 <Box>
                   <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
                     <GroupIcon sx={{ fontSize: 20 }} />

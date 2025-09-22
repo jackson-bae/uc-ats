@@ -771,22 +771,18 @@ const createMeetingSignupConfirmationEmail = (candidateName, memberName, locatio
   };
 
   return {
-    subject: `Meeting Confirmation - Get to Know UC`,
+    subject: `Time Slot Confirmation - Get to Know UC`,
     html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="background-color: #007bff; padding: 20px; text-align: center; color: white;">
-          <h2 style="color: white; margin: 0;">UC Consulting ATS</h2>
-        </div>
-        
+     
+  
         <div style="padding: 30px 20px;">
-          <h3 style="color: #333; margin-bottom: 20px;">☕ Meeting Confirmation - Get to Know UC</h3>
-          
+        
           <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
             Dear ${candidateName},
           </p>
           
           <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
-            Thank you for signing up to meet with a UC Consulting member! We're excited to get to know you better.
+            Thank you for signing up to meet with a UConsulting member! We're excited to get to know you better.
           </p>
           
           <div style="background-color: #cce7ff; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #007bff;">
@@ -799,7 +795,7 @@ const createMeetingSignupConfirmationEmail = (candidateName, memberName, locatio
           
           <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
             <h4 style="color: #333; margin: 0 0 15px 0;">What to Expect</h4>
-            <p style="color: #666; margin: 8px 0;">• This is a casual 1:2 meeting to learn more about UC Consulting</p>
+            <p style="color: #666; margin: 8px 0;">• This is a casual chat to learn more about UC</p>
             <p style="color: #666; margin: 8px 0;">• Feel free to ask questions about our organization, projects, and culture</p>
             <p style="color: #666; margin: 8px 0;">• This is a great opportunity to connect with current members</p>
             <p style="color: #666; margin: 8px 0;">• No preparation required - just come ready to chat!</p>
@@ -814,8 +810,8 @@ const createMeetingSignupConfirmationEmail = (candidateName, memberName, locatio
           </p>
           
           <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
-            Best regards,<br>
-            UC Consulting Team
+            Best,<br>
+             UConsulting Recruitment Team
           </p>
         </div>
         
@@ -842,6 +838,186 @@ export const sendMeetingSignupConfirmation = async (candidateEmail, candidateNam
     return result;
   } catch (error) {
     console.error('Error in sendMeetingSignupConfirmation:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+// Create meeting signup notification email template for members
+const createMeetingSignupNotificationEmail = (memberName, candidateName, candidateEmail, studentId, location, startTime, endTime) => {
+  const formatDateTime = (date) => {
+    return new Date(date).toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const formatTime = (date) => {
+    return new Date(date).toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  return {
+    subject: `New GTKUC Signup - ${candidateName} signed up for your slot`,
+    html: `
+          
+          <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+            Hi ${memberName},
+          </p>
+          
+          <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+            Great news! Someone has signed up for one of your GTKUC slots. Here are the details:
+          </p>
+          
+          <div style="background-color: #d4edda; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #28a745;">
+            <h4 style="color: #155724; margin: 0 0 15px 0;">Meeting Details</h4>
+            <p style="color: #155724; margin: 8px 0;"><strong>Date & Time:</strong> ${formatDateTime(startTime)}</p>
+            <p style="color: #155724; margin: 8px 0;"><strong>Duration:</strong> ${formatTime(startTime)} - ${formatTime(endTime)}</p>
+            <p style="color: #155724; margin: 8px 0;"><strong>Location:</strong> ${location}</p>
+          </div>
+          
+          <div style="background-color: #cce7ff; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #007bff;">
+            <h4 style="color: #004085; margin: 0 0 15px 0;">Candidate Information</h4>
+            <p style="color: #004085; margin: 8px 0;"><strong>Name:</strong> ${candidateName}</p>
+            <p style="color: #004085; margin: 8px 0;"><strong>Email:</strong> ${candidateEmail}</p>
+          </div>
+          
+          <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h4 style="color: #333; margin: 0 0 15px 0;">Next Steps</h4>
+            <p style="color: #666; margin: 8px 0;">• Mark attendance after the meeting in the ATS system</p>
+            <p style="color: #666; margin: 8px 0;">• Contact the candidate if you need to reschedule</p>
+          </div>
+          
+          <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+            You can view and manage all your meeting slots in the <a href="https://uconsultingats.com/member/meeting-slots" style="color: #007bff;">Member Dashboard</a>.
+          </p>
+          
+          <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+            Best regards,<br>
+            UConsulting Recruitment Team
+          </p>
+        </div>
+        
+        <div style="background-color: #f8f9fa; padding: 20px; text-align: center; color: #666; font-size: 12px;">
+          <p style="margin: 0;">This is an automated message. Please do not reply to this email.</p>
+        </div>
+      </div>
+    `
+  };
+};
+
+// Send meeting signup notification email to member
+export const sendMeetingSignupNotification = async (memberEmail, memberName, candidateName, candidateEmail, studentId, location, startTime, endTime) => {
+  try {
+    const emailContent = createMeetingSignupNotificationEmail(memberName, candidateName, candidateEmail, studentId, location, startTime, endTime);
+    const result = await sendEmail(memberEmail, emailContent.subject, emailContent.html);
+    
+    if (result.success) {
+      console.log(`Meeting signup notification email sent to ${memberEmail} for signup by ${candidateName}`);
+    } else {
+      console.error(`Failed to send meeting signup notification email to ${memberEmail}:`, result.error);
+    }
+    
+    return result;
+  } catch (error) {
+    console.error('Error in sendMeetingSignupNotification:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+// Create meeting cancellation email template
+const createMeetingCancellationEmail = (candidateName, memberName, location, startTime, endTime) => {
+  const formatDateTime = (date) => {
+    return new Date(date).toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const formatTime = (date) => {
+    return new Date(date).toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  return {
+    subject: `Meeting Cancelled - Get to Know UC`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background-color: #dc3545; padding: 20px; text-align: center; color: white;">
+          <h2 style="color: white; margin: 0;">UC Consulting ATS</h2>
+        </div>
+        
+        <div style="padding: 30px 20px;">
+          <h3 style="color: #333; margin-bottom: 20px;">❌ Meeting Cancelled</h3>
+          
+          <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+            Dear ${candidateName},
+          </p>
+          
+          <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+            We regret to inform you that your scheduled meeting with UC Consulting has been cancelled.
+          </p>
+          
+          <div style="background-color: #f8d7da; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #dc3545;">
+            <h4 style="color: #721c24; margin: 0 0 15px 0;">Cancelled Meeting Details</h4>
+            <p style="color: #721c24; margin: 8px 0;"><strong>Member:</strong> ${memberName}</p>
+            <p style="color: #721c24; margin: 8px 0;"><strong>Date & Time:</strong> ${formatDateTime(startTime)}</p>
+            <p style="color: #721c24; margin: 8px 0;"><strong>Duration:</strong> ${formatTime(startTime)} - ${formatTime(endTime)}</p>
+            <p style="color: #721c24; margin: 8px 0;"><strong>Location:</strong> ${location}</p>
+          </div>
+          
+          <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h4 style="color: #333; margin: 0 0 15px 0;">What's Next?</h4>
+            <p style="color: #666; margin: 8px 0;">• You can sign up for other available meeting slots</p>
+            <p style="color: #666; margin: 8px 0;">• Visit our <a href="http://localhost:5173/meet" style="color: #007bff;">meeting signup page</a> to see available slots</p>
+            <p style="color: #666; margin: 8px 0;">• If you have any questions, please contact us at <strong>uconsultingla@gmail.com</strong></p>
+            <p style="color: #666; margin: 8px 0;">• We apologize for any inconvenience this may cause</p>
+          </div>
+          
+          <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+            We appreciate your interest in UC Consulting and hope you'll consider signing up for another meeting slot.
+          </p>
+          
+          <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+            Best regards,<br>
+            UC Consulting Team
+          </p>
+        </div>
+        
+        <div style="background-color: #f8f9fa; padding: 20px; text-align: center; color: #666; font-size: 12px;">
+          <p style="margin: 0;">This is an automated message. Please do not reply to this email.</p>
+        </div>
+      </div>
+    `
+  };
+};
+
+// Send meeting cancellation email
+export const sendMeetingCancellationEmail = async (candidateEmail, candidateName, memberName, location, startTime, endTime) => {
+  try {
+    const emailContent = createMeetingCancellationEmail(candidateName, memberName, location, startTime, endTime);
+    const result = await sendEmail(candidateEmail, emailContent.subject, emailContent.html);
+    
+    if (result.success) {
+      console.log(`Meeting cancellation email sent to ${candidateEmail} for cancelled meeting with ${memberName}`);
+    } else {
+      console.error(`Failed to send meeting cancellation email to ${candidateEmail}:`, result.error);
+    }
+    
+    return result;
+  } catch (error) {
+    console.error('Error in sendMeetingCancellationEmail:', error);
     return { success: false, error: error.message };
   }
 };

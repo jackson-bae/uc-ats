@@ -1,0 +1,28 @@
+{
+    "name": "Member Event RSVP Form",
+    "description": "Configuration for member event RSVP Google Forms",
+    "database_mappings": {
+    },
+    "field_patterns": {
+        "email": {
+            "field": "email",
+            "type": "string",
+            "required": true,
+            "validation": "email",
+            "patterns": ["email", "e-mail", "email address"]
+        },
+        "firstName": {
+            "field": "firstName",
+            "type": "string",
+            "required": false,
+            "patterns": ["first name", "firstname", "first", "given name"]
+        },
+        "lastName": {
+            "field": "lastName",
+            "type": "string",
+            "required": false,
+            "patterns": ["last name", "lastname", "last", "surname", "family name"]
+        }
+    },
+    "prisma_model": "MemberEventRsvp"
+}
