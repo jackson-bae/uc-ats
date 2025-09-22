@@ -291,15 +291,49 @@ router.post('/meeting-slots', requireAuth, async (req, res) => {
     if (!location || !startTime) {
       return res.status(400).json({ error: 'Location and start time are required' });
     }
+    
+    // Convert datetime-local input to UTC
+    // datetime-local sends format: "YYYY-MM-DDTHH:MM" (no timezone info)
+    // We need to treat this as PST time and convert to UTC
+    const createUTCDate = (dateTimeString) => {
+      if (!dateTimeString) return null;
+      
+      console.log('Creating UTC date from:', dateTimeString);
+      
+      // Parse the datetime-local string and treat it as PST
+      const [datePart, timePart] = dateTimeString.split('T');
+      const [year, month, day] = datePart.split('-').map(Number);
+      const [hour, minute] = timePart.split(':').map(Number);
+      
+      console.log('Parsed components:', { year, month, day, hour, minute });
+      
+      // Create date in PST (UTC-8) - note: PST is UTC-8, PDT is UTC-7
+      // For simplicity, we'll use PST (UTC-8) year-round
+      // To convert PST to UTC, we add 8 hours
+      const utcDate = new Date(Date.UTC(year, month - 1, day, hour + 8, minute));
+      
+      console.log('Created UTC date:', utcDate);
+      console.log('UTC date toISOString:', utcDate.toISOString());
+      
+      return utcDate;
+    };
+    
+    console.log('Received startTime:', startTime);
+    console.log('Received endTime:', endTime);
+    
     const slot = await prisma.meetingSlot.create({
       data: {
         memberId: req.user.id,
         location,
-        startTime: new Date(startTime),
-        endTime: endTime ? new Date(endTime) : null,
+        startTime: createUTCDate(startTime),
+        endTime: endTime ? createUTCDate(endTime) : null,
         capacity: Number.isInteger(capacity) ? capacity : 2
       }
     });
+    
+    console.log('Created slot startTime:', slot.startTime);
+    console.log('Created slot endTime:', slot.endTime);
+    
     res.json(slot);
   } catch (error) {
     console.error('[POST /api/member/meeting-slots]', error);
@@ -319,6 +353,109 @@ router.get('/meeting-slots', requireAuth, async (req, res) => {
   } catch (error) {
     console.error('[GET /api/member/meeting-slots]', error);
     res.status(500).json({ error: 'Failed to fetch meeting slots' });
+  }
+});
+
+// Member: update a meeting slot
+router.put('/meeting-slots/:id', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { location, startTime, endTime, capacity } = req.body || {};
+    
+    // Check if the slot belongs to this member
+    const existingSlot = await prisma.meetingSlot.findUnique({
+      where: { id },
+      include: { signups: true }
+    });
+    
+    if (!existingSlot) {
+      return res.status(404).json({ error: 'Meeting slot not found' });
+    }
+    
+    if (existingSlot.memberId !== req.user.id) {
+      return res.status(403).json({ error: 'Not authorized to update this meeting slot' });
+    }
+    
+    // Check if there are existing signups and the new time conflicts
+    if (existingSlot.signups.length > 0) {
+      // If there are signups, only allow updating location and capacity
+      if (startTime || endTime) {
+        return res.status(400).json({ 
+          error: 'Cannot change time of meeting slot with existing signups. Only location and capacity can be updated.' 
+        });
+      }
+    }
+    
+    // Convert datetime-local input to UTC (same logic as create)
+    const createUTCDate = (dateTimeString) => {
+      if (!dateTimeString) return null;
+      
+      // Parse the datetime-local string and treat it as PST
+      const [datePart, timePart] = dateTimeString.split('T');
+      const [year, month, day] = datePart.split('-').map(Number);
+      const [hour, minute] = timePart.split(':').map(Number);
+      
+      // Create date in PST (UTC-8) - note: PST is UTC-8, PDT is UTC-7
+      // For simplicity, we'll use PST (UTC-8) year-round
+      // To convert PST to UTC, we add 8 hours
+      const utcDate = new Date(Date.UTC(year, month - 1, day, hour + 8, minute));
+      
+      return utcDate;
+    };
+    
+    const updateData = {};
+    if (location !== undefined) updateData.location = location;
+    if (startTime !== undefined) updateData.startTime = createUTCDate(startTime);
+    if (endTime !== undefined) updateData.endTime = endTime ? createUTCDate(endTime) : null;
+    if (capacity !== undefined) updateData.capacity = Number.isInteger(capacity) ? capacity : existingSlot.capacity;
+    
+    const updatedSlot = await prisma.meetingSlot.update({
+      where: { id },
+      data: updateData,
+      include: { signups: true }
+    });
+    
+    res.json(updatedSlot);
+  } catch (error) {
+    console.error('[PUT /api/member/meeting-slots/:id]', error);
+    res.status(500).json({ error: 'Failed to update meeting slot' });
+  }
+});
+
+// Member: delete a meeting slot
+router.delete('/meeting-slots/:id', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Check if the slot belongs to this member
+    const existingSlot = await prisma.meetingSlot.findUnique({
+      where: { id },
+      include: { signups: true }
+    });
+    
+    if (!existingSlot) {
+      return res.status(404).json({ error: 'Meeting slot not found' });
+    }
+    
+    if (existingSlot.memberId !== req.user.id) {
+      return res.status(403).json({ error: 'Not authorized to delete this meeting slot' });
+    }
+    
+    // Check if there are existing signups
+    if (existingSlot.signups.length > 0) {
+      return res.status(400).json({ 
+        error: 'Cannot delete meeting slot with existing signups. Please contact signups first or wait for them to cancel.' 
+      });
+    }
+    
+    await prisma.meetingSlot.delete({
+      where: { id }
+    });
+    
+    res.json({ message: 'Meeting slot deleted successfully' });
+  } catch (error) {
+    console.error('[DELETE /api/member/meeting-slots/:id]', error);
+    res.status(500).json({ error: 'Failed to delete meeting slot' });
   }
 });
 

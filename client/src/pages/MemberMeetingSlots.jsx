@@ -46,6 +46,9 @@ export default function MemberMeetingSlots() {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [dateError, setDateError] = useState('');
+  const [editingSlot, setEditingSlot] = useState(null);
+  const [editForm, setEditForm] = useState({ location: '', startTime: '', endTime: '', capacity: 2 });
+  const [editDateError, setEditDateError] = useState('');
 
   useEffect(() => {
     api.setToken(token);
@@ -122,7 +125,16 @@ export default function MemberMeetingSlots() {
       setSubmitting(true);
       setError('');
       setDateError('');
-      await api.post('/member/meeting-slots', form);
+      
+      console.log('Sending form data:', form);
+      console.log('startTime type:', typeof form.startTime);
+      console.log('startTime value:', form.startTime);
+      console.log('endTime type:', typeof form.endTime);
+      console.log('endTime value:', form.endTime);
+      
+      const response = await api.post('/member/meeting-slots', form);
+      console.log('Response from server:', response);
+      
       setForm({ location: '', startTime: '', endTime: '', capacity: 2 });
       await load();
     } catch (e) {
@@ -141,11 +153,122 @@ export default function MemberMeetingSlots() {
     }
   };
 
+  const startEdit = (slot) => {
+    setEditingSlot(slot);
+    // Convert UTC time back to datetime-local format for editing
+    const startDate = new Date(slot.startTime);
+    const endDate = slot.endTime ? new Date(slot.endTime) : null;
+    
+    console.log('Original slot startTime:', slot.startTime);
+    console.log('Parsed startDate:', startDate);
+    console.log('StartDate toISOString:', startDate.toISOString());
+    
+    // Format for datetime-local input - convert from UTC to PST
+    const formatForInput = (date) => {
+      // The date is stored as UTC, convert to PST for editing
+      const pstDate = new Date(date.getTime() - (8 * 60 * 60 * 1000));
+      
+      // Format for datetime-local input (YYYY-MM-DDTHH:MM)
+      const year = pstDate.getFullYear();
+      const month = String(pstDate.getMonth() + 1).padStart(2, '0');
+      const day = String(pstDate.getDate()).padStart(2, '0');
+      const hours = String(pstDate.getHours()).padStart(2, '0');
+      const minutes = String(pstDate.getMinutes()).padStart(2, '0');
+      
+      const formatted = `${year}-${month}-${day}T${hours}:${minutes}`;
+      console.log('PST date:', pstDate);
+      console.log('Formatted for input:', formatted);
+      return formatted;
+    };
+    
+    const startTimeFormatted = formatForInput(startDate);
+    const endTimeFormatted = endDate ? formatForInput(endDate) : '';
+    
+    console.log('Setting edit form with:', {
+      startTime: startTimeFormatted,
+      endTime: endTimeFormatted
+    });
+    
+    setEditForm({
+      location: slot.location,
+      startTime: startTimeFormatted,
+      endTime: endTimeFormatted,
+      capacity: slot.capacity
+    });
+    setEditDateError('');
+  };
+
+  const cancelEdit = () => {
+    setEditingSlot(null);
+    setEditForm({ location: '', startTime: '', endTime: '', capacity: 2 });
+    setEditDateError('');
+  };
+
+  const onUpdate = async (e) => {
+    e.preventDefault();
+    
+    // Validate dates before submitting
+    const startTimeError = validateDate(editForm.startTime);
+    const endTimeError = validateDate(editForm.endTime);
+    
+    if (startTimeError || endTimeError) {
+      setEditDateError(startTimeError || endTimeError);
+      return;
+    }
+    
+    // Check if end time is after start time
+    if (editForm.endTime && editForm.startTime && new Date(editForm.endTime) <= new Date(editForm.startTime)) {
+      setEditDateError('End time must be after start time');
+      return;
+    }
+    
+    try {
+      setSubmitting(true);
+      setError('');
+      setEditDateError('');
+      
+      console.log('Updating slot:', editingSlot.id, 'with data:', editForm);
+      console.log('Edit form startTime:', editForm.startTime);
+      console.log('Edit form endTime:', editForm.endTime);
+      
+      const response = await api.put(`/member/meeting-slots/${editingSlot.id}`, editForm);
+      console.log('Update response:', response);
+      setEditingSlot(null);
+      setEditForm({ location: '', startTime: '', endTime: '', capacity: 2 });
+      await load();
+    } catch (e) {
+      setError(e.message || 'Failed to update meeting slot');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const onDelete = async (slotId) => {
+    if (!window.confirm('Are you sure you want to delete this meeting slot? This action cannot be undone.')) {
+      return;
+    }
+    
+    try {
+      setSubmitting(true);
+      setError('');
+      await api.delete(`/member/meeting-slots/${slotId}`);
+      await load();
+    } catch (e) {
+      setError(e.message || 'Failed to delete meeting slot');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleAddToCalendar = (slot) => {
     try {
-      // Format dates for Google Calendar
-      const startDate = new Date(slot.startTime);
-      const endDate = slot.endTime ? new Date(slot.endTime) : new Date(startDate.getTime() + 30 * 60 * 1000); // Default 30 minutes if no end time
+      // Convert UTC time back to PST for Google Calendar
+      const utcStartDate = new Date(slot.startTime);
+      const utcEndDate = slot.endTime ? new Date(slot.endTime) : new Date(utcStartDate.getTime() + 30 * 60 * 1000);
+      
+      // Convert to PST (subtract 8 hours)
+      const startDate = new Date(utcStartDate.getTime() - (8 * 60 * 60 * 1000));
+      const endDate = new Date(utcEndDate.getTime() - (8 * 60 * 60 * 1000));
       
       // Format dates to YYYYMMDDTHHMMSSZ format (UTC)
       const formatDateForGoogle = (date) => {
@@ -155,21 +278,23 @@ export default function MemberMeetingSlots() {
       const startTime = formatDateForGoogle(startDate);
       const endTime = formatDateForGoogle(endDate);
 
-      // Create event details
+      // Create event details using PST times
       const eventTitle = 'Get to Know UC - Meeting Slot';
       const timeString = startDate.toLocaleTimeString('en-US', { 
         hour: 'numeric', 
         minute: '2-digit',
-        hour12: true 
+        hour12: true,
+        timeZone: 'America/Los_Angeles'
       });
       const dateString = startDate.toLocaleDateString('en-US', { 
         weekday: 'long',
         year: 'numeric',
         month: 'long',
-        day: 'numeric'
+        day: 'numeric',
+        timeZone: 'America/Los_Angeles'
       });
       
-      const eventDescription = `Get to Know UC Meeting Slot\n\nMeeting Details:\nDate: ${dateString}\nTime: ${timeString}\nLocation: ${slot.location}\n\nThis is your scheduled meeting slot for "Get to Know UC" where you'll meet with potential candidates.`;
+      const eventDescription = `Get to Know UC Meeting Slot\n\nMeeting Details:\nDate: ${dateString}\nTime: ${timeString} PST\nLocation: ${slot.location}\n\nThis is your scheduled meeting slot for "Get to Know UC" where you'll meet with potential candidates.`;
       const eventLocation = slot.location;
 
       // Create Google Calendar URL
@@ -191,20 +316,33 @@ export default function MemberMeetingSlots() {
   };
 
   const formatDateTime = (dateTime) => {
-    return new Date(dateTime).toLocaleString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true
-    });
+    console.log('formatDateTime input:', dateTime);
+    // Convert UTC time to PST for display
+    const utcDate = new Date(dateTime);
+    console.log('UTC date:', utcDate);
+    console.log('UTC date toISOString:', utcDate.toISOString());
+    
+    // Convert UTC to PST (subtract 8 hours)
+    const pstDate = new Date(utcDate.getTime() - (8 * 60 * 60 * 1000));
+    console.log('PST date:', pstDate);
+    
+    // Format manually using UTC methods to avoid timezone issues
+    const weekday = pstDate.toLocaleDateString('en-US', { weekday: 'short' });
+    const month = pstDate.toLocaleDateString('en-US', { month: 'short' });
+    const day = pstDate.getUTCDate();
+    const hour = pstDate.getUTCHours();
+    const minute = pstDate.getUTCMinutes();
+    
+    const formatted = `${weekday}, ${month} ${day}, ${hour === 0 ? 12 : hour > 12 ? hour - 12 : hour}:${minute.toString().padStart(2, '0')} ${hour < 12 ? 'AM' : 'PM'}`;
+    console.log('formatDateTime output:', formatted);
+    return formatted;
   };
 
   const getSlotStatus = (slot) => {
     const now = new Date();
-    const startTime = new Date(slot.startTime);
-    const endTime = slot.endTime ? new Date(slot.endTime) : new Date(startTime.getTime() + 60 * 60 * 1000); // Default 1 hour
+    // Convert stored UTC times back to PST for comparison
+    const startTime = new Date(new Date(slot.startTime).getTime() - (8 * 60 * 60 * 1000));
+    const endTime = slot.endTime ? new Date(new Date(slot.endTime).getTime() - (8 * 60 * 60 * 1000)) : new Date(startTime.getTime() + 60 * 60 * 1000); // Default 1 hour
     
     if (now < startTime) return 'upcoming';
     if (now >= startTime && now <= endTime) return 'active';
@@ -365,6 +503,132 @@ export default function MemberMeetingSlots() {
         </Box>
       </Paper>
 
+      {/* Edit Meeting Slot Form */}
+      {editingSlot && (
+        <Paper sx={{ p: 3, mb: 4, border: '2px solid', borderColor: 'primary.main' }}>
+          <Typography variant="h5" component="h2" sx={{ fontWeight: 600, mb: 3, color: 'primary.dark' }}>
+            Edit Meeting Slot
+          </Typography>
+          
+          <Box component="form" onSubmit={onUpdate}>
+            <Grid container spacing={3}>
+              <Grid item xs={12} md={3}>
+                <TextField
+                  fullWidth
+                  label="Location"
+                  placeholder="e.g., Kerckhoff 152"
+                  value={editForm.location}
+                  onChange={(e) => setEditForm({ ...editForm, location: e.target.value })}
+                  required
+                  InputProps={{
+                    startAdornment: <LocationIcon sx={{ color: 'text.secondary', mr: 1 }} />
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12} md={3}>
+                <TextField
+                  fullWidth
+                  label="Start Time"
+                  type="datetime-local"
+                  value={editForm.startTime}
+                  onChange={(e) => {
+                    const error = validateDate(e.target.value);
+                    setEditDateError(error || '');
+                    setEditForm({ ...editForm, startTime: e.target.value });
+                  }}
+                  required
+                  error={!!editDateError}
+                  helperText={editDateError}
+                  inputProps={{
+                    min: new Date().toISOString().slice(0, 16),
+                    max: new Date(new Date().getFullYear() + 1, 11, 31).toISOString().slice(0, 16)
+                  }}
+                  InputProps={{
+                    startAdornment: <ScheduleIcon sx={{ color: 'text.secondary', mr: 1 }} />
+                  }}
+                  InputLabelProps={{ shrink: true }}
+                />
+              </Grid>
+              <Grid item xs={12} md={3}>
+                <TextField
+                  fullWidth
+                  label="End Time (Optional)"
+                  type="datetime-local"
+                  value={editForm.endTime}
+                  onChange={(e) => {
+                    const error = validateDate(e.target.value);
+                    setEditDateError(error || '');
+                    setEditForm({ ...editForm, endTime: e.target.value });
+                  }}
+                  inputProps={{
+                    min: editForm.startTime || new Date().toISOString().slice(0, 16),
+                    max: new Date(new Date().getFullYear() + 1, 11, 31).toISOString().slice(0, 16)
+                  }}
+                  InputProps={{
+                    startAdornment: <ScheduleIcon sx={{ color: 'text.secondary', mr: 1 }} />
+                  }}
+                  InputLabelProps={{ shrink: true }}
+                />
+              </Grid>
+              <Grid item xs={12} md={2}>
+                <TextField
+                  fullWidth
+                  label="Capacity"
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={editForm.capacity}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === '') {
+                      setEditForm({ ...editForm, capacity: '' });
+                    } else {
+                      const numValue = parseInt(value, 10);
+                      if (!isNaN(numValue) && numValue >= 1 && numValue <= 10) {
+                        setEditForm({ ...editForm, capacity: numValue });
+                      }
+                    }
+                  }}
+                  onBlur={(e) => {
+                    const value = e.target.value;
+                    if (value === '' || isNaN(parseInt(value, 10))) {
+                      setEditForm({ ...editForm, capacity: 2 });
+                    }
+                  }}
+                  InputProps={{
+                    startAdornment: <PeopleIcon sx={{ color: 'text.secondary', mr: 1 }} />
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12} md={1}>
+                <Stack spacing={1}>
+                  <Button
+                    type="submit"
+                    variant="contained"
+                    fullWidth
+                    disabled={submitting || !!editDateError || !editForm.location || !editForm.startTime || !editForm.capacity || editForm.capacity < 1 || editForm.capacity > 10}
+                    startIcon={<EditIcon />}
+                    sx={{ height: '28px' }}
+                  >
+                    {submitting ? 'Updating...' : 'Update'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outlined"
+                    fullWidth
+                    onClick={cancelEdit}
+                    disabled={submitting}
+                    sx={{ height: '28px' }}
+                  >
+                    Cancel
+                  </Button>
+                </Stack>
+              </Grid>
+            </Grid>
+          </Box>
+        </Paper>
+      )}
+
       {/* Meeting Slots List */}
       <Paper sx={{ p: 3 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
@@ -438,8 +702,22 @@ export default function MemberMeetingSlots() {
                           </IconButton>
                         </Tooltip>
                         <Tooltip title="Edit slot">
-                          <IconButton size="small">
+                          <IconButton 
+                            size="small"
+                            onClick={() => startEdit(slot)}
+                            disabled={editingSlot !== null}
+                          >
                             <EditIcon />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Delete slot">
+                          <IconButton 
+                            size="small"
+                            onClick={() => onDelete(slot.id)}
+                            disabled={slot.signups.length > 0 || editingSlot !== null}
+                            sx={{ color: 'error.main' }}
+                          >
+                            <CancelIcon />
                           </IconButton>
                         </Tooltip>
                       </Box>

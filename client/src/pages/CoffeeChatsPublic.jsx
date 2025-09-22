@@ -74,14 +74,19 @@ export default function CoffeeChatsPublic() {
   };
 
   const formatDateTime = (dateTime) => {
-    return new Date(dateTime).toLocaleString('en-US', {
-      weekday: 'long',
-      month: 'long',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true
-    });
+    // Convert UTC time to PST for display
+    const utcDate = new Date(dateTime);
+    // Convert UTC to PST (subtract 8 hours)
+    const pstDate = new Date(utcDate.getTime() - (8 * 60 * 60 * 1000));
+    
+    // Format manually using UTC methods to avoid timezone issues
+    const weekday = pstDate.toLocaleDateString('en-US', { weekday: 'long' });
+    const month = pstDate.toLocaleDateString('en-US', { month: 'long' });
+    const day = pstDate.getUTCDate();
+    const hour = pstDate.getUTCHours();
+    const minute = pstDate.getUTCMinutes();
+    
+    return `${weekday}, ${month} ${day}, ${hour === 0 ? 12 : hour > 12 ? hour - 12 : hour}:${minute.toString().padStart(2, '0')} ${hour < 12 ? 'AM' : 'PM'}`;
   };
 
   const getSelectedSlotData = () => {
