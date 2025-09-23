@@ -270,36 +270,35 @@ export default function MemberMeetingSlots() {
 
   const handleAddToCalendar = (slot) => {
     try {
-      // Convert UTC time back to PST for Google Calendar
+      // Use the UTC times directly from the database for Google Calendar
+      // Google Calendar expects UTC times in the URL format
       const utcStartDate = new Date(slot.startTime);
       const utcEndDate = slot.endTime ? new Date(slot.endTime) : new Date(utcStartDate.getTime() + 30 * 60 * 1000);
       
-      // Convert to PST (subtract 8 hours)
-      const startDate = new Date(utcStartDate.getTime() - (8 * 60 * 60 * 1000));
-      const endDate = new Date(utcEndDate.getTime() - (8 * 60 * 60 * 1000));
-      
-      // Format dates to YYYYMMDDTHHMMSSZ format (UTC)
+      // Format dates to YYYYMMDDTHHMMSSZ format (UTC) - use the original UTC times
       const formatDateForGoogle = (date) => {
         return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
       };
 
-      const startTime = formatDateForGoogle(startDate);
-      const endTime = formatDateForGoogle(endDate);
+      const startTime = formatDateForGoogle(utcStartDate);
+      const endTime = formatDateForGoogle(utcEndDate);
 
-      // Create event details using PST times
+      // Create event details using PST times for display
       const eventTitle = 'Get to Know UC - Meeting Slot';
-      const timeString = startDate.toLocaleTimeString('en-US', { 
+      
+      // Convert UTC to PST for display in description
+      const pstStartDate = new Date(utcStartDate.getTime() - (8 * 60 * 60 * 1000));
+      
+      const timeString = pstStartDate.toLocaleTimeString('en-US', { 
         hour: 'numeric', 
         minute: '2-digit',
-        hour12: true,
-        timeZone: 'America/Los_Angeles'
+        hour12: true
       });
-      const dateString = startDate.toLocaleDateString('en-US', { 
+      const dateString = pstStartDate.toLocaleDateString('en-US', { 
         weekday: 'long',
         year: 'numeric',
         month: 'long',
-        day: 'numeric',
-        timeZone: 'America/Los_Angeles'
+        day: 'numeric'
       });
       
       const eventDescription = `Get to Know UC Meeting Slot\n\nMeeting Details:\nDate: ${dateString}\nTime: ${timeString} PST\nLocation: ${slot.location}\n\nThis is your scheduled meeting slot for "Get to Know UC" where you'll meet with potential candidates.`;
