@@ -270,24 +270,31 @@ export default function MemberMeetingSlots() {
 
   const handleAddToCalendar = (slot) => {
     try {
-      // Use the UTC times directly from the database for Google Calendar
-      // Google Calendar expects UTC times in the URL format
+      // Convert UTC time back to PST for Google Calendar
       const utcStartDate = new Date(slot.startTime);
       const utcEndDate = slot.endTime ? new Date(slot.endTime) : new Date(utcStartDate.getTime() + 30 * 60 * 1000);
       
-      // Format dates to YYYYMMDDTHHMMSSZ format (UTC) - use the original UTC times
+      // Convert to PST (subtract 8 hours) for Google Calendar
+      const pstStartDate = new Date(utcStartDate.getTime() - (8 * 60 * 60 * 1000));
+      const pstEndDate = new Date(utcEndDate.getTime() - (8 * 60 * 60 * 1000));
+      
+      // Format dates to YYYYMMDDTHHMMSSZ format for Google Calendar
+      // Google Calendar expects the time to be in the user's local timezone
       const formatDateForGoogle = (date) => {
-        return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        const seconds = String(date.getSeconds()).padStart(2, '0');
+        return `${year}${month}${day}T${hours}${minutes}${seconds}`;
       };
 
-      const startTime = formatDateForGoogle(utcStartDate);
-      const endTime = formatDateForGoogle(utcEndDate);
+      const startTime = formatDateForGoogle(pstStartDate);
+      const endTime = formatDateForGoogle(pstEndDate);
 
       // Create event details using PST times for display
       const eventTitle = 'Get to Know UC - Meeting Slot';
-      
-      // Convert UTC to PST for display in description
-      const pstStartDate = new Date(utcStartDate.getTime() - (8 * 60 * 60 * 1000));
       
       const timeString = pstStartDate.toLocaleTimeString('en-US', { 
         hour: 'numeric', 
