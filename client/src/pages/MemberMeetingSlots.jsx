@@ -270,24 +270,17 @@ export default function MemberMeetingSlots() {
 
   const handleAddToCalendar = (slot) => {
     try {
-      // Convert UTC time back to PST for Google Calendar
+      // Convert UTC time back to PST for Google Calendar (subtract 8 hours)
       const utcStartDate = new Date(slot.startTime);
       const utcEndDate = slot.endTime ? new Date(slot.endTime) : new Date(utcStartDate.getTime() + 30 * 60 * 1000);
       
-      // Convert to PST (subtract 8 hours) for Google Calendar
+      // Simply subtract 8 hours from UTC to get PST
       const pstStartDate = new Date(utcStartDate.getTime() - (8 * 60 * 60 * 1000));
       const pstEndDate = new Date(utcEndDate.getTime() - (8 * 60 * 60 * 1000));
       
-      // Format dates to YYYYMMDDTHHMMSSZ format for Google Calendar
-      // Google Calendar expects the time to be in the user's local timezone
+      // Format dates to YYYYMMDDTHHMMSSZ format (UTC) - same as events page
       const formatDateForGoogle = (date) => {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        const hours = String(date.getHours()).padStart(2, '0');
-        const minutes = String(date.getMinutes()).padStart(2, '0');
-        const seconds = String(date.getSeconds()).padStart(2, '0');
-        return `${year}${month}${day}T${hours}${minutes}${seconds}`;
+        return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
       };
 
       const startTime = formatDateForGoogle(pstStartDate);
