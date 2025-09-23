@@ -270,51 +270,47 @@ export default function MemberMeetingSlots() {
 
   const handleAddToCalendar = (slot) => {
     try {
-      // Convert UTC time back to PST for Google Calendar (subtract 8 hours)
+      // Use stored UTC timestamps directly and let Google Calendar handle conversion
       const utcStartDate = new Date(slot.startTime);
       const utcEndDate = slot.endTime ? new Date(slot.endTime) : new Date(utcStartDate.getTime() + 30 * 60 * 1000);
-      
-      // Simply subtract 8 hours from UTC to get PST
-      const pstStartDate = new Date(utcStartDate.getTime() - (8 * 60 * 60 * 1000));
-      const pstEndDate = new Date(utcEndDate.getTime() - (8 * 60 * 60 * 1000));
-      
-      // Format dates to YYYYMMDDTHHMMSSZ format (UTC) - same as events page
-      const formatDateForGoogle = (date) => {
-        return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
-      };
 
-      const startTime = formatDateForGoogle(pstStartDate);
-      const endTime = formatDateForGoogle(pstEndDate);
+      // Format for Google Calendar (UTC, no manual offsets)
+      const formatDateForGoogle = (date) => date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
 
-      // Create event details using PST times for display
+      const startTime = formatDateForGoogle(utcStartDate);
+      const endTime = formatDateForGoogle(utcEndDate);
+
       const eventTitle = 'Get to Know UC - Meeting Slot';
-      
-      const timeString = pstStartDate.toLocaleTimeString('en-US', { 
-        hour: 'numeric', 
+
+      // For human-readable text, format in Los Angeles tz (handles PST/PDT automatically)
+      const timeString = utcStartDate.toLocaleTimeString('en-US', {
+        hour: 'numeric',
         minute: '2-digit',
-        hour12: true
+        hour12: true,
+        timeZone: 'America/Los_Angeles'
       });
-      const dateString = pstStartDate.toLocaleDateString('en-US', { 
+      const dateString = utcStartDate.toLocaleDateString('en-US', {
         weekday: 'long',
         year: 'numeric',
         month: 'long',
-        day: 'numeric'
+        day: 'numeric',
+        timeZone: 'America/Los_Angeles'
       });
-      
-      const eventDescription = `Get to Know UC Meeting Slot\n\nMeeting Details:\nDate: ${dateString}\nTime: ${timeString} PST\nLocation: ${slot.location}\n\nThis is your scheduled meeting slot for "Get to Know UC" where you'll meet with potential candidates.`;
+
+      const eventDescription = `Get to Know UC Meeting Slot\n\nMeeting Details:\nDate: ${dateString}\nTime: ${timeString} PT\nLocation: ${slot.location}\n\nThis is your scheduled meeting slot for "Get to Know UC" where you'll meet with potential candidates.`;
       const eventLocation = slot.location;
 
-      // Create Google Calendar URL
       const googleCalendarUrl = new URL('https://calendar.google.com/calendar/render');
       googleCalendarUrl.searchParams.set('action', 'TEMPLATE');
       googleCalendarUrl.searchParams.set('text', eventTitle);
       googleCalendarUrl.searchParams.set('dates', `${startTime}/${endTime}`);
       googleCalendarUrl.searchParams.set('details', eventDescription);
       googleCalendarUrl.searchParams.set('location', eventLocation);
-      googleCalendarUrl.searchParams.set('sf', 'true'); // Show form
-      googleCalendarUrl.searchParams.set('output', 'xml'); // Open in new tab
+      googleCalendarUrl.searchParams.set('sf', 'true');
+      googleCalendarUrl.searchParams.set('output', 'xml');
+      // Ensure Calendar UI opens with the intended timezone
+      googleCalendarUrl.searchParams.set('ctz', 'America/Los_Angeles');
 
-      // Open Google Calendar in a new tab
       window.open(googleCalendarUrl.toString(), '_blank');
     } catch (error) {
       console.error('Error adding to calendar:', error);
