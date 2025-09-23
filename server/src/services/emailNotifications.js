@@ -163,7 +163,11 @@ export const sendAttendanceConfirmation = async (candidateEmail, candidateName, 
 
 // Helper function to format event date
 export const formatEventDate = (date) => {
-  return new Date(date).toLocaleDateString('en-US', {
+  // Convert UTC time to PST for display (subtract 8 hours)
+  const utcDate = new Date(date);
+  const pstDate = new Date(utcDate.getTime() - (8 * 60 * 60 * 1000));
+  
+  return pstDate.toLocaleDateString('en-US', {
     weekday: 'long',
     year: 'numeric',
     month: 'long',
@@ -753,7 +757,11 @@ export const sendFinalRejectionEmail = async (candidateEmail, candidateName, cur
 // Create meeting signup confirmation email template
 const createMeetingSignupConfirmationEmail = (candidateName, memberName, location, startTime, endTime) => {
   const formatDateTime = (date) => {
-    return new Date(date).toLocaleDateString('en-US', {
+    // Convert UTC time to PST for display (subtract 8 hours)
+    const utcDate = new Date(date);
+    const pstDate = new Date(utcDate.getTime() - (8 * 60 * 60 * 1000));
+    
+    return pstDate.toLocaleDateString('en-US', {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
@@ -764,7 +772,11 @@ const createMeetingSignupConfirmationEmail = (candidateName, memberName, locatio
   };
 
   const formatTime = (date) => {
-    return new Date(date).toLocaleTimeString('en-US', {
+    // Convert UTC time to PST for display (subtract 8 hours)
+    const utcDate = new Date(date);
+    const pstDate = new Date(utcDate.getTime() - (8 * 60 * 60 * 1000));
+    
+    return pstDate.toLocaleTimeString('en-US', {
       hour: '2-digit',
       minute: '2-digit'
     });
@@ -845,7 +857,11 @@ export const sendMeetingSignupConfirmation = async (candidateEmail, candidateNam
 // Create meeting signup notification email template for members
 const createMeetingSignupNotificationEmail = (memberName, candidateName, candidateEmail, studentId, location, startTime, endTime) => {
   const formatDateTime = (date) => {
-    return new Date(date).toLocaleDateString('en-US', {
+    // Convert UTC time to PST for display (subtract 8 hours)
+    const utcDate = new Date(date);
+    const pstDate = new Date(utcDate.getTime() - (8 * 60 * 60 * 1000));
+    
+    return pstDate.toLocaleDateString('en-US', {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
@@ -856,7 +872,11 @@ const createMeetingSignupNotificationEmail = (memberName, candidateName, candida
   };
 
   const formatTime = (date) => {
-    return new Date(date).toLocaleTimeString('en-US', {
+    // Convert UTC time to PST for display (subtract 8 hours)
+    const utcDate = new Date(date);
+    const pstDate = new Date(utcDate.getTime() - (8 * 60 * 60 * 1000));
+    
+    return pstDate.toLocaleTimeString('en-US', {
       hour: '2-digit',
       minute: '2-digit'
     });
@@ -933,7 +953,11 @@ export const sendMeetingSignupNotification = async (memberEmail, memberName, can
 // Create meeting cancellation email template
 const createMeetingCancellationEmail = (candidateName, memberName, location, startTime, endTime) => {
   const formatDateTime = (date) => {
-    return new Date(date).toLocaleDateString('en-US', {
+    // Convert UTC time to PST for display (subtract 8 hours)
+    const utcDate = new Date(date);
+    const pstDate = new Date(utcDate.getTime() - (8 * 60 * 60 * 1000));
+    
+    return pstDate.toLocaleDateString('en-US', {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
@@ -944,7 +968,11 @@ const createMeetingCancellationEmail = (candidateName, memberName, location, sta
   };
 
   const formatTime = (date) => {
-    return new Date(date).toLocaleTimeString('en-US', {
+    // Convert UTC time to PST for display (subtract 8 hours)
+    const utcDate = new Date(date);
+    const pstDate = new Date(utcDate.getTime() - (8 * 60 * 60 * 1000));
+    
+    return pstDate.toLocaleTimeString('en-US', {
       hour: '2-digit',
       minute: '2-digit'
     });
@@ -980,7 +1008,7 @@ const createMeetingCancellationEmail = (candidateName, memberName, location, sta
           <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
             <h4 style="color: #333; margin: 0 0 15px 0;">What's Next?</h4>
             <p style="color: #666; margin: 8px 0;">• You can sign up for other available meeting slots</p>
-            <p style="color: #666; margin: 8px 0;">• Visit our <a href="http://localhost:5173/meet" style="color: #007bff;">meeting signup page</a> to see available slots</p>
+            <p style="color: #666; margin: 8px 0;">• Visit our <a href="https://uconsultingats.com/meet" style="color: #007bff;">meeting signup page</a> to see available slots</p>
             <p style="color: #666; margin: 8px 0;">• If you have any questions, please contact us at <strong>uconsultingla@gmail.com</strong></p>
             <p style="color: #666; margin: 8px 0;">• We apologize for any inconvenience this may cause</p>
           </div>
