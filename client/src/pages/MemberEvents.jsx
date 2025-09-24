@@ -15,7 +15,15 @@ export default function MemberEvents() {
       setLoading(true);
       // Use member events endpoint
       const data = await apiClient.get('/member/events');
-      setEvents(data);
+      
+      // Filter out past events
+      const now = new Date();
+      const upcomingEvents = data.filter(event => {
+        const eventDate = new Date(event.eventStartDate);
+        return eventDate >= now;
+      });
+      
+      setEvents(upcomingEvents);
     } catch (e) {
       setError('Failed to load events');
       console.error('Error fetching events:', e);

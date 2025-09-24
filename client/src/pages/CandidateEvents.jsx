@@ -15,7 +15,15 @@ export default function CandidateEvents() {
       setLoading(true);
       // Pass user email to check RSVP status
       const data = await apiClient.get(`/events?userEmail=${encodeURIComponent(user?.email || '')}`);
-      setEvents(data);
+      
+      // Filter out past events
+      const now = new Date();
+      const upcomingEvents = data.filter(event => {
+        const eventDate = new Date(event.eventStartDate);
+        return eventDate >= now;
+      });
+      
+      setEvents(upcomingEvents);
     } catch (e) {
       setError('Failed to load events');
       console.error('Error fetching events:', e);

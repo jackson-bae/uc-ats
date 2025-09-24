@@ -1,5 +1,6 @@
 import express from 'express';
 import prisma from '../prismaClient.js';
+import { requireAuth, requireAdmin } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -19,7 +20,9 @@ router.get('/', async (req, res) => {
     // Group resources by round
     const groupedResources = {
       firstRound: resources.filter(r => r.round === 'firstRound'),
-      finalRound: resources.filter(r => r.round === 'finalRound')
+      finalRound: resources.filter(r => r.round === 'finalRound'),
+      coffeeChats: resources.filter(r => r.round === 'coffeeChats'),
+      applications: resources.filter(r => r.round === 'applications')
     };
 
     res.json(groupedResources);
@@ -30,7 +33,7 @@ router.get('/', async (req, res) => {
 });
 
 // Create a new interview resource
-router.post('/', async (req, res) => {
+router.post('/', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { title, description, url, hasExternalLink, icon, round } = req.body;
 
@@ -39,8 +42,8 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Title, description, and round are required' });
     }
 
-    // Get user ID from request (you'll need to implement authentication middleware)
-    const createdBy = req.user?.id || 'ef9dcdcd-c434-4f62-b48d-f7bd5bf2c6af'; // Temporary fallback
+    // Get user ID from authenticated user
+    const createdBy = req.user.id;
 
     // Get the next order number for this round
     const maxOrder = await prisma.interviewResource.findFirst({
@@ -72,7 +75,7 @@ router.post('/', async (req, res) => {
 });
 
 // Update an interview resource
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const { title, description, url, hasExternalLink, icon, round, order } = req.body;
@@ -106,7 +109,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // Delete an interview resource
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -125,7 +128,7 @@ router.delete('/:id', async (req, res) => {
 });
 
 // Reorder resources within a round
-router.post('/reorder', async (req, res) => {
+router.post('/reorder', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { round, resourceIds } = req.body;
 

@@ -84,8 +84,15 @@
   font-size: 1.5rem;
   font-weight: 600;
   color: var(--text-primary);
-  margin: 0 0 1.5rem 0;
+  margin: 0 0 0.5rem 0;
   font-family: var(--font-family-heading);
+}
+
+.section-description {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  margin: 0 0 1.5rem 0;
+  line-height: 1.6;
 }
 
 .resources-grid {
@@ -369,6 +376,22 @@
   background-color: var(--status-error-bg);
   border: 1px solid var(--status-error-border);
   border-radius: var(--border-radius);
+}
+
+.no-data-message {
+  text-align: center;
+  padding: 2rem;
+  background-color: var(--bg-gray-lighter);
+  border: 1px solid var(--border-light);
+  border-radius: var(--border-radius);
+  margin: 1rem 0;
+}
+
+.no-data-message p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 1rem;
+  line-height: 1.6;
 }
 
 /* Responsive Design */

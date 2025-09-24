@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import api from '../utils/api';
 import '../styles/InterviewPreparation.css';
 
 // Icons for the resources
@@ -56,6 +57,26 @@ const XMarkIcon = () => (
   </svg>
 );
 
+const CoffeeChatIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M3 2h12l-1 14H4L3 2z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M15 2h4v4h-4z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M9 16v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M12 16v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M15 16v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
+const ApplicationIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    <polyline points="14,2 14,8 20,8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    <line x1="16" y1="13" x2="8" y2="13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    <line x1="16" y1="17" x2="8" y2="17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    <polyline points="10,9 9,9 8,9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
 const ResourceCard = ({ resource, onClick, onEdit, onDelete, isAdmin = false }) => {
   const getIconComponent = (iconName) => {
     switch (iconName) {
@@ -63,6 +84,10 @@ const ResourceCard = ({ resource, onClick, onEdit, onDelete, isAdmin = false }) 
         return PeopleIcon;
       case 'globe':
         return GlobeIcon;
+      case 'coffee':
+        return CoffeeChatIcon;
+      case 'application':
+        return ApplicationIcon;
       default:
         return BookIcon;
     }
@@ -122,7 +147,8 @@ const ResourceModal = ({ isOpen, onClose, onSave, resource = null, round }) => {
     description: '',
     url: '',
     hasExternalLink: true,
-    icon: 'book'
+    icon: 'book',
+    round: ''
   });
 
   useEffect(() => {
@@ -132,7 +158,8 @@ const ResourceModal = ({ isOpen, onClose, onSave, resource = null, round }) => {
         description: resource.description,
         url: resource.url || '',
         hasExternalLink: resource.hasExternalLink,
-        icon: resource.icon
+        icon: resource.icon,
+        round: round || ''
       });
     } else {
       setFormData({
@@ -140,16 +167,16 @@ const ResourceModal = ({ isOpen, onClose, onSave, resource = null, round }) => {
         description: '',
         url: '',
         hasExternalLink: true,
-        icon: 'book'
+        icon: 'book',
+        round: round || ''
       });
     }
-  }, [resource]);
+  }, [resource, round]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
     onSave({
-      ...formData,
-      round
+      ...formData
     });
     onClose();
   };
@@ -207,6 +234,21 @@ const ResourceModal = ({ isOpen, onClose, onSave, resource = null, round }) => {
             </label>
           </div>
           <div className="form-group">
+            <label htmlFor="round">Section</label>
+            <select
+              id="round"
+              value={formData.round}
+              onChange={(e) => setFormData({ ...formData, round: e.target.value })}
+              required
+            >
+              <option value="">Select a section...</option>
+              <option value="applications">Applications</option>
+              <option value="coffeeChats">Coffee Chats</option>
+              <option value="firstRound">First Round</option>
+              <option value="finalRound">Final Round</option>
+            </select>
+          </div>
+          <div className="form-group">
             <label htmlFor="icon">Icon</label>
             <select
               id="icon"
@@ -216,6 +258,8 @@ const ResourceModal = ({ isOpen, onClose, onSave, resource = null, round }) => {
               <option value="book">Book</option>
               <option value="people">People</option>
               <option value="globe">Globe</option>
+              <option value="coffee">Coffee</option>
+              <option value="application">Application</option>
             </select>
           </div>
           <div className="modal-actions">
@@ -238,7 +282,9 @@ export default function InterviewPreparation() {
   
   const [resources, setResources] = useState({
     firstRound: [],
-    finalRound: []
+    finalRound: [],
+    coffeeChats: [],
+    applications: []
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -253,12 +299,14 @@ export default function InterviewPreparation() {
   const fetchResources = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/interview-resources');
-      if (!response.ok) {
-        throw new Error('Failed to fetch resources');
-      }
-      const data = await response.json();
-      setResources(data);
+      const data = await api.get('/interview-resources');
+      // Ensure all resource arrays exist
+      setResources({
+        firstRound: data.firstRound || [],
+        finalRound: data.finalRound || [],
+        coffeeChats: data.coffeeChats || [],
+        applications: data.applications || []
+      });
     } catch (err) {
       setError(err.message);
       console.error('Error fetching resources:', err);
@@ -267,9 +315,14 @@ export default function InterviewPreparation() {
     }
   };
 
+
   useEffect(() => {
+    // Set up API client with auth token
+    if (user?.token) {
+      api.setToken(user.token);
+    }
     fetchResources();
-  }, []);
+  }, [user]);
 
   const handleResourceClick = (url) => {
     if (url && url !== '#') {
@@ -277,20 +330,10 @@ export default function InterviewPreparation() {
     }
   };
 
+
   const handleAddResource = async (newResource) => {
     try {
-      const response = await fetch('/api/interview-resources', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(newResource),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to create resource');
-      }
-
+      await api.post('/interview-resources', newResource);
       await fetchResources(); // Refresh the list
     } catch (err) {
       setError(err.message);
@@ -300,18 +343,7 @@ export default function InterviewPreparation() {
 
   const handleEditResource = async (updatedResource) => {
     try {
-      const response = await fetch(`/api/interview-resources/${modalState.resource.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(updatedResource),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update resource');
-      }
-
+      await api.put(`/interview-resources/${modalState.resource.id}`, updatedResource);
       await fetchResources(); // Refresh the list
     } catch (err) {
       setError(err.message);
@@ -325,14 +357,7 @@ export default function InterviewPreparation() {
     }
 
     try {
-      const response = await fetch(`/api/interview-resources/${resourceId}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to delete resource');
-      }
-
+      await api.delete(`/interview-resources/${resourceId}`);
       await fetchResources(); // Refresh the list
     } catch (err) {
       setError(err.message);
@@ -378,32 +403,55 @@ export default function InterviewPreparation() {
             <div className="admin-actions">
               <button 
                 className="add-resource-btn"
-                onClick={() => setModalState({ isOpen: true, resource: null, round: 'firstRound' })}
+                onClick={() => setModalState({ isOpen: true, resource: null, round: null })}
               >
                 <PlusIcon />
-                Add First Round Resource
-              </button>
-              <button 
-                className="add-resource-btn"
-                onClick={() => setModalState({ isOpen: true, resource: null, round: 'finalRound' })}
-              >
-                <PlusIcon />
-                Add Final Round Resource
+                Add Resource
               </button>
             </div>
           )}
         </div>
       </div>
 
-      <div className="social-follow">
-        <span>Follow us on:</span>
-      </div>
+     
 
       <div className="interview-prep-content">
         <div className="prep-section">
+          <h2 className="section-title">Applications</h2>
+          <div className="resources-grid">
+            {(resources.applications || []).map((resource) => (
+              <ResourceCard
+                key={resource.id}
+                resource={resource}
+                onClick={() => handleResourceClick(resource.url)}
+                onEdit={isAdmin ? (resource) => setModalState({ isOpen: true, resource, round: 'applications' }) : null}
+                onDelete={isAdmin ? handleDeleteResource : null}
+                isAdmin={isAdmin}
+              />
+            ))}
+          </div>
+        </div>
+
+        <div className="prep-section">
+          <h2 className="section-title">Coffee Chats</h2>
+          <div className="resources-grid">
+            {(resources.coffeeChats || []).map((resource) => (
+              <ResourceCard
+                key={resource.id}
+                resource={resource}
+                onClick={() => handleResourceClick(resource.url)}
+                onEdit={isAdmin ? (resource) => setModalState({ isOpen: true, resource, round: 'coffeeChats' }) : null}
+                onDelete={isAdmin ? handleDeleteResource : null}
+                isAdmin={isAdmin}
+              />
+            ))}
+          </div>
+        </div>
+
+        <div className="prep-section">
           <h2 className="section-title">First Round</h2>
           <div className="resources-grid">
-            {resources.firstRound.map((resource) => (
+            {(resources.firstRound || []).map((resource) => (
               <ResourceCard
                 key={resource.id}
                 resource={resource}
@@ -419,7 +467,7 @@ export default function InterviewPreparation() {
         <div className="prep-section">
           <h2 className="section-title">Final Round</h2>
           <div className="resources-grid">
-            {resources.finalRound.map((resource) => (
+            {(resources.finalRound || []).map((resource) => (
               <ResourceCard
                 key={resource.id}
                 resource={resource}

@@ -119,7 +119,10 @@ const UserManagement = () => {
       await apiClient.patch(`/users/${selectedUser.id}`, editForm);
       setShowEditModal(false);
       setSelectedUser(null);
+      setSuccess('User information updated successfully!');
       fetchUsers();
+      // Clear success message after 3 seconds
+      setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
       setError('Failed to update user');
       console.error('Error updating user:', err);
@@ -129,7 +132,10 @@ const UserManagement = () => {
   const handleUpdateRole = async (userId, newRole) => {
     try {
       await apiClient.patch(`/users/${userId}/role`, { role: newRole });
+      setSuccess('User role updated successfully!');
       fetchUsers();
+      // Clear success message after 3 seconds
+      setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
       setError('Failed to update user role');
       console.error('Error updating role:', err);
@@ -200,10 +206,10 @@ const UserManagement = () => {
     setShowImageModal(true);
   };
 
-  const filteredUsers = users.filter(user => {
-    const matchesSearch = user.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesRole = roleFilter === 'ALL' || user.role === roleFilter;
+  const filteredUsers = users.filter(userItem => {
+    const matchesSearch = userItem.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         userItem.email.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesRole = roleFilter === 'ALL' || userItem.role === roleFilter;
     return matchesSearch && matchesRole;
   });
 
@@ -383,15 +389,15 @@ const UserManagement = () => {
           </Box>
                             ) : (
             <Grid container spacing={1} sx={{ width: '100%' }}>
-              {filteredUsers.map(user => (
-                <Grid item xs={12} sm={6} lg={4} key={user.id}>
+              {filteredUsers.map(userItem => (
+                <Grid item xs={12} sm={6} lg={4} key={userItem.id}>
                   <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
                     <CardContent sx={{ flexGrow: 1, p: 1.5 }}>
                                           {/* User Header */}
                       <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
                         <Avatar
-                          key={`${user.id}-${user.profileImage || 'no-image'}`}
-                          src={user.profileImage ? `${user.profileImage}?t=${Date.now()}` : undefined}
+                          key={`${userItem.id}-${userItem.profileImage || 'no-image'}`}
+                          src={userItem.profileImage ? `${userItem.profileImage}?t=${Date.now()}` : undefined}
                           sx={{ 
                             width: 48, 
                             height: 48, 
@@ -404,44 +410,44 @@ const UserManagement = () => {
                             e.target.style.display = 'none';
                           }}
                         >
-                          {user.fullName.charAt(0).toUpperCase()}
+                          {userItem.fullName.charAt(0).toUpperCase()}
                         </Avatar>
                         <Box sx={{ flexGrow: 1, minWidth: 0 }}>
                           <Typography variant="h6" noWrap sx={{ fontSize: '1rem' }}>
-                            {user.fullName}
+                            {userItem.fullName}
                           </Typography>
                           <Typography variant="body2" color="text.secondary" noWrap sx={{ fontSize: '0.75rem' }}>
-                            {user.email}
+                            {userItem.email}
                           </Typography>
                         </Box>
                       </Box>
 
                     {/* User Details */}
                     <Stack spacing={1} sx={{ mb: 2 }}>
-                      {user.graduationClass && (
+                      {userItem.graduationClass && (
                         <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                           <Typography variant="body2" color="text.secondary">Class:</Typography>
-                          <Typography variant="body2">{user.graduationClass}</Typography>
+                          <Typography variant="body2">{userItem.graduationClass}</Typography>
                         </Box>
                       )}
                       <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                         <Typography variant="body2" color="text.secondary">Joined:</Typography>
                         <Typography variant="body2">
-                          {new Date(user.createdAt).toLocaleDateString()}
+                          {new Date(userItem.createdAt).toLocaleDateString()}
                         </Typography>
                       </Box>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <Typography variant="body2" color="text.secondary">Role:</Typography>
                         <Chip 
-                          label={user.role} 
-                          color={getRoleColor(user.role)}
+                          label={userItem.role} 
+                          color={getRoleColor(userItem.role)}
                           size="small"
                         />
                       </Box>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                         <Typography variant="body2" color="text.secondary">Activity:</Typography>
                         <Typography variant="body2">
-                          {user._count?.comments || 0} comments, {user._count?.evaluations || 0} evaluations
+                          {userItem._count?.comments || 0} comments, {userItem._count?.evaluations || 0} evaluations
                         </Typography>
                       </Box>
                     </Stack>
@@ -452,10 +458,10 @@ const UserManagement = () => {
                     <FormControl fullWidth size="small" sx={{ mb: 2 }}>
                       <InputLabel>Change Role</InputLabel>
                       <Select
-                        value={user.role}
+                        value={userItem.role}
                         label="Change Role"
-                        onChange={(e) => handleUpdateRole(user.id, e.target.value)}
-                        disabled={user.id === user?.id}
+                        onChange={(e) => handleUpdateRole(userItem.id, e.target.value)}
+                        disabled={userItem.id === user?.id}
                       >
                         <MenuItem value="USER">User</MenuItem>
                         <MenuItem value="MEMBER">Member</MenuItem>
@@ -469,7 +475,7 @@ const UserManagement = () => {
                     <Button
                       size="small"
                       startIcon={<PhotoCameraIcon />}
-                      onClick={() => openImageModal(user)}
+                      onClick={() => openImageModal(userItem)}
                       sx={{ minWidth: 'auto', px: 1 }}
                     >
                       Upload
@@ -477,17 +483,17 @@ const UserManagement = () => {
                     <Button
                       size="small"
                       startIcon={<EditIcon />}
-                      onClick={() => openEditModal(user)}
+                      onClick={() => openEditModal(userItem)}
                       sx={{ minWidth: 'auto', px: 1 }}
                     >
                       Edit
                     </Button>
-                    {user.id !== user?.id && (
+                    {userItem.id !== user?.id && (
                       <Button
                         size="small"
                         color="error"
                         startIcon={<DeleteIcon />}
-                        onClick={() => handleDeleteUser(user.id)}
+                        onClick={() => handleDeleteUser(userItem.id)}
                         sx={{ minWidth: 'auto', px: 1 }}
                       >
                         Delete
