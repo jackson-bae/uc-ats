@@ -361,18 +361,6 @@ export default function MemberMeetingSlots() {
     }
   };
 
-  // Filter out past meeting slots
-  const getCurrentAndFutureSlots = () => {
-    const now = new Date();
-    return slots.filter(slot => {
-      // Convert stored UTC time to PST for comparison
-      const startTime = new Date(new Date(slot.startTime).getTime() - (8 * 60 * 60 * 1000));
-      // Only show slots that haven't ended yet
-      return startTime >= now;
-    });
-  };
-
-  const currentAndFutureSlots = getCurrentAndFutureSlots();
 
   return (
     <Box sx={{ maxWidth: 1200, mx: 'auto', p: 0 }}>
@@ -652,7 +640,7 @@ export default function MemberMeetingSlots() {
             Your Meeting Slots
           </Typography>
           <Chip
-            label={`${currentAndFutureSlots.length} Active`}
+            label={`${slots.length} Total`}
             color="primary"
             variant="outlined"
           />
@@ -662,22 +650,19 @@ export default function MemberMeetingSlots() {
           <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
             <CircularProgress />
           </Box>
-        ) : currentAndFutureSlots.length === 0 ? (
+        ) : slots.length === 0 ? (
           <Box sx={{ textAlign: 'center', p: 4 }}>
             <ScheduleIcon sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
             <Typography variant="h6" color="text.secondary" sx={{ mb: 1 }}>
-              {slots.length === 0 ? 'No Meeting Slots Yet' : 'No Active Meeting Slots'}
+              No Meeting Slots Yet
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              {slots.length === 0 
-                ? 'Create your first meeting slot to start connecting with potential candidates.'
-                : 'All your meeting slots have passed. Create new ones to continue connecting with potential candidates.'
-              }
+              Create your first meeting slot to start connecting with potential candidates.
             </Typography>
           </Box>
         ) : (
           <Stack spacing={3}>
-            {currentAndFutureSlots.map((slot) => {
+            {slots.map((slot) => {
               const status = getSlotStatus(slot);
               const attendedCount = slot.signups.filter(s => s.attended).length;
               

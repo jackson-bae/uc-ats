@@ -104,6 +104,23 @@ export default function CoffeeChatsPublic() {
     return slots.find(s => s.id === selectedSlot);
   };
 
+  // Filter out past meeting slots and full capacity slots
+  const getAvailableSlots = () => {
+    const now = new Date();
+    return slots.filter(slot => {
+      // Convert stored UTC time to PST for comparison
+      const startTime = new Date(new Date(slot.startTime).getTime() - (8 * 60 * 60 * 1000));
+      // Only show slots that haven't ended yet AND have available capacity
+      return startTime >= now && slot.remaining > 0;
+    });
+  };
+
+  const availableSlots = getAvailableSlots();
+  
+  // Calculate total available spots and total spots
+  const totalAvailableSpots = availableSlots.reduce((sum, slot) => sum + slot.remaining, 0);
+  const totalSpots = slots.reduce((sum, slot) => sum + slot.capacity, 0);
+
   return (
     <Box>
       {/* Hero Section with Club Photo - Full Width */}
@@ -196,6 +213,68 @@ export default function CoffeeChatsPublic() {
             </Alert>
           </Box>
         </Container>
+
+        {/* Stats Section */}
+        {!loading && (
+          <Container maxWidth="lg" sx={{ px: { xs: 2, md: 3 }, mt: 4 }}>
+            <Box sx={{ 
+              display: 'flex', 
+              justifyContent: 'center', 
+              gap: { xs: 2, md: 4 },
+              flexWrap: 'wrap'
+            }}>
+              <Box sx={{ 
+                textAlign: 'center',
+                px: { xs: 2, md: 3 },
+                py: { xs: 1.5, md: 2 },
+                borderRadius: 2,
+                backgroundColor: 'primary.50',
+                border: 1,
+                borderColor: 'primary.200',
+                minWidth: { xs: 120, md: 140 }
+              }}>
+                <Typography variant="h4" component="div" sx={{ 
+                  fontWeight: 700, 
+                  color: 'primary.main',
+                  fontSize: { xs: '1.75rem', md: '2.125rem' }
+                }}>
+                  {totalAvailableSpots}
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ 
+                  fontSize: { xs: '0.8rem', md: '0.875rem' },
+                  fontWeight: 500
+                }}>
+                  Available Spots
+                </Typography>
+              </Box>
+              
+              <Box sx={{ 
+                textAlign: 'center',
+                px: { xs: 2, md: 3 },
+                py: { xs: 1.5, md: 2 },
+                borderRadius: 2,
+                backgroundColor: 'grey.50',
+                border: 1,
+                borderColor: 'grey.300',
+                minWidth: { xs: 120, md: 140 }
+              }}>
+                <Typography variant="h4" component="div" sx={{ 
+                  fontWeight: 700, 
+                  color: 'text.primary',
+                  fontSize: { xs: '1.75rem', md: '2.125rem' }
+                }}>
+                  {totalSpots}
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ 
+                  fontSize: { xs: '0.8rem', md: '0.875rem' },
+                  fontWeight: 500
+                }}>
+                  Total Spots
+                </Typography>
+              </Box>
+            </Box>
+          </Container>
+        )}
       </Box>
 
       <Container maxWidth="lg" sx={{ py: { xs: 3, md: 4 }, px: { xs: 1.5, md: 3 } }}>
@@ -224,19 +303,22 @@ export default function CoffeeChatsPublic() {
               <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
                 <CircularProgress />
               </Box>
-            ) : slots.length === 0 ? (
+            ) : availableSlots.length === 0 ? (
               <Box sx={{ textAlign: 'center', p: 4 }}>
                 <ScheduleIcon sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
                 <Typography variant="h6" color="text.secondary" sx={{ mb: 1 }}>
-                  No Meeting Slots Available
+                  {slots.length === 0 ? 'No Meeting Slots Available' : 'No Available Meeting Slots'}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Check back later for new meeting opportunities.
+                  {slots.length === 0 
+                    ? 'Check back later for new meeting opportunities.'
+                    : 'All meeting slots are either full or have passed. Check back later for new meeting opportunities.'
+                  }
                 </Typography>
               </Box>
             ) : (
               <Stack spacing={{ xs: 1.5, md: 2 }}>
-                {slots.map((slot) => (
+                {availableSlots.map((slot) => (
                     <Card 
                     key={slot.id} 
                     variant="outlined"
