@@ -6,6 +6,51 @@ import { sendMeetingCancellationEmail } from '../services/emailNotifications.js'
 
 const router = express.Router();
 
+// Get events for members with per-user RSVP status
+router.get('/events', requireAuth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Fetch all events with cycle for ordering/filtering
+    const events = await prisma.events.findMany({
+      include: {
+        cycle: true
+      },
+      orderBy: {
+        eventStartDate: 'asc'
+      }
+    });
+
+    // Only include events from active cycles
+    const activeEvents = events.filter(event => event.cycle?.isActive);
+
+    // Build a Set of eventIds this member RSVP'd to
+    const eventIds = activeEvents.map(e => e.id);
+    let rsvpsByEventId = new Set();
+    if (eventIds.length > 0) {
+      const memberRsvps = await prisma.memberEventRsvp.findMany({
+        where: {
+          memberId: userId,
+          eventId: { in: eventIds }
+        },
+        select: { eventId: true }
+      });
+      rsvpsByEventId = new Set(memberRsvps.map(r => r.eventId));
+    }
+
+    const eventsWithStatus = activeEvents.map(event => ({
+      ...event,
+      memberRsvpUrl: event.memberRsvpUrl || null,
+      hasMemberRsvpd: rsvpsByEventId.has(event.id)
+    }));
+
+    res.json(eventsWithStatus);
+  } catch (error) {
+    console.error('[GET /api/member/events]', error);
+    res.status(500).json({ error: 'Failed to fetch member events' });
+  }
+});
+
 // Get current user's team information
 router.get('/my-team', requireAuth, async (req, res) => {
   try {

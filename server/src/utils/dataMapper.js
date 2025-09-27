@@ -52,7 +52,15 @@ function transformValue(value, mapping) {
     
     case 'decimal':
       const numValue = parseFloat(value);
-      return isNaN(numValue) ? null : numValue;
+      if (isNaN(numValue)) {
+        // For major GPA, return 0.00 if invalid
+        if (mapping.field === 'majorGpa') {
+          console.warn(`Invalid major GPA value: "${value}". Setting to 0.00.`);
+          return 0.00;
+        }
+        return null;
+      }
+      return numValue;
     
     case 'string':
       return String(value).trim();

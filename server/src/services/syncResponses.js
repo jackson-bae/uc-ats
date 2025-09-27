@@ -54,24 +54,44 @@ export default async function syncFormResponses() {
         
         // Extract candidate information from the application data
         const studentId = dbRecord.studentId;
-        const candidateData = {
-          studentId,
-          firstName: dbRecord.firstName,
-          lastName: dbRecord.lastName,
-          email: dbRecord.email
-        };
+        const emailFromForm = (dbRecord.email || '').trim();
 
-        // Check if candidate already exists
-        let candidate = await prisma.candidate.findUnique({
-          where: { studentId }
+        // Prefer tying applications to an existing candidate by studentId or email
+        let candidate = await prisma.candidate.findFirst({
+          where: {
+            OR: [
+              studentId ? { studentId } : undefined,
+              emailFromForm ? { email: emailFromForm } : undefined
+            ].filter(Boolean)
+          }
         });
 
         if (!candidate) {
-          // Create new candidate
+          // No existing candidate, create a new one
           candidate = await prisma.candidate.create({
-            data: candidateData
+            data: {
+              studentId,
+              firstName: dbRecord.firstName,
+              lastName: dbRecord.lastName,
+              email: emailFromForm
+            }
           });
-          console.log(`Created new candidate for studentId ${studentId}: ${candidateData.firstName} ${candidateData.lastName}`);
+          console.log(`Created new candidate for studentId ${studentId}: ${dbRecord.firstName} ${dbRecord.lastName}`);
+        } else {
+          // Candidate exists: backfill any missing fields but avoid overwriting existing non-null values
+          const updates = {};
+          if (!candidate.studentId && studentId) updates.studentId = studentId;
+          if (!candidate.firstName && dbRecord.firstName) updates.firstName = dbRecord.firstName;
+          if (!candidate.lastName && dbRecord.lastName) updates.lastName = dbRecord.lastName;
+          if (!candidate.email && emailFromForm) updates.email = emailFromForm;
+
+          if (Object.keys(updates).length > 0) {
+            candidate = await prisma.candidate.update({
+              where: { id: candidate.id },
+              data: updates
+            });
+          }
+          console.log(`Linked application to existing candidate id=${candidate.id} (${candidate.firstName} ${candidate.lastName})`);
         }
 
         // Create application with candidate connection
@@ -81,7 +101,16 @@ export default async function syncFormResponses() {
           currentRound: '1', // Set to Resume Review round for new applications
           ...(activeCycle ? { cycleId: activeCycle.id } : {})
         };
-        
+
+        // Remove undefined values to avoid Prisma validation errors
+        Object.keys(dataToCreate).forEach(key => {
+          if (dataToCreate[key] === undefined) {
+            delete dataToCreate[key];
+          }
+        });
+
+        // Ensure we do not duplicate by responseID (already filtered), but also guard
+        // against the same candidate submitting twice by cycle with the same responseID
         await prisma.application.create({ data: dataToCreate });
         successCount++;
 

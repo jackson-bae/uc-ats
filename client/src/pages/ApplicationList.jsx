@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { MagnifyingGlassIcon, PlusIcon } from '@heroicons/react/24/outline';
 import apiClient from '../utils/api';
+import AuthenticatedImage from '../components/AuthenticatedImage';
+import ImageCache from '../utils/imageCache';
+import AddApplicationModal from '../components/AddApplicationModal';
 import '../styles/ApplicationList.css';
 
 export default function ApplicationList() {
@@ -16,12 +19,30 @@ export default function ApplicationList() {
     transfer: '',
     decision: ''
   });
+  const [showAddModal, setShowAddModal] = useState(false);
 
   useEffect(() => {
     const fetchApplicants = async () => {
       try {
         const data = await apiClient.get('/applications');
         setApplicants(data);
+        
+        // Preload all profile images in the background
+        const imageUrls = data
+          .filter(applicant => applicant.headshotUrl)
+          .map(applicant => applicant.headshotUrl);
+        
+        if (imageUrls.length > 0) {
+          console.log(`Preloading ${imageUrls.length} profile images...`);
+          ImageCache.preloadImages(imageUrls, apiClient.token)
+            .then(results => {
+              const successful = results.filter(r => r.status === 'fulfilled').length;
+              console.log(`Successfully preloaded ${successful}/${imageUrls.length} images`);
+            })
+            .catch(err => {
+              console.error('Error preloading images:', err);
+            });
+        }
       } catch (err) {
         setError(err.message);
       } finally {
@@ -62,10 +83,19 @@ export default function ApplicationList() {
     }));
   };
 
-  const handleImageError = (e) => {
-    e.target.style.display = 'none';
-    e.target.nextSibling.style.display = 'flex';
+  const handleApplicationAdded = () => {
+    // Refresh the applications list
+    const fetchApplicants = async () => {
+      try {
+        const data = await apiClient.get('/applications');
+        setApplicants(data);
+      } catch (err) {
+        setError(err.message);
+      }
+    };
+    fetchApplicants();
   };
+
 
   if (loading) {
     return (
@@ -87,7 +117,16 @@ export default function ApplicationList() {
     <div className="application-list">
       {/* Simple header */}
       <div className="application-list-header">
-        <h1 className="header-title">Grade Applications</h1>
+        <div className="header-top">
+          <h1 className="header-title">Grade Applications</h1>
+          <button 
+            className="add-application-btn"
+            onClick={() => setShowAddModal(true)}
+          >
+            <PlusIcon className="btn-icon" />
+            Add Application
+          </button>
+        </div>
         
         <div className="search-section">
           <div className="header-search">
@@ -183,17 +222,17 @@ export default function ApplicationList() {
                 <div className="candidate-info">
                   {/* Profile Picture with fallback */}
                   {applicant.headshotUrl ? (
-                    <>
-                      <img
-                        src={applicant.headshotUrl}
-                        alt={`${applicant.firstName} ${applicant.lastName}`}
-                        className="candidate-avatar"
-                        onError={handleImageError}
-                      />
-                      <div className="candidate-avatar-fallback" style={{ display: 'none' }}>
-                        {getInitials(applicant.firstName, applicant.lastName)}
-                      </div>
-                    </>
+                    <AuthenticatedImage
+                      src={applicant.headshotUrl}
+                      alt={`${applicant.firstName} ${applicant.lastName}`}
+                      className="candidate-avatar"
+                      style={{
+                        width: '60px',
+                        height: '60px',
+                        borderRadius: '50%',
+                        objectFit: 'cover'
+                      }}
+                    />
                   ) : (
                     <div className="candidate-avatar-fallback">
                       {getInitials(applicant.firstName, applicant.lastName)}
@@ -216,6 +255,13 @@ export default function ApplicationList() {
           ))}
         </div>
       )}
+
+      {/* Add Application Modal */}
+      <AddApplicationModal
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onSuccess={handleApplicationAdded}
+      />
     </div>
   );
 }

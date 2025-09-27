@@ -125,6 +125,188 @@ router.get('/candidates', async (req, res) => {
   }
 });
 
+router.get('/candidates/comprehensive', async (req, res) => {
+  try {
+    const candidates = await prisma.candidate.findMany({
+      include: {
+        assignedGroup: true,
+        applications: {
+          include: {
+            cycle: true,
+            comments: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    fullName: true,
+                    email: true
+                  }
+                }
+              },
+              orderBy: { createdAt: 'desc' }
+            },
+            interviewEvaluations: {
+              include: {
+                evaluator: {
+                  select: {
+                    id: true,
+                    fullName: true,
+                    email: true
+                  }
+                },
+                interview: {
+                  select: {
+                    id: true,
+                    title: true,
+                    interviewType: true,
+                    startDate: true
+                  }
+                }
+              }
+            },
+            firstRoundEvaluations: {
+              include: {
+                evaluator: {
+                  select: {
+                    id: true,
+                    fullName: true,
+                    email: true
+                  }
+                }
+              }
+            },
+            flaggedDocuments: {
+              include: {
+                flagger: {
+                  select: {
+                    id: true,
+                    fullName: true,
+                    email: true
+                  }
+                },
+                resolver: {
+                  select: {
+                    id: true,
+                    fullName: true,
+                    email: true
+                  }
+                }
+              }
+            }
+          }
+        },
+        resumeScores: {
+          include: {
+            evaluator: {
+              select: {
+                id: true,
+                fullName: true,
+                email: true
+              }
+            }
+          }
+        },
+        coverLetterScores: {
+          include: {
+            evaluator: {
+              select: {
+                id: true,
+                fullName: true,
+                email: true
+              }
+            }
+          }
+        },
+        videoScores: {
+          include: {
+            evaluator: {
+              select: {
+                id: true,
+                fullName: true,
+                email: true
+              }
+            }
+          }
+        },
+        roundOne: {
+          include: {
+            evaluations: {
+              include: {
+                evaluator: {
+                  select: {
+                    id: true,
+                    fullName: true,
+                    email: true
+                  }
+                }
+              }
+            }
+          }
+        },
+        roundTwo: {
+          include: {
+            evaluations: {
+              include: {
+                evaluator: {
+                  select: {
+                    id: true,
+                    fullName: true,
+                    email: true
+                  }
+                }
+              }
+            }
+          }
+        },
+        coffeeChat: {
+          include: {
+            evaluations: {
+              include: {
+                evaluator: {
+                  select: {
+                    id: true,
+                    fullName: true,
+                    email: true
+                  }
+                }
+              }
+            }
+          }
+        },
+        eventAttendance: {
+          include: {
+            event: {
+              select: {
+                id: true,
+                eventName: true,
+                eventStartDate: true
+              }
+            }
+          }
+        },
+        eventRsvp: {
+          include: {
+            event: {
+              select: {
+                id: true,
+                eventName: true,
+                eventStartDate: true
+              }
+            }
+          }
+        },
+        referrals: true
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    res.json(candidates);
+  } catch (error) {
+    console.error('[GET /api/admin/candidates/comprehensive]', error);
+    res.status(500).json({ error: 'Failed to fetch comprehensive candidate data' });
+  }
+});
+
 // Get all users (with optional role filter)
 router.get('/users', async (req, res) => {
   try {
@@ -220,11 +402,15 @@ router.put('/candidates/:id', async (req, res) => {
     }
 
     if (updateData.majorGpa !== undefined) {
-      const gpa = parseFloat(updateData.majorGpa);
-      if (isNaN(gpa) || gpa < 0 || gpa > 4) {
-        return res.status(400).json({ error: 'Invalid major GPA' });
+      if (updateData.majorGpa === null || updateData.majorGpa === '') {
+        updateData.majorGpa = null;
+      } else {
+        const gpa = parseFloat(updateData.majorGpa);
+        if (isNaN(gpa) || gpa < 0 || gpa > 4) {
+          return res.status(400).json({ error: 'Invalid major GPA' });
+        }
+        updateData.majorGpa = gpa;
       }
-      updateData.majorGpa = gpa;
     }
 
     const validStatuses = ['SUBMITTED', 'UNDER_REVIEW', 'ACCEPTED', 'REJECTED', 'WAITLISTED'];
@@ -3710,6 +3896,72 @@ router.patch('/flagged-documents/:id/unresolve', async (req, res) => {
   } catch (error) {
     console.error('[PATCH /api/admin/flagged-documents/:id/unresolve]', error);
     res.status(500).json({ error: 'Failed to unresolve flagged document' });
+  }
+});
+
+// Send flagged document back to members for grading
+router.patch('/flagged-documents/:id/send-back', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const flaggedDocument = await prisma.flaggedDocument.findUnique({
+      where: { id },
+      include: {
+        application: {
+          include: {
+            candidate: {
+              include: {
+                assignedGroup: {
+                  include: {
+                    memberOneUser: true,
+                    memberTwoUser: true,
+                    memberThreeUser: true
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!flaggedDocument) {
+      return res.status(404).json({ error: 'Flagged document not found' });
+    }
+
+    // Delete the flag to send it back to members
+    await prisma.flaggedDocument.delete({
+      where: { id }
+    });
+
+    // Get the group members who should grade this document
+    const group = flaggedDocument.application.candidate?.assignedGroup;
+    const groupMembers = [];
+    
+    if (group) {
+      if (group.memberOneUser) groupMembers.push(group.memberOneUser);
+      if (group.memberTwoUser) groupMembers.push(group.memberTwoUser);
+      if (group.memberThreeUser) groupMembers.push(group.memberThreeUser);
+    }
+
+    res.json({
+      message: 'Document sent back to members for grading',
+      groupMembers: groupMembers.map(member => ({
+        id: member.id,
+        fullName: member.fullName,
+        email: member.email
+      })),
+      candidate: {
+        id: flaggedDocument.application.candidate?.id,
+        firstName: flaggedDocument.application.firstName,
+        lastName: flaggedDocument.application.lastName,
+        email: flaggedDocument.application.email
+      },
+      documentType: flaggedDocument.documentType
+    });
+  } catch (error) {
+    console.error('[PATCH /api/admin/flagged-documents/:id/send-back]', error);
+    res.status(500).json({ error: 'Failed to send document back to members' });
   }
 });
 

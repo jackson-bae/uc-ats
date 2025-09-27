@@ -100,7 +100,27 @@ export default function MemberMeetingSlots() {
   const handleDateChange = (field, value) => {
     const error = validateDate(value);
     setDateError(error || '');
-    setForm({ ...form, [field]: value });
+    
+    if (field === 'startTime' && value) {
+      // When start time changes, automatically set end time to 30 minutes later
+      const startDate = new Date(value);
+      const endDate = new Date(startDate.getTime() + 30 * 60 * 1000); // Add 30 minutes
+      
+      // Format the end date for datetime-local input
+      const formatForInput = (date) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        return `${year}-${month}-${day}T${hours}:${minutes}`;
+      };
+      
+      const endTimeFormatted = formatForInput(endDate);
+      setForm({ ...form, [field]: value, endTime: endTimeFormatted });
+    } else {
+      setForm({ ...form, [field]: value });
+    }
   };
 
   const onCreate = async (e) => {
@@ -538,7 +558,27 @@ export default function MemberMeetingSlots() {
                   onChange={(e) => {
                     const error = validateDate(e.target.value);
                     setEditDateError(error || '');
-                    setEditForm({ ...editForm, startTime: e.target.value });
+                    
+                    if (e.target.value) {
+                      // When start time changes, automatically set end time to 30 minutes later
+                      const startDate = new Date(e.target.value);
+                      const endDate = new Date(startDate.getTime() + 30 * 60 * 1000); // Add 30 minutes
+                      
+                      // Format the end date for datetime-local input
+                      const formatForInput = (date) => {
+                        const year = date.getFullYear();
+                        const month = String(date.getMonth() + 1).padStart(2, '0');
+                        const day = String(date.getDate()).padStart(2, '0');
+                        const hours = String(date.getHours()).padStart(2, '0');
+                        const minutes = String(date.getMinutes()).padStart(2, '0');
+                        return `${year}-${month}-${day}T${hours}:${minutes}`;
+                      };
+                      
+                      const endTimeFormatted = formatForInput(endDate);
+                      setEditForm({ ...editForm, startTime: e.target.value, endTime: endTimeFormatted });
+                    } else {
+                      setEditForm({ ...editForm, startTime: e.target.value });
+                    }
                   }}
                   required
                   error={!!editDateError}

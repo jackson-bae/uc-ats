@@ -18,7 +18,7 @@ model User {
   resetToken           String?
   resetTokenExpiry     DateTime?
   profileImage         String?
-  studentId            String?
+  studentId            String?            @unique
   comments             Comment[]
   coverLetterScores    CoverLetterScore[]
   evaluations          Evaluation[]
@@ -79,7 +79,7 @@ model Application {
   isTransferStudent    Boolean
   priorCollegeYears    String?
   cumulativeGpa        Decimal               @db.Decimal(3, 2)
-  majorGpa             Decimal               @db.Decimal(3, 2)
+  majorGpa             Decimal?              @db.Decimal(3, 2)
   major1               String
   major2               String?
   gender               String?

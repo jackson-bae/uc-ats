@@ -91,21 +91,39 @@ const DocumentGradingModal = ({ open, onClose, application, documentType }) => {
           rubricCategories: [
             {
               id: 'scoreOne',
-              title: 'Content & Relevance',
-              description: 'How well does the cover letter address the position and demonstrate interest?',
-              maxScore: 10
+              title: 'Consulting Interest',
+              description: 'Demonstrates understanding and passion for consulting career',
+              maxScore: 4,
+              criteria: {
+                4: 'Clearly articulates professional goals in consulting that strongly align personal experiences, traits, and skills. Shows passion and purpose for consulting interest.',
+                3: 'Shows substantial knowledge of consulting industry. Has clear goals set defining match between personality and consulting.',
+                2: 'Demonstrates understanding of consulting as a career path. Lacks developed explanation of personal experiences/traits that inspire interests.',
+                1: 'Minimal or unclear interest in consulting. Little to no effort made to explore or understand the field.'
+              }
             },
             {
               id: 'scoreTwo',
-              title: 'Writing Quality',
-              description: 'Is the cover letter well-written, clear, and professional?',
-              maxScore: 10
+              title: 'UC Interest',
+              description: 'Shows specific knowledge and interest in UConsulting',
+              maxScore: 4,
+              criteria: {
+                4: 'Applies specific references of UC to personal growth objectives. Displays sincere interest to capitalize on and contribute to UC initiatives and resources.',
+                3: 'References to specific initiatives, including but not limited to past projects, committees, firm events, etc.',
+                2: 'Generic references to UC activities and dynamics. Lacks expansion or displays lack of engagement.',
+                1: 'Fails to include any UC specific details. Absence of personalization.'
+              }
             },
             {
               id: 'scoreThree',
-              title: 'Personalization & Impact',
-              description: 'How effectively does the cover letter personalize the application and show value?',
-              maxScore: 10
+              title: 'Culture Addition',
+              description: 'Demonstrates unique traits and contributions to UC culture',
+              maxScore: 4,
+              criteria: {
+                4: 'Exceptionally unique story and background. Advanced explanation of how candidate traits advance and contribute to UC.',
+                3: 'Describes noteworthy traits, qualifications, or experiences and how to apply them at UC. Demonstrates passion for something.',
+                2: 'Describes generic traits, qualifications, or experiences. Demonstrates lack of motivation and passion for an area in writing.',
+                1: 'Does not elaborate on any traits, qualifications, or experiences that make the candidate unique.'
+              }
             }
           ],
           apiEndpoint: '/review-teams/cover-letter-score',
@@ -120,21 +138,14 @@ const DocumentGradingModal = ({ open, onClose, application, documentType }) => {
           rubricCategories: [
             {
               id: 'scoreOne',
-              title: 'Communication Skills',
-              description: 'How well does the candidate communicate their thoughts and ideas?',
-              maxScore: 10
-            },
-            {
-              id: 'scoreTwo',
-              title: 'Professionalism',
-              description: 'Does the candidate present themselves professionally and appropriately?',
-              maxScore: 10
-            },
-            {
-              id: 'scoreThree',
-              title: 'Content & Engagement',
-              description: 'How engaging and relevant is the video content?',
-              maxScore: 10
+              title: 'Overall Video Assessment',
+              description: 'Comprehensive evaluation of the candidate based on video content',
+              maxScore: 2,
+              criteria: {
+                0: 'Learn little about the person, low energy, not good fit for UC',
+                1: 'Learn a little about the person, medium energy, ok fit',
+                2: 'Awesome video learn a lot about the person, high energy, definite fit for UC'
+              }
             }
           ],
           apiEndpoint: '/review-teams/video-score',
@@ -285,14 +296,50 @@ const DocumentGradingModal = ({ open, onClose, application, documentType }) => {
   };
 
   const calculateOverallScore = () => {
+    // For video, we only use scoreOne since it's a single category
+    if (documentType === 'video') {
+      return scoreOne !== '' && scoreOne !== null ? scoreOne : 0;
+    }
+    
+    // For other document types, use all three scores
     const scores = [scoreOne, scoreTwo, scoreThree].filter(score => score !== '' && score !== null);
     if (scores.length === 0) return 0;
-    return (scores.reduce((sum, score) => sum + parseInt(score), 0) / scores.length).toFixed(1);
+    const average = scores.reduce((sum, score) => sum + parseInt(score), 0) / scores.length;
+    return average.toFixed(1);
+  };
+
+  const getMaxScore = () => {
+    return config.rubricCategories[0]?.maxScore || 10;
   };
 
   const handleScoreChange = (field, value) => {
+    // Allow empty string for deletion
+    if (value === '') {
+      switch (field) {
+        case 'scoreOne':
+          setScoreOne('');
+          break;
+        case 'scoreTwo':
+          setScoreTwo('');
+          break;
+        case 'scoreThree':
+          setScoreThree('');
+          break;
+        default:
+          break;
+      }
+      return;
+    }
+
     const numValue = parseInt(value);
-    if (numValue >= 0 && numValue <= 10) {
+    const maxScore = getMaxScore();
+    const minScore = documentType === 'coverLetter' ? 1 : 0;
+    
+    // Additional validation for video to ensure max score of 2
+    const effectiveMaxScore = documentType === 'video' ? Math.min(maxScore, 2) : maxScore;
+    
+    // Allow intermediate states (like "4" when typing "42")
+    if (!isNaN(numValue) && numValue >= minScore && numValue <= effectiveMaxScore) {
       switch (field) {
         case 'scoreOne':
           setScoreOne(value);
@@ -469,18 +516,40 @@ const DocumentGradingModal = ({ open, onClose, application, documentType }) => {
                     {config.rubricCategories.map((category, index) => (
                       <Paper key={category.id} sx={{ p: 2, mb: 2 }}>
                         <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
-                          {category.title} (0-{category.maxScore})
+                          {category.title} ({documentType === 'coverLetter' ? '1' : '0'}-{documentType === 'video' ? Math.min(category.maxScore, 2) : category.maxScore})
                         </Typography>
                         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                           {category.description}
                         </Typography>
+                        
+                        {/* Show detailed criteria if available */}
+                        {category.criteria && (
+                          <Box sx={{ mb: 2 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 500, mb: 1 }}>
+                              Scoring Criteria:
+                            </Typography>
+                            {Object.entries(category.criteria).map(([score, description]) => (
+                              <Box key={score} sx={{ mb: 1, p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
+                                <Typography variant="body2" sx={{ fontWeight: 500, display: 'inline' }}>
+                                  {score} = {score == 4 ? 'Exceptional' : score == 3 ? 'Above Average' : score == 2 ? 'Average' : 'Below Average'}:
+                                </Typography>
+                                <Typography variant="body2" sx={{ ml: 1, display: 'inline' }}>
+                                  {description}
+                                </Typography>
+                              </Box>
+                            ))}
+                          </Box>
+                        )}
                         
                         <TextField
                           type="number"
                           label="Score"
                           value={category.id === 'scoreOne' ? scoreOne : category.id === 'scoreTwo' ? scoreTwo : scoreThree}
                           onChange={(e) => handleScoreChange(category.id, e.target.value)}
-                          inputProps={{ min: 0, max: category.maxScore }}
+                          inputProps={{ 
+                            min: documentType === 'coverLetter' ? 1 : 0, 
+                            max: documentType === 'video' ? Math.min(category.maxScore, 2) : category.maxScore
+                          }}
                           sx={{ width: 100, mr: 2 }}
                         />
                       </Paper>
@@ -490,10 +559,10 @@ const DocumentGradingModal = ({ open, onClose, application, documentType }) => {
                   {/* Overall Score */}
                   <Paper sx={{ p: 2, mb: 3, backgroundColor: 'primary.light', color: 'white' }}>
                     <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                      Overall Score: {calculateOverallScore()}/10
+                      Overall Score: {calculateOverallScore()}/{getMaxScore()}
                     </Typography>
                     <Typography variant="body2">
-                      Average of all three category scores
+                      {documentType === 'video' ? 'Single category score' : 'Average of all three category scores'}
                     </Typography>
                   </Paper>
 

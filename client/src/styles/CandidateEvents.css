@@ -139,6 +139,17 @@
   line-height: 1.4;
 }
 
+.event-rsvp-count {
+  font-size: 0.875rem;
+  color: var(--primary-blue);
+  font-weight: 500;
+  margin-top: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  background-color: rgba(59, 130, 246, 0.1);
+  border-radius: 4px;
+  display: inline-block;
+}
+
 /* Action Section */
 .event-action {
   flex-shrink: 0;

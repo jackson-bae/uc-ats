@@ -307,6 +307,20 @@ export default function AdminDocumentGrading() {
     }
   };
 
+  const handleSendBackToMembers = async (flagId) => {
+    try {
+      const response = await apiClient.patch(`/admin/flagged-documents/${flagId}/send-back`);
+      alert(`Document sent back to members for grading. Group members: ${response.groupMembers.map(m => m.fullName).join(', ')}`);
+      fetchFlaggedDocuments(); // Refresh the flagged list
+      if (tabValue === 4) {
+        fetchResolvedDocuments(); // Refresh the resolved list if on resolved tab
+      }
+    } catch (err) {
+      console.error('Error sending document back to members:', err);
+      alert('Error sending document back to members');
+    }
+  };
+
   const fetchFlaggedDocuments = async () => {
     try {
       setFlaggedLoading(true);
@@ -798,7 +812,7 @@ export default function AdminDocumentGrading() {
                           </Box>
                         </TableCell>
                         <TableCell>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                             <Chip
                               label="Flagged"
                               color="error"
@@ -814,6 +828,15 @@ export default function AdminDocumentGrading() {
                               sx={{ minWidth: 'auto', px: 1 }}
                             >
                               Resolve
+                            </Button>
+                            <Button
+                              size="small"
+                              variant="contained"
+                              color="primary"
+                              onClick={() => handleSendBackToMembers(flaggedDoc.id)}
+                              sx={{ minWidth: 'auto', px: 1 }}
+                            >
+                              Send Back
                             </Button>
                           </Box>
                         </TableCell>
@@ -886,7 +909,7 @@ export default function AdminDocumentGrading() {
                           </Box>
                         </TableCell>
                         <TableCell>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                             <Chip
                               label="Resolved"
                               color="success"
@@ -902,6 +925,15 @@ export default function AdminDocumentGrading() {
                               sx={{ minWidth: 'auto', px: 1 }}
                             >
                               Unresolve
+                            </Button>
+                            <Button
+                              size="small"
+                              variant="contained"
+                              color="primary"
+                              onClick={() => handleSendBackToMembers(resolvedDoc.id)}
+                              sx={{ minWidth: 'auto', px: 1 }}
+                            >
+                              Send Back
                             </Button>
                           </Box>
                         </TableCell>

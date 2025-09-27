@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import apiClient from '../utils/api';
+import ImageCache from '../utils/imageCache';
 
 const AuthenticatedImage = ({ src, alt, style, onError, ...props }) => {
   const [imageUrl, setImageUrl] = useState(null);
@@ -15,29 +16,18 @@ const AuthenticatedImage = ({ src, alt, style, onError, ...props }) => {
 
     const loadImage = async () => {
       try {
-        console.log('AuthenticatedImage: Loading image from:', src);
-        console.log('AuthenticatedImage: Token available:', !!apiClient.token);
-        
-        // Use our API client to fetch with authentication
-        const response = await fetch(src, {
-          headers: {
-            'Authorization': `Bearer ${apiClient.token}`
-          }
-        });
-
-        console.log('AuthenticatedImage: Response status:', response.status);
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('AuthenticatedImage: Error response:', errorText);
-          throw new Error(`Failed to load image: ${response.status} ${response.statusText}`);
+        // Check if image is already cached
+        const cachedImage = ImageCache.getCachedImage(src);
+        if (cachedImage) {
+          setImageUrl(cachedImage);
+          setLoading(false);
+          return;
         }
 
-        const blob = await response.blob();
-        const blobUrl = URL.createObjectURL(blob);
+        // Load image using cache
+        const blobUrl = await ImageCache.loadImage(src, apiClient.token);
         setImageUrl(blobUrl);
         setLoading(false);
-        console.log('AuthenticatedImage: Successfully loaded image');
       } catch (err) {
         console.error('Error loading image:', err);
         setError(true);
@@ -47,13 +37,6 @@ const AuthenticatedImage = ({ src, alt, style, onError, ...props }) => {
     };
 
     loadImage();
-
-    // Cleanup blob URL when component unmounts
-    return () => {
-      if (imageUrl) {
-        URL.revokeObjectURL(imageUrl);
-      }
-    };
   }, [src]);
 
   if (loading) {

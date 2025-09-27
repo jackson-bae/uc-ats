@@ -179,11 +179,12 @@ export default function MemberDashboard() {
         }
       }
       
-      // Add RSVP tasks for events that have member RSVP URLs and haven't been RSVP'd to
+      // Add RSVP tasks for events that have member RSVP URLs and the member hasn't RSVP'd yet
       const eventsNeedingRsvp = events.filter(event => 
         event.memberRsvpUrl && 
         event.eventStartDate && 
-        new Date(event.eventStartDate) > new Date() // Only future events
+        new Date(event.eventStartDate) > new Date() && // Only future events
+        !event.hasMemberRsvpd
       );
       
       eventsNeedingRsvp.forEach(event => {

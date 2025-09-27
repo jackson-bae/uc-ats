@@ -331,16 +331,22 @@ export async function syncMemberEventRSVP(eventId) {
         
         console.log(`Transformed data for member RSVP response:`, JSON.stringify(transformedData, null, 2));
         
-        // Find the member by email
+        // Find the member by student ID or email
         let member = null;
-        if (transformedData.email) {
+        if (transformedData.studentId) {
+          member = await prisma.user.findUnique({
+            where: { studentId: transformedData.studentId }
+          });
+        }
+        
+        if (!member && transformedData.email) {
           member = await prisma.user.findUnique({
             where: { email: transformedData.email }
           });
         }
 
         if (!member) {
-          console.warn(`Member not found for RSVP response: ${transformedData.email}`);
+          console.warn(`Member not found for RSVP response: studentId=${transformedData.studentId}, email=${transformedData.email}`);
           errorCount++;
           continue; // Still count as processed, but as an error
         }

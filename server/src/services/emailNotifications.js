@@ -18,7 +18,7 @@ const createRSVPConfirmationEmail = (candidateName, eventName, eventDate, eventL
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <div style="background-color: #f8f9fa; padding: 20px; text-align: center;">
-          <h2 style="color: #333; margin: 0;">UC Consulting ATS</h2>
+          <h2 style="color: #333; margin: 0;">UConsulting ATS</h2>
         </div>
         
         <div style="padding: 30px 20px;">
@@ -35,7 +35,6 @@ const createRSVPConfirmationEmail = (candidateName, eventName, eventDate, eventL
           <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
             <h4 style="color: #333; margin: 0 0 10px 0;">Event Details</h4>
             <p style="color: #666; margin: 5px 0;"><strong>Event:</strong> ${eventName}</p>
-            <p style="color: #666; margin: 5px 0;"><strong>Date:</strong> ${eventDate}</p>
             ${eventLocation ? `<p style="color: #666; margin: 5px 0;"><strong>Location:</strong> ${eventLocation}</p>` : ''}
           </div>
           
@@ -63,7 +62,7 @@ const createAttendanceConfirmationEmail = (candidateName, eventName, eventDate, 
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <div style="background-color: #f8f9fa; padding: 20px; text-align: center;">
-          <h2 style="color: #333; margin: 0;">UC Consulting ATS</h2>
+          <h2 style="color: #333; margin: 0;">UConsulting ATS</h2>
         </div>
         
         <div style="padding: 30px 20px;">
@@ -80,7 +79,6 @@ const createAttendanceConfirmationEmail = (candidateName, eventName, eventDate, 
           <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
             <h4 style="color: #333; margin: 0 0 10px 0;">Event Details</h4>
             <p style="color: #666; margin: 5px 0;"><strong>Event:</strong> ${eventName}</p>
-            <p style="color: #666; margin: 5px 0;"><strong>Date:</strong> ${eventDate}</p>
             ${eventLocation ? `<p style="color: #666; margin: 5px 0;"><strong>Location:</strong> ${eventLocation}</p>` : ''}
           </div>
           

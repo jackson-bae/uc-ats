@@ -125,6 +125,127 @@ router.get('/test-google-api', async (req, res) => {
 // All routes below require authentication
 router.use(requireAuth);
 
+// Create manual application
+router.post('/manual', async (req, res) => {
+  try {
+    
+    const {
+      firstName,
+      lastName,
+      email,
+      studentId,
+      phoneNumber,
+      graduationYear,
+      isTransferStudent,
+      priorCollegeYears,
+      cumulativeGpa,
+      majorGpa,
+      major1,
+      major2,
+      gender,
+      isFirstGeneration,
+      resumeUrl,
+      headshotUrl,
+      coverLetterUrl,
+      videoUrl,
+      responseID,
+      rawResponses
+    } = req.body;
+
+    // Validate required fields
+    const requiredFields = { firstName, lastName, email, studentId, phoneNumber, graduationYear, cumulativeGpa, major1, resumeUrl, headshotUrl };
+    const missingFields = Object.entries(requiredFields)
+      .filter(([key, value]) => {
+        // Special handling for cumulativeGpa - 0 is a valid value
+        if (key === 'cumulativeGpa') {
+          return value === null || value === undefined || (typeof value === 'string' && value.trim() === '');
+        }
+        // For other fields, check if they're falsy or empty strings
+        return !value || (typeof value === 'string' && value.trim() === '');
+      })
+      .map(([key]) => key);
+
+    if (missingFields.length > 0) {
+      return res.status(400).json({ 
+        error: `Missing required fields: ${missingFields.join(', ')}`
+      });
+    }
+
+    // Get the active recruiting cycle
+    const activeCycle = await prisma.recruitingCycle.findFirst({ 
+      where: { isActive: true } 
+    });
+
+    if (!activeCycle) {
+      return res.status(400).json({ 
+        error: 'No active recruiting cycle found. Please create an active cycle first.' 
+      });
+    }
+
+    // Check if candidate already exists
+    let candidate = await prisma.candidate.findUnique({
+      where: { studentId }
+    });
+
+    // Create candidate if doesn't exist
+    if (!candidate) {
+      candidate = await prisma.candidate.create({
+        data: {
+          studentId,
+          firstName,
+          lastName,
+          email
+        }
+      });
+    }
+
+    // Create the application
+    const applicationData = {
+      status: 'SUBMITTED',
+      responseID,
+      email,
+      firstName,
+      lastName,
+      studentId,
+      phoneNumber,
+      graduationYear,
+      isTransferStudent: isTransferStudent || false,
+      priorCollegeYears,
+      cumulativeGpa: parseFloat(cumulativeGpa),
+      major1,
+      major2,
+      gender,
+      isFirstGeneration: isFirstGeneration || false,
+      resumeUrl,
+      headshotUrl,
+      coverLetterUrl,
+      videoUrl,
+      rawResponses: rawResponses || {},
+      cycleId: activeCycle.id,
+      candidateId: candidate.id
+    };
+
+    // Handle majorGpa - set to 0.00 if empty, otherwise parse the value
+    if (majorGpa && majorGpa !== '') {
+      applicationData.majorGpa = parseFloat(majorGpa);
+    } else {
+      applicationData.majorGpa = 0.00;
+    }
+
+    const application = await prisma.application.create({
+      data: applicationData
+    });
+
+    res.status(201).json(application);
+  } catch (error) {
+    console.error('Error creating manual application:', error);
+    res.status(500).json({ 
+      error: 'Failed to create application',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
 // Get all applications with average grades
 router.get('/', async (req, res) => {
   try {
@@ -840,6 +961,12 @@ router.get('/:id/events', requireAuth, async (req, res) => {
       select: {
         cycleId: true,
         candidateId: true,
+        studentId: true,
+        candidate: {
+          select: {
+            studentId: true
+          }
+        },
         cycle: {
           select: {
             id: true,
@@ -906,7 +1033,7 @@ router.get('/:id/events', requireAuth, async (req, res) => {
     // Add "Get to Know UC" meeting attendance as a special event
     const meetingAttendance = await prisma.meetingSignup.findFirst({
       where: { 
-        studentId: application.studentId,
+        studentId: application.candidate?.studentId || application.studentId,
         attended: true
       },
       include: {

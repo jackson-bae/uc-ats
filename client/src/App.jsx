@@ -35,6 +35,8 @@ import InterviewPreparation from './pages/InterviewPreparation';
 import InterviewDetail from './pages/InterviewDetail';
 import CoffeeChatsPublic from './pages/CoffeeChatsPublic';
 import MemberMeetingSlots from './pages/MemberMeetingSlots';
+import CandidateList from './pages/CandidateList';
+import CandidateDetail from './pages/CandidateDetail';
 import './styles/variables.css';
 // Protected Route wrapper for admin/member users
 const ProtectedRoute = ({ children }) => {
@@ -169,6 +171,24 @@ const AppRoutes = () => {
       />
       
       <Route
+        path="/candidate-list"
+        element={
+          <ProtectedRoute>
+            <CandidateList />
+          </ProtectedRoute>
+        }
+      />
+      
+      <Route
+        path="/candidate-detail/:id"
+        element={
+          <ProtectedRoute>
+            <CandidateDetail />
+          </ProtectedRoute>
+        }
+      />
+      
+      <Route
         path="/staging"
         element={
           <ProtectedRoute>
@@ -204,6 +224,7 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
+      
       
       <Route
         path="/admin/interview-interface"

@@ -202,6 +202,7 @@ router.get('/events', async (req, res) => {
         ...event,
         hasRsvpd,
         hasAttended,
+        rsvpCount: event.eventRsvp.length,
         eventRsvp: undefined, // Remove the full RSVP data from response
         eventAttendance: undefined // Remove the full attendance data from response
       };

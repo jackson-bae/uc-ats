@@ -168,6 +168,11 @@ export default function CandidateEvents() {
                     {event.description}
                   </p>
                 )}
+                {event.rsvpForm && event.rsvpCount > 0 && (
+                  <div className="event-rsvp-count">
+                    {event.rsvpCount} people have RSVP'd
+                  </div>
+                )}
               </div>
               
               <div className="event-action">

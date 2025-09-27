@@ -512,7 +512,7 @@ export default function ApplicationDetail() {
               </div>
               <div className="info-item">
                 <span className="info-label">Major GPA</span>
-                <span className="info-value">{application.majorGpa}</span>
+                <span className="info-value">{application.majorGpa || 'Not provided'}</span>
               </div>
               <div className="info-item">
                 <span className="info-label">Primary Major</span>
