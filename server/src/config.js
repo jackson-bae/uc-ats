@@ -22,6 +22,9 @@ const config = {
 
   dbUrl: process.env.DATABASE_URL,
   gCloudKeyPath: process.env.GOOGLE_CLOUD_KEY_PATH ? path.resolve(process.env.GOOGLE_CLOUD_KEY_PATH) : null,
+  
+  // Base URL for file serving - defaults based on environment
+  baseUrl: process.env.BASE_URL || (process.env.NODE_ENV === 'production' ? 'https://uconsultingats.com' : 'http://localhost:3001'),
 
   form: formConfig,
 };

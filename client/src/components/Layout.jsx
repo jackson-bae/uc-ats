@@ -40,7 +40,6 @@ const Layout = ({ children }) => {
       { name: 'Events', href: '/events', icon: CalendarDaysIcon },
       { name: 'Assigned Interviews', href: '/assigned-interviews', icon: UserGroupIcon2 },
       { name: 'Applications', href: '/candidates', icon: DocumentTextIcon },
-      { name: 'Candidates', href: '/candidate-list', icon: UserGroupIcon },
       { name: 'Get to Know UC', href: '/member/meeting-slots', icon: ChatBubbleLeftRightIcon },
       { name: 'Recruitment Resources and Timeline', href: '/recruitment-resources', icon: ClipboardDocumentListIcon },
       { name: 'Message an Admin', href: '#', icon: ChatBubbleOvalLeftEllipsisIcon, isAction: true },

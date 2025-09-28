@@ -51,6 +51,142 @@ router.get('/events', requireAuth, async (req, res) => {
   }
 });
 
+// Get all applications (member version - no admin access required)
+router.get('/all-applications', requireAuth, async (req, res) => {
+  try {
+    console.log('Fetching all applications for member:', req.user.id);
+    
+    // Get the active cycle first
+    const activeCycle = await prisma.recruitingCycle.findFirst({ 
+      where: { isActive: true } 
+    });
+    
+    console.log('Active cycle found:', activeCycle?.id);
+    
+    if (!activeCycle) {
+      console.log('No active cycle found, returning empty array');
+      return res.json([]);
+    }
+
+    // Get all applications for the active cycle
+    const applications = await prisma.application.findMany({
+      where: {
+        cycleId: activeCycle.id
+      },
+      include: {
+        candidate: {
+          select: {
+            id: true,
+            assignedGroupId: true
+          }
+        }
+      },
+      orderBy: {
+        submittedAt: 'desc'
+      }
+    });
+
+    console.log('Found applications:', applications.length);
+
+    // Transform the data
+    const transformedApplications = applications.map(app => ({
+      id: app.id,
+      candidateId: app.candidateId,
+      name: `${app.firstName} ${app.lastName}`,
+      major: app.major1 || 'N/A',
+      year: app.graduationYear || 'N/A',
+      gpa: app.cumulativeGpa?.toString() || 'N/A',
+      status: app.status || 'SUBMITTED',
+      email: app.email,
+      submittedAt: app.submittedAt,
+      headshotUrl: app.headshotUrl,
+      gender: app.gender || 'N/A',
+      isFirstGeneration: app.isFirstGeneration,
+      isTransferStudent: app.isTransferStudent,
+      resumeUrl: app.resumeUrl,
+      coverLetterUrl: app.coverLetterUrl,
+      videoUrl: app.videoUrl,
+      groupId: app.candidate?.assignedGroupId,
+      groupName: app.candidate?.assignedGroupId ? 
+        `Team ${app.candidate.assignedGroupId.slice(-4)}` : 'Unassigned'
+    }));
+
+    console.log('Transformed applications:', transformedApplications.length);
+    res.json(transformedApplications);
+  } catch (error) {
+    console.error('Error fetching all applications for member:', error);
+    console.error('Error details:', error.message, error.stack);
+    res.status(500).json({ error: 'Failed to fetch applications', details: error.message });
+  }
+});
+
+// Get all candidates (member version - no admin access required)
+router.get('/all-candidates', requireAuth, async (req, res) => {
+  try {
+    console.log('Fetching all candidates for member:', req.user.id);
+    
+    // First, try a simpler query to test database connectivity
+    const candidateCount = await prisma.candidate.count();
+    console.log('Total candidates in database:', candidateCount);
+    
+    // Try the full query with error handling for each part
+    let candidates;
+    try {
+      candidates = await prisma.candidate.findMany({
+        include: {
+          assignedGroup: {
+            select: {
+              id: true,
+              memberOne: true,
+              memberTwo: true,
+              memberThree: true
+            }
+          },
+          applications: {
+            include: {
+              cycle: {
+                select: {
+                  id: true,
+                  name: true,
+                  isActive: true
+                }
+              }
+            },
+            orderBy: {
+              submittedAt: 'desc'
+            }
+          }
+        },
+        orderBy: {
+          createdAt: 'desc'
+        }
+      });
+    } catch (queryError) {
+      console.error('Prisma query error:', queryError);
+      // Try a simpler query without includes
+      candidates = await prisma.candidate.findMany({
+        select: {
+          id: true,
+          studentId: true,
+          createdAt: true,
+          assignedGroupId: true
+        },
+        orderBy: {
+          createdAt: 'desc'
+        }
+      });
+      console.log('Using simplified query, found candidates:', candidates.length);
+    }
+
+    console.log('Found candidates:', candidates.length);
+    res.json(candidates);
+  } catch (error) {
+    console.error('Error fetching all candidates for member:', error);
+    console.error('Error details:', error.message, error.stack);
+    res.status(500).json({ error: 'Failed to fetch candidates', details: error.message });
+  }
+});
+
 // Get current user's team information
 router.get('/my-team', requireAuth, async (req, res) => {
   try {
@@ -578,9 +714,9 @@ router.patch('/meeting-signups/:id/attendance', requireAuth, async (req, res) =>
               .sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt))[0];
 
             if (latestApplication) {
-              console.log(`Adding 5 points to application ${latestApplication.id} for meeting attendance (studentId: ${signup.studentId})`);
+              console.log(`Adding 3 points to application ${latestApplication.id} for meeting attendance (studentId: ${signup.studentId})`);
               
-              // Note: The 5 points will be automatically added when the overall score is calculated
+              // Note: The 3 points will be automatically added when the overall score is calculated
               // in the existing scoring system (similar to referral bonus and event points)
               // No need to store this separately as it's calculated dynamically
             }

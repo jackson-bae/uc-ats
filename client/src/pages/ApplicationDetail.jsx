@@ -3,7 +3,6 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeftIcon, DocumentIcon, ChatBubbleLeftRightIcon, ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
 import apiClient from '../utils/api';
 import AuthenticatedImage from '../components/AuthenticatedImage';
-import AuthenticatedFileLink from '../components/AuthenticatedFileLink';
 import DocumentPreviewModal from '../components/DocumentPreviewModal';
 import '../styles/ApplicationDetail.css';
 
@@ -385,7 +384,7 @@ export default function ApplicationDetail() {
                         <span className="average-grade-label">Resume</span>
                         <div>
                           <span className="average-grade-value">{calculatedAverages.resume.toFixed(1)}</span>
-                          <span className="average-grade-total">/ 10</span>
+                          <span className="average-grade-total">/ 13</span>
                         </div>
                         {resumeScores.length > 0 && (
                           <div className="average-grade-count">
@@ -398,7 +397,7 @@ export default function ApplicationDetail() {
                         <span className="average-grade-label">Video</span>
                         <div>
                           <span className="average-grade-value">{calculatedAverages.video.toFixed(1)}</span>
-                          <span className="average-grade-total">/ 10</span>
+                          <span className="average-grade-total">/ 2</span>
                         </div>
                         {videoScores.length > 0 && (
                           <div className="average-grade-count">
@@ -411,7 +410,7 @@ export default function ApplicationDetail() {
                         <span className="average-grade-label">Cover Letter</span>
                         <div>
                           <span className="average-grade-value">{calculatedAverages.cover_letter.toFixed(1)}</span>
-                          <span className="average-grade-total">/ 10</span>
+                          <span className="average-grade-total">/ 3</span>
                         </div>
                         {coverLetterScores.length > 0 && (
                           <div className="average-grade-count">
@@ -435,7 +434,7 @@ export default function ApplicationDetail() {
                         <span className="average-grade-label">Overall</span>
                         <div>
                           <span className="average-grade-value" style={{ color: '#0369a1' }}>{calculatedAverages.total.toFixed(1)}</span>
-                          <span className="average-grade-total">/ 10</span>
+                          <span className="average-grade-total">/ 18</span>
                         </div>
                         {calculatedAverages.count > 0 && (
                           <div className="average-grade-count">
@@ -444,7 +443,7 @@ export default function ApplicationDetail() {
                         )}
                         {calculatedAverages.eventPointsContribution > 0 && (
                           <div className="average-grade-count" style={{ color: '#059669', fontWeight: '600' }}>
-                            +{Math.floor(calculatedAverages.eventPointsContribution / 5)} events
+                            +{Math.floor(calculatedAverages.eventPointsContribution / 3)} events
                           </div>
                         )}
                       </div>
@@ -607,14 +606,17 @@ export default function ApplicationDetail() {
               )}
               {application.videoUrl && (
                 <div className="info-item">
-                  <AuthenticatedFileLink
-                    href={application.videoUrl}
-                    filename={`${application.firstName}_${application.lastName}_Video`}
+                  <a
+                    href="#"
                     className="document-link"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setPreview({ open: true, src: application.videoUrl, kind: 'video', title: `${application.firstName} ${application.lastName} – Video` });
+                    }}
                   >
                     <DocumentIcon className="document-icon" />
                     Video
-                  </AuthenticatedFileLink>
+                  </a>
                 </div>
               )}
             </div>
@@ -1052,7 +1054,7 @@ export default function ApplicationDetail() {
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <div style={{ fontSize: '1.125rem', fontWeight: '600', color: '#059669' }}>
-                        {score.overallScore}/10
+                        {score.overallScore}/13
                       </div>
                       <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
                         Overall Score
@@ -1105,7 +1107,7 @@ export default function ApplicationDetail() {
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <div style={{ fontSize: '1.125rem', fontWeight: '600', color: '#059669' }}>
-                        {score.overallScore}/10
+                        {score.overallScore}/3
                       </div>
                       <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
                         Overall Score
@@ -1158,7 +1160,7 @@ export default function ApplicationDetail() {
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <div style={{ fontSize: '1.125rem', fontWeight: '600', color: '#059669' }}>
-                        {score.overallScore}/10
+                        {score.overallScore}/2
                       </div>
                       <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
                         Overall Score
@@ -1331,18 +1333,40 @@ export default function ApplicationDetail() {
                 Category Scores
               </div>
               <div style={{ display: 'grid', gap: '8px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px', backgroundColor: '#f9fafb', borderRadius: '4px' }}>
-                  <span>Content & Relevance</span>
-                  <span style={{ fontWeight: '600' }}>{selectedScore.scoreOne || 'N/A'}/10</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px', backgroundColor: '#f9fafb', borderRadius: '4px' }}>
-                  <span>Structure & Formatting</span>
-                  <span style={{ fontWeight: '600' }}>{selectedScore.scoreTwo || 'N/A'}/10</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px', backgroundColor: '#f9fafb', borderRadius: '4px' }}>
-                  <span>Impact & Achievement</span>
-                  <span style={{ fontWeight: '600' }}>{selectedScore.scoreThree || 'N/A'}/10</span>
-                </div>
+                {selectedScore.documentType === 'Resume' && (
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px', backgroundColor: '#f9fafb', borderRadius: '4px' }}>
+                      <span>Content, Relevance, and Impact</span>
+                      <span style={{ fontWeight: '600' }}>{selectedScore.scoreOne || 'N/A'}/10</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px', backgroundColor: '#f9fafb', borderRadius: '4px' }}>
+                      <span>Structure & Formatting</span>
+                      <span style={{ fontWeight: '600' }}>{selectedScore.scoreTwo || 'N/A'}/3</span>
+                    </div>
+                  </>
+                )}
+                {selectedScore.documentType === 'Cover Letter' && (
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px', backgroundColor: '#f9fafb', borderRadius: '4px' }}>
+                      <span>Consulting Interest</span>
+                      <span style={{ fontWeight: '600' }}>{selectedScore.scoreOne || 'N/A'}/3</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px', backgroundColor: '#f9fafb', borderRadius: '4px' }}>
+                      <span>UC Interest</span>
+                      <span style={{ fontWeight: '600' }}>{selectedScore.scoreTwo || 'N/A'}/3</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px', backgroundColor: '#f9fafb', borderRadius: '4px' }}>
+                      <span>Culture Addition</span>
+                      <span style={{ fontWeight: '600' }}>{selectedScore.scoreThree || 'N/A'}/3</span>
+                    </div>
+                  </>
+                )}
+                {selectedScore.documentType === 'Video' && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px', backgroundColor: '#f9fafb', borderRadius: '4px' }}>
+                    <span>Overall Video Assessment</span>
+                    <span style={{ fontWeight: '600' }}>{selectedScore.scoreOne || 'N/A'}/2</span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1351,7 +1375,9 @@ export default function ApplicationDetail() {
                 Overall Score
               </div>
               <div style={{ fontSize: '1.25rem', fontWeight: '600', color: '#059669' }}>
-                {selectedScore.overallScore}/10
+                {selectedScore.overallScore}/{selectedScore.documentType === 'Resume' ? '13' : 
+                                           selectedScore.documentType === 'Cover Letter' ? '3' : 
+                                           selectedScore.documentType === 'Video' ? '2' : '10'}
               </div>
             </div>
 

@@ -2294,7 +2294,7 @@ router.get('/staging/candidates', async (req, res) => {
 
       overallScore += totalEventPoints;
 
-      // Add meeting attendance bonus (5 points for attending "Get to Know UC")
+      // Add meeting attendance bonus (3 points for attending "Get to Know UC")
       const meetingAttendance = await prisma.meetingSignup.findFirst({
         where: { 
           studentId: app.studentId,
@@ -2303,7 +2303,7 @@ router.get('/staging/candidates', async (req, res) => {
       });
 
       if (meetingAttendance) {
-        overallScore += 5;
+        overallScore += 3;
       }
 
       // Build attendance object

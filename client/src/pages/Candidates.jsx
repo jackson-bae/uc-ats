@@ -33,9 +33,13 @@ export default function Candidates() {
       if (!user?.id) return;
       setLoading(true);
       try {
-        const data = await apiClient.get(`/review-teams/member-applications/${user.id}`);
+        // Use member endpoint to get all applications, not just assigned ones
+        const data = await apiClient.get('/member/all-applications');
+        console.log('Fetched all applications data:', data);
+        console.log('Number of applications:', data?.length || 0);
         setApplications(Array.isArray(data) ? data : []);
       } catch (e) {
+        console.error('Error loading applications:', e);
         setError(e.message || 'Failed to load applications');
       } finally {
         setLoading(false);

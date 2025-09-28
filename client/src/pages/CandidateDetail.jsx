@@ -14,7 +14,7 @@ export default function CandidateDetail() {
   useEffect(() => {
     const fetchCandidate = async () => {
       try {
-        const data = await apiClient.get(`/admin/candidates/comprehensive`);
+        const data = await apiClient.get(`/member/all-candidates`);
         const foundCandidate = data.find(c => c.id === id);
         if (foundCandidate) {
           setCandidate(foundCandidate);
@@ -22,6 +22,7 @@ export default function CandidateDetail() {
           setError('Candidate not found');
         }
       } catch (err) {
+        console.error('Error loading candidate detail:', err);
         setError(err.message);
       } finally {
         setLoading(false);
@@ -31,8 +32,30 @@ export default function CandidateDetail() {
     fetchCandidate();
   }, [id]);
 
-  const getInitials = (firstName, lastName) => {
-    return `${firstName?.charAt(0) || ''}${lastName?.charAt(0) || ''}`.toUpperCase();
+  const getInitials = (name) => {
+    if (!name) return '?';
+    const nameParts = name.split(' ');
+    return nameParts.map(part => part.charAt(0)).join('').toUpperCase().slice(0, 2);
+  };
+
+  // Helper function to get candidate display info from applications
+  const getCandidateDisplayInfo = (candidate) => {
+    const latestApp = candidate.applications?.[0];
+    if (!latestApp) {
+      return {
+        name: 'Unknown Candidate',
+        email: 'N/A',
+        firstName: 'Unknown',
+        lastName: 'Candidate'
+      };
+    }
+    
+    return {
+      name: `${latestApp.firstName} ${latestApp.lastName}`,
+      email: latestApp.email,
+      firstName: latestApp.firstName,
+      lastName: latestApp.lastName
+    };
   };
 
   const formatDate = (dateString) => {
@@ -77,6 +100,8 @@ export default function CandidateDetail() {
     );
   }
 
+  const displayInfo = getCandidateDisplayInfo(candidate);
+
   return (
     <div className="candidate-detail">
       {/* Header */}
@@ -94,7 +119,7 @@ export default function CandidateDetail() {
           {candidate.applications && candidate.applications.length > 0 && candidate.applications[0].headshotUrl ? (
             <AuthenticatedImage
               src={candidate.applications[0].headshotUrl}
-              alt={`${candidate.firstName} ${candidate.lastName}`}
+              alt={displayInfo.name}
               className="candidate-avatar-large"
               style={{
                 width: '120px',
@@ -105,13 +130,13 @@ export default function CandidateDetail() {
             />
           ) : (
             <div className="candidate-avatar-large-fallback">
-              {getInitials(candidate.firstName, candidate.lastName)}
+              {getInitials(displayInfo.name)}
             </div>
           )}
           <div className="candidate-basic-info">
-            <h2 className="candidate-name">{candidate.firstName} {candidate.lastName}</h2>
-            <p className="candidate-email">{candidate.email}</p>
-            <p className="candidate-student-id">Student ID: {candidate.studentId}</p>
+            <h2 className="candidate-name">{displayInfo.name}</h2>
+            <p className="candidate-email">{displayInfo.email}</p>
+            <p className="candidate-student-id">Student ID: {candidate.studentId || 'N/A'}</p>
             <div className="candidate-status">
               <span className={`status-badge ${candidate.applications && candidate.applications.length > 0 ? 'applied' : 'not_applied'}`}>
                 {candidate.applications && candidate.applications.length > 0 ? 'APPLIED' : 'NOT APPLIED'}

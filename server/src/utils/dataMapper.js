@@ -81,7 +81,9 @@ function generateFileUrl(fileData, fileType) {
   }
   
   const fileId = fileData.fileId;
-  const baseUrl = process.env.BASE_URL || 'http://localhost:3001';
+  
+  // Use the base URL from config
+  const baseUrl = config.baseUrl;
   
   // Prefer actual MIME type when present
   const actualMimeType = fileData.mimeType;

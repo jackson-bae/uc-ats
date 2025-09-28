@@ -1,16 +1,31 @@
 // /server/src/prismaClient.js
 import { PrismaClient } from '@prisma/client';
 
+// Enhance database URL with connection pool parameters
+const enhanceDatabaseUrl = (url) => {
+  if (!url) return url;
+  
+  // Add connection pool parameters if not already present
+  const urlObj = new URL(url);
+  
+  // Set connection pool parameters
+  urlObj.searchParams.set('connection_limit', '10');  // Allow up to 10 connections
+  urlObj.searchParams.set('pool_timeout', '20');      // 20 second pool timeout
+  urlObj.searchParams.set('connect_timeout', '10');   // 10 second connection timeout
+  
+  return urlObj.toString();
+};
+
 const prisma = new PrismaClient({
   datasources: {
     db: {
-      url: process.env.DATABASE_URL,
+      url: enhanceDatabaseUrl(process.env.DATABASE_URL),
     },
   },
   log: ['error', 'warn'],
   transactionOptions: {
-    maxWait: 3000,    // Reduced from 5s to 3s
-    timeout: 8000,    // Reduced from 10s to 8s
+    maxWait: 5000,    // Increased to 5s
+    timeout: 10000,   // Increased to 10s
     isolationLevel: 'ReadCommitted',
   },
   // Add connection pooling configuration

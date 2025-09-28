@@ -62,21 +62,25 @@ const DocumentGradingModal = ({ open, onClose, application, documentType }) => {
           rubricCategories: [
             {
               id: 'scoreOne',
-              title: 'Content & Relevance',
-              description: 'How well does the resume showcase relevant experience and skills?',
-              maxScore: 10
+              title: 'Content, Relevance, and Impact',
+              description: 'Evaluates how well the resume showcases relevant experience, leadership, and business acumen while clearly demonstrating measurable impact and achievements.',
+              maxScore: 10,
+              criteria: {
+                '1-3': 'Mostly generic experience, little relevance, no clear results',
+                '4-6': 'Relevant experience present, but minimal quantification or impact',
+                '7-10': 'Strong, relevant experience with leadership/impact metrics and quantifiable outcomes'
+              }
             },
             {
               id: 'scoreTwo',
               title: 'Structure & Formatting',
-              description: 'Is the resume well-organized, professional, and easy to read?',
-              maxScore: 10
-            },
-            {
-              id: 'scoreThree',
-              title: 'Impact & Achievement',
-              description: 'How effectively does the resume demonstrate quantifiable achievements?',
-              maxScore: 10
+              description: 'Assesses professionalism, organization, and readability.',
+              maxScore: 3,
+              criteria: {
+                1: 'Major red flags',
+                2: 'Easy to read but lacks professionalism',
+                3: 'Professional, structured and fully complete bullet points'
+              }
             }
           ],
           apiEndpoint: '/review-teams/resume-score',
@@ -93,11 +97,10 @@ const DocumentGradingModal = ({ open, onClose, application, documentType }) => {
               id: 'scoreOne',
               title: 'Consulting Interest',
               description: 'Demonstrates understanding and passion for consulting career',
-              maxScore: 4,
+              maxScore: 3,
               criteria: {
-                4: 'Clearly articulates professional goals in consulting that strongly align personal experiences, traits, and skills. Shows passion and purpose for consulting interest.',
-                3: 'Shows substantial knowledge of consulting industry. Has clear goals set defining match between personality and consulting.',
-                2: 'Demonstrates understanding of consulting as a career path. Lacks developed explanation of personal experiences/traits that inspire interests.',
+                3: 'Clearly articulates professional goals in consulting that strongly align personal experiences, traits, and skills. Shows passion and purpose for consulting interest.',
+                2: 'Shows substantial knowledge of consulting industry. Has clear goals set defining match between personality and consulting.',
                 1: 'Minimal or unclear interest in consulting. Little to no effort made to explore or understand the field.'
               }
             },
@@ -105,11 +108,10 @@ const DocumentGradingModal = ({ open, onClose, application, documentType }) => {
               id: 'scoreTwo',
               title: 'UC Interest',
               description: 'Shows specific knowledge and interest in UConsulting',
-              maxScore: 4,
+              maxScore: 3,
               criteria: {
-                4: 'Applies specific references of UC to personal growth objectives. Displays sincere interest to capitalize on and contribute to UC initiatives and resources.',
-                3: 'References to specific initiatives, including but not limited to past projects, committees, firm events, etc.',
-                2: 'Generic references to UC activities and dynamics. Lacks expansion or displays lack of engagement.',
+                3: 'Applies specific references of UC to personal growth objectives. Displays sincere interest to capitalize on and contribute to UC initiatives and resources.',
+                2: 'References to specific initiatives, including but not limited to past projects, committees, firm events, etc.',
                 1: 'Fails to include any UC specific details. Absence of personalization.'
               }
             },
@@ -117,11 +119,10 @@ const DocumentGradingModal = ({ open, onClose, application, documentType }) => {
               id: 'scoreThree',
               title: 'Culture Addition',
               description: 'Demonstrates unique traits and contributions to UC culture',
-              maxScore: 4,
+              maxScore: 3,
               criteria: {
-                4: 'Exceptionally unique story and background. Advanced explanation of how candidate traits advance and contribute to UC.',
-                3: 'Describes noteworthy traits, qualifications, or experiences and how to apply them at UC. Demonstrates passion for something.',
-                2: 'Describes generic traits, qualifications, or experiences. Demonstrates lack of motivation and passion for an area in writing.',
+                3: 'Exceptionally unique story and background. Advanced explanation of how candidate traits advance and contribute to UC.',
+                2: 'Describes noteworthy traits, qualifications, or experiences and how to apply them at UC. Demonstrates passion for something.',
                 1: 'Does not elaborate on any traits, qualifications, or experiences that make the candidate unique.'
               }
             }
@@ -301,7 +302,16 @@ const DocumentGradingModal = ({ open, onClose, application, documentType }) => {
       return scoreOne !== '' && scoreOne !== null ? scoreOne : 0;
     }
     
-    // For other document types, use all three scores
+    // For resume, we have 2 categories with different max scores (10 and 3)
+    if (documentType === 'resume') {
+      const scores = [scoreOne, scoreTwo].filter(score => score !== '' && score !== null);
+      if (scores.length === 0) return 0;
+      const totalScore = scores.reduce((sum, score) => sum + parseInt(score), 0);
+      const maxPossibleScore = 13; // 10 + 3
+      return totalScore;
+    }
+    
+    // For other document types (cover letter), use all three scores
     const scores = [scoreOne, scoreTwo, scoreThree].filter(score => score !== '' && score !== null);
     if (scores.length === 0) return 0;
     const average = scores.reduce((sum, score) => sum + parseInt(score), 0) / scores.length;
@@ -309,6 +319,9 @@ const DocumentGradingModal = ({ open, onClose, application, documentType }) => {
   };
 
   const getMaxScore = () => {
+    if (documentType === 'resume') {
+      return 13; // 10 + 3
+    }
     return config.rubricCategories[0]?.maxScore || 10;
   };
 
@@ -332,11 +345,30 @@ const DocumentGradingModal = ({ open, onClose, application, documentType }) => {
     }
 
     const numValue = parseInt(value);
-    const maxScore = getMaxScore();
-    const minScore = documentType === 'coverLetter' ? 1 : 0;
+    let minScore = 0;
+    if (documentType === 'coverLetter') {
+      minScore = 1;
+    } else if (documentType === 'resume' && field === 'scoreOne') {
+      minScore = 1; // Content, Relevance, and Impact minimum is 1
+    }
     
-    // Additional validation for video to ensure max score of 2
-    const effectiveMaxScore = documentType === 'video' ? Math.min(maxScore, 2) : maxScore;
+    // Get the max score for the specific field
+    let effectiveMaxScore;
+    if (documentType === 'resume') {
+      if (field === 'scoreOne') {
+        effectiveMaxScore = 10; // Content, Relevance, and Impact
+      } else if (field === 'scoreTwo') {
+        effectiveMaxScore = 3; // Structure & Formatting
+      } else {
+        effectiveMaxScore = 0; // scoreThree not used for resume
+      }
+    } else if (documentType === 'video') {
+      effectiveMaxScore = 2;
+    } else if (documentType === 'coverLetter') {
+      effectiveMaxScore = 3; // All cover letter categories now max at 3
+    } else {
+      effectiveMaxScore = getMaxScore();
+    }
     
     // Allow intermediate states (like "4" when typing "42")
     if (!isNaN(numValue) && numValue >= minScore && numValue <= effectiveMaxScore) {
@@ -516,7 +548,9 @@ const DocumentGradingModal = ({ open, onClose, application, documentType }) => {
                     {config.rubricCategories.map((category, index) => (
                       <Paper key={category.id} sx={{ p: 2, mb: 2 }}>
                         <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
-                          {category.title} ({documentType === 'coverLetter' ? '1' : '0'}-{documentType === 'video' ? Math.min(category.maxScore, 2) : category.maxScore})
+                          {category.title} ({documentType === 'coverLetter' ? '1' : 
+                                           documentType === 'resume' && category.id === 'scoreOne' ? '1' : 
+                                           documentType === 'resume' && category.id === 'scoreTwo' ? '1' : '0'}-{documentType === 'video' ? Math.min(category.maxScore, 2) : category.maxScore})
                         </Typography>
                         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                           {category.description}
@@ -528,16 +562,53 @@ const DocumentGradingModal = ({ open, onClose, application, documentType }) => {
                             <Typography variant="body2" sx={{ fontWeight: 500, mb: 1 }}>
                               Scoring Criteria:
                             </Typography>
-                            {Object.entries(category.criteria).map(([score, description]) => (
-                              <Box key={score} sx={{ mb: 1, p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
-                                <Typography variant="body2" sx={{ fontWeight: 500, display: 'inline' }}>
-                                  {score} = {score == 4 ? 'Exceptional' : score == 3 ? 'Above Average' : score == 2 ? 'Average' : 'Below Average'}:
-                                </Typography>
-                                <Typography variant="body2" sx={{ ml: 1, display: 'inline' }}>
-                                  {description}
-                                </Typography>
+                            <Box sx={{ 
+                              border: 1, 
+                              borderColor: 'grey.300', 
+                              borderRadius: 1, 
+                              overflow: 'hidden',
+                              mb: 1
+                            }}>
+                              <Box sx={{ 
+                                display: 'grid', 
+                                gridTemplateColumns: 'auto 1fr',
+                                '& > *': { 
+                                  borderBottom: 1, 
+                                  borderColor: 'grey.300',
+                                  p: 1
+                                }
+                              }}>
+                                <Box sx={{ 
+                                  bgcolor: 'grey.100', 
+                                  fontWeight: 600,
+                                  borderRight: 1,
+                                  borderColor: 'grey.300'
+                                }}>
+                                  Score Range
+                                </Box>
+                                <Box sx={{ 
+                                  bgcolor: 'grey.100', 
+                                  fontWeight: 600
+                                }}>
+                                  Description
+                                </Box>
+                                {Object.entries(category.criteria).map(([score, description]) => (
+                                  <React.Fragment key={score}>
+                                    <Box sx={{ 
+                                      bgcolor: 'grey.50',
+                                      borderRight: 1,
+                                      borderColor: 'grey.300',
+                                      fontWeight: 500
+                                    }}>
+                                      {score}
+                                    </Box>
+                                    <Box sx={{ bgcolor: 'grey.50' }}>
+                                      {description}
+                                    </Box>
+                                  </React.Fragment>
+                                ))}
                               </Box>
-                            ))}
+                            </Box>
                           </Box>
                         )}
                         
@@ -547,8 +618,9 @@ const DocumentGradingModal = ({ open, onClose, application, documentType }) => {
                           value={category.id === 'scoreOne' ? scoreOne : category.id === 'scoreTwo' ? scoreTwo : scoreThree}
                           onChange={(e) => handleScoreChange(category.id, e.target.value)}
                           inputProps={{ 
-                            min: documentType === 'coverLetter' ? 1 : 0, 
-                            max: documentType === 'video' ? Math.min(category.maxScore, 2) : category.maxScore
+                            min: (documentType === 'coverLetter') ? 1 : 
+                                 (documentType === 'resume' && category.id === 'scoreOne') ? 1 : 0, 
+                            max: category.maxScore
                           }}
                           sx={{ width: 100, mr: 2 }}
                         />
@@ -562,7 +634,9 @@ const DocumentGradingModal = ({ open, onClose, application, documentType }) => {
                       Overall Score: {calculateOverallScore()}/{getMaxScore()}
                     </Typography>
                     <Typography variant="body2">
-                      {documentType === 'video' ? 'Single category score' : 'Average of all three category scores'}
+                      {documentType === 'video' ? 'Single category score' : 
+                       documentType === 'resume' ? 'Sum of Content/Relevance/Impact (1-10) and Structure/Formatting (1-3)' :
+                       'Average of all three category scores'}
                     </Typography>
                   </Paper>
 
@@ -583,7 +657,7 @@ const DocumentGradingModal = ({ open, onClose, application, documentType }) => {
                     variant="contained"
                     startIcon={<SaveIcon />}
                     onClick={handleSave}
-                    disabled={saving || (!scoreOne && !scoreTwo && !scoreThree)}
+                    disabled={saving || (documentType === 'resume' ? (!scoreOne && !scoreTwo) : (!scoreOne && !scoreTwo && !scoreThree))}
                     fullWidth
                     size="large"
                   >

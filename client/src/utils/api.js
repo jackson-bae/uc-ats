@@ -30,13 +30,30 @@ class ApiClient {
     const response = await fetch(url, config);
     
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'An error occurred' }));
+      let error;
+      try {
+        error = await response.json();
+      } catch (parseError) {
+        // If JSON parsing fails, try to get text response
+        try {
+          const textResponse = await response.text();
+          error = { error: `Server Error (${response.status}): ${textResponse || response.statusText}` };
+        } catch (textError) {
+          error = { error: `Server Error (${response.status}): ${response.statusText}` };
+        }
+      }
+      
       console.error('API Error Response:', {
         status: response.status,
         statusText: response.statusText,
-        error: error
+        error: error,
+        url: url
       });
-      throw new Error(error.error || 'Request failed');
+      
+      // Include more details in the error message
+      const errorMessage = error.error || error.message || 'Request failed';
+      const detailedError = `${errorMessage} (Status: ${response.status})`;
+      throw new Error(detailedError);
     }
 
     return response.json();
