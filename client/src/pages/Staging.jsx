@@ -315,17 +315,16 @@ const AttendanceDisplay = ({ attendance, events }) => {
     return isAttended;
   };
 
-  // Calculate attendance summary
-  const totalEvents = events.length;
-  const attendedEvents = events.filter(event => getAttendanceStatus(event)).length;
-  const attendancePercentage = totalEvents > 0 ? Math.round((attendedEvents / totalEvents) * 100) : 0;
+  // Filter to only show attended events
+  const attendedEventsList = events.filter(event => getAttendanceStatus(event));
+  const attendedEventsCount = attendedEventsList.length;
 
-  // Handle case where no attendance data exists
-  if (!attendance || Object.keys(attendance).length === 0) {
+  // Handle case where no events were attended
+  if (attendedEventsCount === 0) {
     return (
       <Box display="flex" alignItems="center" justifyContent="center" minHeight="60px">
         <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-          No attendance data available
+          No events attended
         </Typography>
       </Box>
     );
@@ -335,35 +334,26 @@ const AttendanceDisplay = ({ attendance, events }) => {
     <Stack spacing={0.5}>
       {/* Summary row */}
       <Box display="flex" alignItems="center" gap={1} sx={{ mb: 0.5 }}>
-        <Tooltip 
-          title={`${attendedEvents} out of ${totalEvents} events attended (${attendancePercentage}% attendance rate)`}
-          arrow
+        <Typography 
+          variant="caption" 
+          color="success.main"
+          sx={{ 
+            fontWeight: 600, 
+            fontSize: '0.75rem'
+          }}
         >
-          <Typography 
-            variant="caption" 
-            color={attendancePercentage >= 80 ? "success.main" : 
-                   attendancePercentage >= 60 ? "warning.main" : 
-                   attendancePercentage >= 40 ? "info.main" : "error.main"}
-            sx={{ 
-              fontWeight: 600, 
-              fontSize: '0.75rem',
-              cursor: 'help'
-            }}
-          >
-            {attendedEvents}/{totalEvents} ({attendancePercentage}%)
-          </Typography>
-        </Tooltip>
+          {attendedEventsCount} event{attendedEventsCount !== 1 ? 's' : ''} attended
+        </Typography>
       </Box>
       
-      {/* Individual events */}
-      {events.map((event) => {
-        const isAttended = getAttendanceStatus(event);
+      {/* Individual attended events only */}
+      {attendedEventsList.map((event) => {
         const eventName = event.eventName || event.name || event.id;
         
         return (
           <Box key={event.id || event.name} display="flex" alignItems="center" gap={0.5}>
             <Checkbox
-              checked={isAttended}
+              checked={true}
               disabled
               size="small"
               sx={{ padding: 0.5 }}
@@ -372,10 +362,10 @@ const AttendanceDisplay = ({ attendance, events }) => {
             />
             <Typography 
               variant="caption" 
-              color={isAttended ? "success.main" : "text.secondary"}
+              color="success.main"
               sx={{ 
                 fontSize: '0.7rem',
-                fontWeight: isAttended ? 500 : 400,
+                fontWeight: 500,
                 maxWidth: '120px',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
@@ -498,7 +488,47 @@ export default function Staging() {
   const [appModal, setAppModal] = useState(null);
   const [interviewEvaluations, setInterviewEvaluations] = useState([]);
   const [evaluationsLoading, setEvaluationsLoading] = useState(false);
+  
+  // Document scores for modal
+  const [modalResumeScores, setModalResumeScores] = useState([]);
+  const [modalCoverLetterScores, setModalCoverLetterScores] = useState([]);
+  const [modalVideoScores, setModalVideoScores] = useState([]);
+  const [scoresLoading, setScoresLoading] = useState(false);
   const [docPreview, setDocPreview] = useState({ open: false, src: '', kind: 'pdf', title: '' });
+
+  // Functions to fetch document scores for modal
+  const fetchModalResumeScores = async (candidateId) => {
+    try {
+      if (!candidateId) return;
+      const scores = await apiClient.get(`/review-teams/resume-scores/${candidateId}`);
+      setModalResumeScores(scores);
+    } catch (e) {
+      console.error('Error fetching resume scores:', e);
+      setModalResumeScores([]);
+    }
+  };
+
+  const fetchModalCoverLetterScores = async (candidateId) => {
+    try {
+      if (!candidateId) return;
+      const scores = await apiClient.get(`/review-teams/cover-letter-scores/${candidateId}`);
+      setModalCoverLetterScores(scores);
+    } catch (e) {
+      console.error('Error fetching cover letter scores:', e);
+      setModalCoverLetterScores([]);
+    }
+  };
+
+  const fetchModalVideoScores = async (candidateId) => {
+    try {
+      if (!candidateId) return;
+      const scores = await apiClient.get(`/review-teams/video-scores/${candidateId}`);
+      setModalVideoScores(scores);
+    } catch (e) {
+      console.error('Error fetching video scores:', e);
+      setModalVideoScores([]);
+    }
+  };
   const [evaluationSummaries, setEvaluationSummaries] = useState({});
   const [evaluationSummariesFirstRound, setEvaluationSummariesFirstRound] = useState({});
 
@@ -618,9 +648,6 @@ export default function Staging() {
       ]);
       setCandidates(data);
       setAdminApplications(adminApplicationsData || []); // Update admin applications data
-      console.log('fetchCandidates - adminApplicationsData updated:', adminApplicationsData);
-      console.log('fetchCandidates - adminApplicationsData length:', adminApplicationsData?.length);
-      console.log('fetchCandidates - adminApplicationsData approved=true count:', adminApplicationsData?.filter(app => app.approved === true).length);
       setEvents(eventsData || []); // Update events data
       setReviewTeams(reviewTeamsData || []); // Update review teams data
       
@@ -804,7 +831,6 @@ export default function Staging() {
 
   const handleInlineDecisionChange = async (item, value, phase = 'resume') => {
     try {
-      console.log('handleInlineDecisionChange called:', { itemId: item.id, value, phase });
       
       // Save decision to database immediately
       // Note: item.id is the application ID (works for both candidates and applications)
@@ -812,7 +838,6 @@ export default function Staging() {
 
       // Update local UI selection
       setInlineDecisions(prev => ({ ...prev, [item.id]: value }));
-      console.log('Updated inlineDecisions for item:', item.id, 'to value:', value);
 
       // Show success message
       setSnackbar({ open: true, message: 'Decision saved successfully', severity: 'success' });
@@ -1076,6 +1101,9 @@ export default function Staging() {
       candidate.email.toLowerCase().includes(filters.search.toLowerCase());
 
     return matchesStatus && matchesRound && matchesDecision && matchesAttendance && matchesReviewTeam && matchesReferral && matchesSearch;
+  }).sort((a, b) => {
+    // Sort by overall score (highest to lowest)
+    return b.scores.overall - a.scores.overall;
   });
 
   if (loading) {
@@ -1300,13 +1328,14 @@ export default function Staging() {
               </Button>
             </Box>
             
-            <TableContainer>
-              <Table>
+            <TableContainer sx={{ overflowX: 'auto', maxWidth: '100%' }}>
+              <Table sx={{ minWidth: 1200 }}>
                 <TableHead>
                   <TableRow>
+                    <TableCell>Rank</TableCell>
+                    <TableCell>Scores</TableCell>
                     <TableCell>Candidate</TableCell>
                     <TableCell>Grading Status</TableCell>
-                    <TableCell>Scores</TableCell>
                     <TableCell>Review Team</TableCell>
                     <TableCell>Referral</TableCell>
                     <TableCell>Attendance</TableCell>
@@ -1314,13 +1343,14 @@ export default function Staging() {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {filteredCandidates.map((candidate) => (
+                  {filteredCandidates.map((candidate, index) => (
                     <TableRow key={candidate.id} hover sx={{ cursor: 'pointer' }} onClick={async () => {
                       try {
                         setAppModalLoading(true);
                         setEvaluationsLoading(true);
+                        setScoresLoading(true);
                         
-                        // Load application data and interview evaluations in parallel
+                        // Load application data, interview evaluations, and document scores in parallel
                         const [appData, evaluationsData] = await Promise.all([
                           apiClient.get(`/applications/${candidate.id}`),
                           apiClient.get(`/admin/applications/${candidate.id}/interview-evaluations`)
@@ -1328,6 +1358,16 @@ export default function Staging() {
                         
                         setAppModal(appData);
                         setInterviewEvaluations(evaluationsData);
+                        
+                        // Fetch document scores if candidateId is available
+                        if (appData.candidateId) {
+                          await Promise.all([
+                            fetchModalResumeScores(appData.candidateId),
+                            fetchModalCoverLetterScores(appData.candidateId),
+                            fetchModalVideoScores(appData.candidateId)
+                          ]);
+                        }
+                        
                         setAppModalOpen(true);
                       } catch (e) {
                         console.error('Failed to load application', e);
@@ -1335,31 +1375,21 @@ export default function Staging() {
                       } finally {
                         setAppModalLoading(false);
                         setEvaluationsLoading(false);
+                        setScoresLoading(false);
                       }
                     }}>
                       <TableCell>
-                        <Box>
-                          <Typography variant="subtitle2" fontWeight="bold">
-                            {candidate.firstName} {candidate.lastName}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            {candidate.major} | {candidate.graduationYear}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            {candidate.email}
-                          </Typography>
-                          <Stack direction="row" spacing={0.5} mt={0.5}>
-                            {candidate.isFirstGeneration && (
-                              <Chip label="First Gen" size="small" variant="outlined" />
-                            )}
-                            {candidate.isTransferStudent && (
-                              <Chip label="Transfer" size="small" variant="outlined" />
-                            )}
-                          </Stack>
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <GradingStatusDisplay candidate={candidate} gradingData={gradingCompleteByCandidate[candidate.candidateId]} />
+                        <Typography 
+                          variant="h6" 
+                          fontWeight="bold" 
+                          color="primary"
+                          sx={{ 
+                            textAlign: 'center',
+                            minWidth: '50px'
+                          }}
+                        >
+                          #{index + 1}
+                        </Typography>
                       </TableCell>
                       <TableCell>
                         <Tooltip 
@@ -1389,6 +1419,30 @@ export default function Staging() {
                             {candidate.scores.overall}
                           </Typography>
                         </Tooltip>
+                      </TableCell>
+                      <TableCell>
+                        <Box>
+                          <Typography variant="subtitle2" fontWeight="bold">
+                            {candidate.firstName} {candidate.lastName}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {candidate.major} | {candidate.graduationYear}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {candidate.email}
+                          </Typography>
+                          <Stack direction="row" spacing={0.5} mt={0.5}>
+                            {candidate.isFirstGeneration && (
+                              <Chip label="First Gen" size="small" variant="outlined" />
+                            )}
+                            {candidate.isTransferStudent && (
+                              <Chip label="Transfer" size="small" variant="outlined" />
+                            )}
+                          </Stack>
+                        </Box>
+                      </TableCell>
+                      <TableCell>
+                        <GradingStatusDisplay candidate={candidate} gradingData={gradingCompleteByCandidate[candidate.candidateId]} />
                       </TableCell>
                       <TableCell>
                         {candidate.reviewTeam ? (
@@ -1571,15 +1625,9 @@ export default function Staging() {
                 </TableHead>
                 <TableBody>
                   {(() => {
-                    console.log('All adminApplications:', adminApplications);
-                    console.log('adminApplications length:', adminApplications?.length);
                     // Filter for applications that are approved (true) - these should be in coffee chat round
                     // TEMPORARY: Using status filter since approved field isn't working from backend
                     const filteredApps = adminApplications.filter(app => app.status === 'UNDER_REVIEW');
-                    console.log('Filtered applications (status=UNDER_REVIEW):', filteredApps);
-                    console.log('Filtered apps length:', filteredApps.length);
-                    console.log('Applications with approved=true:', adminApplications.filter(app => app.approved === true).map(app => ({ id: app.id, approved: app.approved, status: app.status })));
-                    console.log('All applications with their approved field:', adminApplications.map(app => ({ id: app.id, approved: app.approved, status: app.status, name: app.name })));
                     
                     // Sort applications by ranking score (highest first)
                     const sortedApps = filteredApps.sort((a, b) => {
@@ -1589,11 +1637,9 @@ export default function Staging() {
                     });
                     
                     return sortedApps.map((application, index) => {
-                      console.log('Coffee Chats application:', application); // Debug log
                       
                       // Coffee chat round decisions start fresh for this round
                       const displayDecision = inlineDecisions[application.id] || '';
-                      console.log('Final displayDecision for app:', application.id, '=', displayDecision);
                       
                       return (
                         <TableRow key={application.id} hover sx={{ cursor: 'pointer' }} onClick={async () => {
@@ -2110,6 +2156,165 @@ export default function Staging() {
               </Grid>
             ) : (
               <Typography variant="body2">No application data</Typography>
+            )}
+            
+            {/* Document Scores Section */}
+            {appModal && (
+              <Box mt={3}>
+                <Divider sx={{ mb: 2 }} />
+                <Typography variant="h6" gutterBottom>
+                  Document Scores
+                </Typography>
+                
+                {scoresLoading ? (
+                  <Box display="flex" justifyContent="center" alignItems="center" minHeight="100px">
+                    <CircularProgress />
+                  </Box>
+                ) : (
+                  <Grid container spacing={2}>
+                    {/* Resume Scores */}
+                    <Grid item xs={12} md={4}>
+                      <Card variant="outlined">
+                        <CardContent>
+                          <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                            Resume Scores ({modalResumeScores?.length || 0})
+                          </Typography>
+                          {modalResumeScores && modalResumeScores.length > 0 ? (
+                            <Stack spacing={1}>
+                              {modalResumeScores.map((score) => (
+                              <Box key={score.id} sx={{ 
+                                p: 1, 
+                                border: '1px solid', 
+                                borderColor: 'grey.300', 
+                                borderRadius: 1,
+                                backgroundColor: 'grey.50'
+                              }}>
+                                <Typography variant="body2" fontWeight="bold">
+                                  {score.evaluator?.fullName || 'Unknown Evaluator'}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                  {new Date(score.createdAt).toLocaleDateString()}
+                                </Typography>
+                                <Typography variant="h6" color="success.main" fontWeight="bold">
+                                  {score.overallScore}/13
+                                </Typography>
+                                {score.notes && (
+                                  <Typography variant="caption" sx={{ 
+                                    display: 'block', 
+                                    mt: 0.5,
+                                    fontStyle: 'italic'
+                                  }}>
+                                    {score.notes}
+                                  </Typography>
+                                )}
+                              </Box>
+                            ))}
+                          </Stack>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                            No resume scores yet.
+                          </Typography>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </Grid>
+
+                    {/* Cover Letter Scores */}
+                    <Grid item xs={12} md={4}>
+                      <Card variant="outlined">
+                        <CardContent>
+                          <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                            Cover Letter Scores ({modalCoverLetterScores?.length || 0})
+                          </Typography>
+                          {modalCoverLetterScores && modalCoverLetterScores.length > 0 ? (
+                            <Stack spacing={1}>
+                              {modalCoverLetterScores.map((score) => (
+                              <Box key={score.id} sx={{ 
+                                p: 1, 
+                                border: '1px solid', 
+                                borderColor: 'grey.300', 
+                                borderRadius: 1,
+                                backgroundColor: 'grey.50'
+                              }}>
+                                <Typography variant="body2" fontWeight="bold">
+                                  {score.evaluator?.fullName || 'Unknown Evaluator'}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                  {new Date(score.createdAt).toLocaleDateString()}
+                                </Typography>
+                                <Typography variant="h6" color="success.main" fontWeight="bold">
+                                  {score.overallScore}/3
+                                </Typography>
+                                {score.notes && (
+                                  <Typography variant="caption" sx={{ 
+                                    display: 'block', 
+                                    mt: 0.5,
+                                    fontStyle: 'italic'
+                                  }}>
+                                    {score.notes}
+                                  </Typography>
+                                )}
+                              </Box>
+                            ))}
+                          </Stack>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                            No cover letter scores yet.
+                          </Typography>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </Grid>
+
+                    {/* Video Scores */}
+                    <Grid item xs={12} md={4}>
+                      <Card variant="outlined">
+                        <CardContent>
+                          <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                            Video Scores ({modalVideoScores?.length || 0})
+                          </Typography>
+                          {modalVideoScores && modalVideoScores.length > 0 ? (
+                            <Stack spacing={1}>
+                              {modalVideoScores.map((score) => (
+                              <Box key={score.id} sx={{ 
+                                p: 1, 
+                                border: '1px solid', 
+                                borderColor: 'grey.300', 
+                                borderRadius: 1,
+                                backgroundColor: 'grey.50'
+                              }}>
+                                <Typography variant="body2" fontWeight="bold">
+                                  {score.evaluator?.fullName || 'Unknown Evaluator'}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                  {new Date(score.createdAt).toLocaleDateString()}
+                                </Typography>
+                                <Typography variant="h6" color="success.main" fontWeight="bold">
+                                  {score.overallScore}/2
+                                </Typography>
+                                {score.notes && (
+                                  <Typography variant="caption" sx={{ 
+                                    display: 'block', 
+                                    mt: 0.5,
+                                    fontStyle: 'italic'
+                                  }}>
+                                    {score.notes}
+                                  </Typography>
+                                )}
+                              </Box>
+                            ))}
+                          </Stack>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                            No video scores yet.
+                          </Typography>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  </Grid>
+                )}
+              </Box>
             )}
             
             {/* Interview Evaluations Section */}

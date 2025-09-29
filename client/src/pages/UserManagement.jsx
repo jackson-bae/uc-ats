@@ -69,8 +69,6 @@ const UserManagement = () => {
   const [imageFile, setImageFile] = useState(null);
 
   useEffect(() => {
-    console.log('UserManagement: user =', user);
-    console.log('UserManagement: user?.role =', user?.role);
     if (user?.role === 'ADMIN') {
       fetchUsers();
     } else if (user && user.role !== 'ADMIN') {
@@ -81,10 +79,7 @@ const UserManagement = () => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      console.log('Fetching users...');
-      console.log('API client token:', apiClient.token);
       const response = await apiClient.get('/admin/users');
-      console.log('Fetched users:', response);
       setUsers(response);
     } catch (err) {
       setError('Failed to fetch users');
@@ -151,7 +146,6 @@ const UserManagement = () => {
 
     try {
       const response = await apiClient.post(`/users/${selectedUser.id}/profile-image`, formData);
-      console.log('Upload response:', response);
       setShowImageModal(false);
       setSelectedUser(null);
       setImageFile(null);

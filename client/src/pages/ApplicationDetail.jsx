@@ -65,14 +65,6 @@ export default function ApplicationDetail() {
         total: averages.total,
         count: averages.count
       });
-      
-      console.log('Average grades for this application:', {
-        resume: averages.resume,
-        video: averages.video,
-        cover_letter: averages.cover_letter,
-        overall_average: averages.total,
-        total_submissions: averages.count
-      });
     } catch (error) {
       console.error('Error fetching average grades:', error);
     }
@@ -184,29 +176,16 @@ export default function ApplicationDetail() {
       eventPointsContribution: eventPointsContribution
     };
     
-    // Debug logging
-    console.log('Calculated totals:', {
-      resume: { total: resumeAvg, count: resumeScores.length },
-      video: { total: videoAvg, count: videoScores.length },
-      cover_letter: { total: coverLetterAvg, count: coverLetterScores.length },
-      overall: overallTotal,
-      referralBonus: 0,
-      eventPointsContribution: eventPointsContribution,
-      totalCount: result.count
-    });
-    
     return result;
   };
 
   const fetchResumeScores = async (candidateId) => {
     try {
       if (!candidateId) {
-        console.log('No candidateId provided for fetchResumeScores');
         return;
       }
       const scores = await apiClient.get(`/review-teams/resume-scores/${candidateId}`);
       setResumeScores(scores);
-      console.log('Fetched resume scores:', scores);
     } catch (e) {
       console.error('Error fetching resume scores:', e);
     }
@@ -215,12 +194,10 @@ export default function ApplicationDetail() {
   const fetchCoverLetterScores = async (candidateId) => {
     try {
       if (!candidateId) {
-        console.log('No candidateId provided for fetchCoverLetterScores');
         return;
       }
       const scores = await apiClient.get(`/review-teams/cover-letter-scores/${candidateId}`);
       setCoverLetterScores(scores);
-      console.log('Fetched cover letter scores:', scores);
     } catch (e) {
       console.error('Error fetching cover letter scores:', e);
     }
@@ -229,12 +206,10 @@ export default function ApplicationDetail() {
   const fetchVideoScores = async (candidateId) => {
     try {
       if (!candidateId) {
-        console.log('No candidateId provided for fetchVideoScores');
         return;
       }
       const scores = await apiClient.get(`/review-teams/video-scores/${candidateId}`);
       setVideoScores(scores);
-      console.log('Fetched video scores:', scores);
     } catch (e) {
       console.error('Error fetching video scores:', e);
     }
@@ -244,7 +219,6 @@ export default function ApplicationDetail() {
     try {
       const data = await apiClient.get(`/applications/${id}/events`);
       setEventData(data);
-      console.log('Fetched event data:', data);
     } catch (e) {
       console.error('Error fetching event data:', e);
     } finally {
@@ -257,7 +231,6 @@ export default function ApplicationDetail() {
       setEvaluationsLoading(true);
       const evaluations = await apiClient.get(`/admin/applications/${id}/interview-evaluations`);
       setInterviewEvaluations(evaluations);
-      console.log('Fetched interview evaluations:', evaluations);
     } catch (e) {
       console.error('Error fetching interview evaluations:', e);
       setInterviewEvaluations([]);
@@ -281,7 +254,6 @@ export default function ApplicationDetail() {
         
         setApplication(appData);
         setCurrentUserId(userData.userId);
-        console.log('Current User ID:', userData.userId);
         
         // Log average grades
         await logAverageGrades();

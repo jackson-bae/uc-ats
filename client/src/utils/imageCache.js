@@ -32,7 +32,6 @@ class ImageCache {
 
   static async fetchImage(src, token) {
     try {
-      console.log('ImageCache: Loading image from:', src);
       
       const response = await fetch(src, {
         headers: {
@@ -50,7 +49,6 @@ class ImageCache {
       // Store blob URL for cleanup
       blobUrlCache.set(src, blobUrl);
       
-      console.log('ImageCache: Successfully loaded image');
       return blobUrl;
     } catch (error) {
       console.error('ImageCache: Error loading image:', error);

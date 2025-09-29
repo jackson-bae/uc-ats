@@ -167,6 +167,7 @@ model Groups {
   memberOne          String?
   memberTwo          String?
   memberThree        String?
+  teamName           String?
   avgScore           Decimal?           @db.Decimal(5, 2)
   cycleId            String
   createdAt          DateTime           @default(now())

@@ -92,56 +92,127 @@ export default function AdminDocumentGrading() {
     const applicationsWithCoverLetter = applications.filter(app => app.coverLetterUrl);
     const applicationsWithVideo = applications.filter(app => app.videoUrl);
     
-    // Count completed gradings only for applications that have the documents
-    const resumeGraded = applicationsWithResume.filter(app => app.hasResumeScore).length;
-    const coverLetterGraded = applicationsWithCoverLetter.filter(app => app.hasCoverLetterScore).length;
-    const videoGraded = applicationsWithVideo.filter(app => app.hasVideoScore).length;
+    if (gradeOnlyAssigned) {
+      // When "Grade Only Assigned" is toggled on, show admin's personal progress
+      // Count applications where the current admin has completed their grading
+      const resumeGradedByMe = applicationsWithResume.filter(app => app.hasResumeScore).length;
+      const coverLetterGradedByMe = applicationsWithCoverLetter.filter(app => app.hasCoverLetterScore).length;
+      const videoGradedByMe = applicationsWithVideo.filter(app => app.hasVideoScore).length;
 
-    // Calculate total grades needed vs completed only for applications with documents
-    const totalResumeGradesNeeded = applicationsWithResume.reduce((sum, app) => sum + (app.resumeTotalMembers || 0), 0);
-    const totalResumeGradesCompleted = applicationsWithResume.reduce((sum, app) => sum + ((app.resumeTotalMembers || 0) - (app.resumeMissingGrades || 0)), 0);
-    
-    const totalCoverLetterGradesNeeded = applicationsWithCoverLetter.reduce((sum, app) => sum + (app.coverLetterTotalMembers || 0), 0);
-    const totalCoverLetterGradesCompleted = applicationsWithCoverLetter.reduce((sum, app) => sum + ((app.coverLetterTotalMembers || 0) - (app.coverLetterMissingGrades || 0)), 0);
-    
-    const totalVideoGradesNeeded = applicationsWithVideo.reduce((sum, app) => sum + (app.videoTotalMembers || 0), 0);
-    const totalVideoGradesCompleted = applicationsWithVideo.reduce((sum, app) => sum + ((app.videoTotalMembers || 0) - (app.videoMissingGrades || 0)), 0);
+      // For personal progress, we show how many of MY assigned documents I've graded
+      const myResumeAssignments = applicationsWithResume.length;
+      const myCoverLetterAssignments = applicationsWithCoverLetter.length;
+      const myVideoAssignments = applicationsWithVideo.length;
 
-    return [
-      {
-        title: 'Resume Completion',
-        icon: <DocumentIcon />,
-        completed: resumeGraded,
-        total: applicationsWithResume.length,
-        gradesCompleted: totalResumeGradesCompleted,
-        gradesNeeded: totalResumeGradesNeeded,
-        deadline: 'Oct 5th, EOD',
-        percentage: totalResumeGradesNeeded > 0 ? Math.round((totalResumeGradesCompleted / totalResumeGradesNeeded) * 100) : 0,
-        color: 'success'
-      },
-      {
-        title: 'Cover Letter Completion',
-        icon: <EditIcon />,
-        completed: coverLetterGraded,
-        total: applicationsWithCoverLetter.length,
-        gradesCompleted: totalCoverLetterGradesCompleted,
-        gradesNeeded: totalCoverLetterGradesNeeded,
-        deadline: 'Oct 5th, EOD',
-        percentage: totalCoverLetterGradesNeeded > 0 ? Math.round((totalCoverLetterGradesCompleted / totalCoverLetterGradesNeeded) * 100) : 0,
-        color: 'success'
-      },
-      {
-        title: 'Video Review Completion',
-        icon: <VideoIcon />,
-        completed: videoGraded,
-        total: applicationsWithVideo.length,
-        gradesCompleted: totalVideoGradesCompleted,
-        gradesNeeded: totalVideoGradesNeeded,
-        deadline: 'Oct 5th, EOD',
-        percentage: totalVideoGradesNeeded > 0 ? Math.round((totalVideoGradesCompleted / totalVideoGradesNeeded) * 100) : 0,
-        color: 'success'
-      }
-    ];
+      return [
+        {
+          title: 'My Resume Grading',
+          icon: <DocumentIcon />,
+          completed: resumeGradedByMe,
+          total: myResumeAssignments,
+          gradesCompleted: resumeGradedByMe,
+          gradesNeeded: myResumeAssignments,
+          deadline: 'Oct 5th, EOD',
+          percentage: myResumeAssignments > 0 ? Math.round((resumeGradedByMe / myResumeAssignments) * 100) : 0,
+          color: 'success'
+        },
+        {
+          title: 'My Cover Letter Grading',
+          icon: <EditIcon />,
+          completed: coverLetterGradedByMe,
+          total: myCoverLetterAssignments,
+          gradesCompleted: coverLetterGradedByMe,
+          gradesNeeded: myCoverLetterAssignments,
+          deadline: 'Oct 5th, EOD',
+          percentage: myCoverLetterAssignments > 0 ? Math.round((coverLetterGradedByMe / myCoverLetterAssignments) * 100) : 0,
+          color: 'success'
+        },
+        {
+          title: 'My Video Review',
+          icon: <VideoIcon />,
+          completed: videoGradedByMe,
+          total: myVideoAssignments,
+          gradesCompleted: videoGradedByMe,
+          gradesNeeded: myVideoAssignments,
+          deadline: 'Oct 5th, EOD',
+          percentage: myVideoAssignments > 0 ? Math.round((videoGradedByMe / myVideoAssignments) * 100) : 0,
+          color: 'success'
+        }
+      ];
+    } else {
+      // When "Grade Only Assigned" is toggled off, show overall progress across all applications
+      // Every application needs exactly 3 reviews for each document type they submit
+      // NOTE: Currently, the backend only tracks grading for applications assigned to groups.
+      // Unassigned applications need backend changes to track individual scores.
+      
+      // Calculate total grades needed: 3 reviews per document per application
+      const totalResumeGradesNeeded = applicationsWithResume.length * 3;
+      const totalCoverLetterGradesNeeded = applicationsWithCoverLetter.length * 3;
+      const totalVideoGradesNeeded = applicationsWithVideo.length * 3;
+      
+      // Calculate completed grades (including both assigned and unassigned applications)
+      const totalResumeGradesCompleted = applicationsWithResume.reduce((sum, app) => {
+        // For assigned applications, use the existing calculation
+        if (app.resumeTotalMembers && app.resumeTotalMembers > 0) {
+          return sum + ((app.resumeTotalMembers || 0) - (app.resumeMissingGrades || 0));
+        }
+        // For unassigned applications, we need to count individual scores
+        // Since the backend doesn't currently track individual scores for unassigned apps,
+        // we'll need to implement this functionality
+        // For now, we'll assume 0 completed grades for unassigned applications
+        return sum + 0;
+      }, 0);
+      
+      const totalCoverLetterGradesCompleted = applicationsWithCoverLetter.reduce((sum, app) => {
+        if (app.coverLetterTotalMembers && app.coverLetterTotalMembers > 0) {
+          return sum + ((app.coverLetterTotalMembers || 0) - (app.coverLetterMissingGrades || 0));
+        }
+        return sum + 0;
+      }, 0);
+      
+      const totalVideoGradesCompleted = applicationsWithVideo.reduce((sum, app) => {
+        if (app.videoTotalMembers && app.videoTotalMembers > 0) {
+          return sum + ((app.videoTotalMembers || 0) - (app.videoMissingGrades || 0));
+        }
+        return sum + 0;
+      }, 0);
+
+      return [
+        {
+          title: 'Resume Completion',
+          icon: <DocumentIcon />,
+          completed: applicationsWithResume.length, // Total applications with resumes
+          total: applicationsWithResume.length,
+          gradesCompleted: totalResumeGradesCompleted,
+          gradesNeeded: totalResumeGradesNeeded,
+          deadline: 'Oct 5th, EOD',
+          percentage: totalResumeGradesNeeded > 0 ? Math.round((totalResumeGradesCompleted / totalResumeGradesNeeded) * 100) : 0,
+          color: 'success'
+        },
+        {
+          title: 'Cover Letter Completion',
+          icon: <EditIcon />,
+          completed: applicationsWithCoverLetter.length, // Total applications with cover letters
+          total: applicationsWithCoverLetter.length,
+          gradesCompleted: totalCoverLetterGradesCompleted,
+          gradesNeeded: totalCoverLetterGradesNeeded,
+          deadline: 'Oct 5th, EOD',
+          percentage: totalCoverLetterGradesNeeded > 0 ? Math.round((totalCoverLetterGradesCompleted / totalCoverLetterGradesNeeded) * 100) : 0,
+          color: 'success'
+        },
+        {
+          title: 'Video Review Completion',
+          icon: <VideoIcon />,
+          completed: applicationsWithVideo.length, // Total applications with videos
+          total: applicationsWithVideo.length,
+          gradesCompleted: totalVideoGradesCompleted,
+          gradesNeeded: totalVideoGradesNeeded,
+          deadline: 'Oct 5th, EOD',
+          percentage: totalVideoGradesNeeded > 0 ? Math.round((totalVideoGradesCompleted / totalVideoGradesNeeded) * 100) : 0,
+          color: 'success'
+        }
+      ];
+    }
   };
 
   const progressData = calculateProgressData();
@@ -533,7 +604,7 @@ export default function AdminDocumentGrading() {
       {/* Progress Section */}
       <Paper sx={{ p: 3, mb: 4 }}>
         <Typography variant="h6" component="h2" sx={{ fontWeight: 600, color: 'primary.dark', mb: 3 }}>
-          Document Grading Progress
+          {gradeOnlyAssigned ? 'My Document Grading Progress' : 'Overall Document Grading Progress'}
         </Typography>
         
         <Stack spacing={3}>
@@ -548,7 +619,10 @@ export default function AdminDocumentGrading() {
                     {item.title}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    {item.gradesCompleted} / {item.gradesNeeded} Grades | Deadline: {item.deadline}
+                    {gradeOnlyAssigned 
+                      ? `${item.gradesCompleted} / ${item.gradesNeeded} Documents Graded | Deadline: ${item.deadline}`
+                      : `${item.gradesCompleted} / ${item.gradesNeeded} Grades | Deadline: ${item.deadline}`
+                    }
                   </Typography>
                 </Box>
                 <Typography variant="body2" sx={{ fontWeight: 600, color: 'success.main' }}>

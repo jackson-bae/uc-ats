@@ -146,14 +146,8 @@ export default function MemberMeetingSlots() {
       setError('');
       setDateError('');
       
-      console.log('Sending form data:', form);
-      console.log('startTime type:', typeof form.startTime);
-      console.log('startTime value:', form.startTime);
-      console.log('endTime type:', typeof form.endTime);
-      console.log('endTime value:', form.endTime);
       
       const response = await api.post('/member/meeting-slots', form);
-      console.log('Response from server:', response);
       
       setForm({ location: '', startTime: '', endTime: '', capacity: 2 });
       await load();
@@ -179,9 +173,6 @@ export default function MemberMeetingSlots() {
     const startDate = new Date(slot.startTime);
     const endDate = slot.endTime ? new Date(slot.endTime) : null;
     
-    console.log('Original slot startTime:', slot.startTime);
-    console.log('Parsed startDate:', startDate);
-    console.log('StartDate toISOString:', startDate.toISOString());
     
     // Format for datetime-local input - convert from UTC to PST
     const formatForInput = (date) => {
@@ -196,18 +187,11 @@ export default function MemberMeetingSlots() {
       const minutes = String(pstDate.getMinutes()).padStart(2, '0');
       
       const formatted = `${year}-${month}-${day}T${hours}:${minutes}`;
-      console.log('PST date:', pstDate);
-      console.log('Formatted for input:', formatted);
       return formatted;
     };
     
     const startTimeFormatted = formatForInput(startDate);
     const endTimeFormatted = endDate ? formatForInput(endDate) : '';
-    
-    console.log('Setting edit form with:', {
-      startTime: startTimeFormatted,
-      endTime: endTimeFormatted
-    });
     
     setEditForm({
       location: slot.location,
@@ -247,12 +231,8 @@ export default function MemberMeetingSlots() {
       setError('');
       setEditDateError('');
       
-      console.log('Updating slot:', editingSlot.id, 'with data:', editForm);
-      console.log('Edit form startTime:', editForm.startTime);
-      console.log('Edit form endTime:', editForm.endTime);
       
       const response = await api.put(`/member/meeting-slots/${editingSlot.id}`, editForm);
-      console.log('Update response:', response);
       setEditingSlot(null);
       setEditForm({ location: '', startTime: '', endTime: '', capacity: 2 });
       await load();
@@ -339,15 +319,11 @@ export default function MemberMeetingSlots() {
   };
 
   const formatDateTime = (dateTime) => {
-    console.log('formatDateTime input:', dateTime);
     // Convert UTC time to PST for display
     const utcDate = new Date(dateTime);
-    console.log('UTC date:', utcDate);
-    console.log('UTC date toISOString:', utcDate.toISOString());
     
     // Convert UTC to PST (subtract 8 hours)
     const pstDate = new Date(utcDate.getTime() - (8 * 60 * 60 * 1000));
-    console.log('PST date:', pstDate);
     
     // Format manually using UTC methods to avoid timezone issues
     const weekday = pstDate.toLocaleDateString('en-US', { weekday: 'short' });
@@ -357,7 +333,6 @@ export default function MemberMeetingSlots() {
     const minute = pstDate.getUTCMinutes();
     
     const formatted = `${weekday}, ${month} ${day}, ${hour === 0 ? 12 : hour > 12 ? hour - 12 : hour}:${minute.toString().padStart(2, '0')} ${hour < 12 ? 'AM' : 'PM'}`;
-    console.log('formatDateTime output:', formatted);
     return formatted;
   };
 

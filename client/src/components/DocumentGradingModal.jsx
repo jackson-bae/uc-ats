@@ -342,6 +342,11 @@ const DocumentGradingModal = ({ open, onClose, application, documentType }) => {
       return;
     }
 
+    // Only allow integers - reject any input containing decimal points or non-numeric characters
+    if (!/^\d+$/.test(value)) {
+      return;
+    }
+
     const numValue = parseInt(value);
     let minScore = 0;
     if (documentType === 'coverLetter') {
@@ -618,7 +623,8 @@ const DocumentGradingModal = ({ open, onClose, application, documentType }) => {
                           inputProps={{ 
                             min: (documentType === 'coverLetter') ? 1 : 
                                  (documentType === 'resume' && category.id === 'scoreOne') ? 1 : 0, 
-                            max: category.maxScore
+                            max: category.maxScore,
+                            onWheel: (e) => e.target.blur()
                           }}
                           sx={{ width: 100, mr: 2 }}
                         />

@@ -59,17 +59,10 @@ export default function CandidateList() {
 
   // Filter and search logic
   const filteredCandidates = candidates.filter(candidate => {
-    // Use candidate's own name fields, fallback to application data if needed
-    const candidateName = candidate.firstName && candidate.lastName 
-      ? `${candidate.firstName} ${candidate.lastName}`
-      : candidate.applications?.[0] 
-        ? `${candidate.applications[0].firstName} ${candidate.applications[0].lastName}`
-        : 'Unknown Candidate';
-    
-    const candidateEmail = candidate.email || candidate.applications?.[0]?.email || '';
-    
-    const matchesSearch = candidateName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         candidateEmail.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    // Get the latest application for search
+    const latestApp = candidate.applications?.[0];
+    const matchesSearch = (latestApp?.firstName + ' ' + latestApp?.lastName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (latestApp?.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                          (candidate.studentId || '').toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesGroup = !filters.group || 
@@ -203,9 +196,7 @@ export default function CandidateList() {
                   {candidate.applications && candidate.applications.length > 0 && candidate.applications[0].headshotUrl ? (
                     <AuthenticatedImage
                       src={candidate.applications[0].headshotUrl}
-                      alt={candidate.firstName && candidate.lastName 
-                        ? `${candidate.firstName} ${candidate.lastName}`
-                        : `${candidate.applications[0].firstName} ${candidate.applications[0].lastName}`}
+                      alt={`${candidate.applications[0].firstName} ${candidate.applications[0].lastName}`}
                       className="candidate-avatar"
                       style={{
                         width: '60px',
@@ -216,21 +207,13 @@ export default function CandidateList() {
                     />
                   ) : (
                     <div className="candidate-avatar-fallback">
-                      {getInitials(candidate.firstName && candidate.lastName 
-                        ? `${candidate.firstName} ${candidate.lastName}`
-                        : candidate.applications?.[0] 
-                          ? `${candidate.applications[0].firstName} ${candidate.applications[0].lastName}`
-                          : 'Unknown')}
+                      {getInitials(candidate.applications?.[0] ? `${candidate.applications[0].firstName} ${candidate.applications[0].lastName}` : 'Unknown')}
                     </div>
                   )}
                   <div className="candidate-details">
-                    <h3>{candidate.firstName && candidate.lastName 
-                      ? `${candidate.firstName} ${candidate.lastName}`
-                      : candidate.applications?.[0] 
-                        ? `${candidate.applications[0].firstName} ${candidate.applications[0].lastName}`
-                        : 'Unknown Candidate'}</h3>
+                    <h3>{candidate.applications?.[0] ? `${candidate.applications[0].firstName} ${candidate.applications[0].lastName}` : 'Unknown Candidate'}</h3>
                     <p className="candidate-meta">
-                      {candidate.studentId || 'N/A'} • {candidate.email || candidate.applications?.[0]?.email || 'N/A'}
+                      {candidate.studentId || 'N/A'} • {candidate.applications?.[0]?.email || 'N/A'}
                     </p>
                     <p className="candidate-meta">
                       Applications: {candidate.applications?.length || 0} • 

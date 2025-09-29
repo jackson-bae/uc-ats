@@ -2265,11 +2265,13 @@ router.get('/staging/candidates', async (req, res) => {
       return []; // Return empty array if query fails
     });
 
+
     const stagingCandidates = await Promise.all(applications.map(async app => {
-      // Calculate average scores
-      const resumeScores = app.candidate.resumeScores.map(s => s.overallScore);
-      const coverLetterScores = app.candidate.coverLetterScores.map(s => s.overallScore);
-      const videoScores = app.candidate.videoScores.map(s => s.overallScore);
+      // Calculate average scores - convert to numbers to avoid string concatenation
+      const resumeScores = app.candidate.resumeScores.map(s => parseFloat(s.overallScore));
+      const coverLetterScores = app.candidate.coverLetterScores.map(s => parseFloat(s.overallScore));
+      const videoScores = app.candidate.videoScores.map(s => parseFloat(s.overallScore));
+
 
       const avgResume = resumeScores.length > 0 ? 
         resumeScores.reduce((a, b) => a + b, 0) / resumeScores.length : 0;
@@ -2278,20 +2280,20 @@ router.get('/staging/candidates', async (req, res) => {
       const avgVideo = videoScores.length > 0 ? 
         videoScores.reduce((a, b) => a + b, 0) / videoScores.length : 0;
 
-      let overallScore = [avgResume, avgCoverLetter, avgVideo]
-        .filter(score => score > 0)
-        .reduce((a, b) => a + b, 0) / 3;
+      // Calculate overall total by summing all document scores (not averaging)
+      let overallScore = 0;
+      if (avgResume > 0) overallScore += avgResume;
+      if (avgCoverLetter > 0) overallScore += avgCoverLetter;
+      if (avgVideo > 0) overallScore += avgVideo;
 
-      // Add event points contribution (raw points, not scaled)
+
+      // Add event points contribution (3 points per attended event, matching application detail page)
       const eventAttendance = await prisma.eventAttendance.findMany({
         where: { candidateId: app.candidateId },
         include: { event: true }
       });
 
-      const totalEventPoints = eventAttendance.reduce((sum, attendance) => {
-        return sum + (attendance.event.points || 0);
-      }, 0);
-
+      const totalEventPoints = eventAttendance.length * 3; // 3 points per attended event
       overallScore += totalEventPoints;
 
       // Add meeting attendance bonus (3 points for attending "Get to Know UC")
@@ -2305,6 +2307,7 @@ router.get('/staging/candidates', async (req, res) => {
       if (meetingAttendance) {
         overallScore += 3;
       }
+
 
       // Build attendance object
       const attendance = {};
