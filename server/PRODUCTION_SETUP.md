@@ -92,3 +92,4 @@ The server is configured with CORS enabled, allowing cross-origin requests for f
 - All file endpoints require valid JWT tokens
 - Check that the Authorization header is being sent with requests
 
+

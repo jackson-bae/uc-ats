@@ -302,13 +302,11 @@ const DocumentGradingModal = ({ open, onClose, application, documentType }) => {
       return scoreOne !== '' && scoreOne !== null ? scoreOne : 0;
     }
     
-    // For resume, we have 2 categories with different max scores (10 and 3)
+    // For resume, we have 2 categories that should be summed (10 + 3 = 13 total)
     if (documentType === 'resume') {
-      const scores = [scoreOne, scoreTwo].filter(score => score !== '' && score !== null);
-      if (scores.length === 0) return 0;
-      const totalScore = scores.reduce((sum, score) => sum + parseInt(score), 0);
-      const maxPossibleScore = 13; // 10 + 3
-      return totalScore;
+      const score1 = scoreOne !== '' && scoreOne !== null ? parseInt(scoreOne) : 0;
+      const score2 = scoreTwo !== '' && scoreTwo !== null ? parseInt(scoreTwo) : 0;
+      return score1 + score2;
     }
     
     // For other document types (cover letter), use all three scores
@@ -320,7 +318,7 @@ const DocumentGradingModal = ({ open, onClose, application, documentType }) => {
 
   const getMaxScore = () => {
     if (documentType === 'resume') {
-      return 13; // 10 + 3
+      return 13; // Sum of (10 + 3) for Content/Relevance/Impact + Structure/Formatting
     }
     return config.rubricCategories[0]?.maxScore || 10;
   };

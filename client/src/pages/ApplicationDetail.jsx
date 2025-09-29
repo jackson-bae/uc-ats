@@ -164,34 +164,32 @@ export default function ApplicationDetail() {
     const videoAvg = calculateAverageScore(videoScores);
     const coverLetterAvg = calculateAverageScore(coverLetterScores);
     
-    // Calculate overall average only from document types that have scores
-    const averages = [];
-    if (resumeScores.length > 0) averages.push(resumeAvg);
-    if (videoScores.length > 0) averages.push(videoAvg);
-    if (coverLetterScores.length > 0) averages.push(coverLetterAvg);
-    
-    let overallAvg = averages.length > 0 ? averages.reduce((sum, avg) => sum + avg, 0) / averages.length : 0;
+    // Calculate overall total by summing all document scores (not averaging)
+    let overallTotal = 0;
+    if (resumeScores.length > 0) overallTotal += resumeAvg;
+    if (videoScores.length > 0) overallTotal += videoAvg;
+    if (coverLetterScores.length > 0) overallTotal += coverLetterAvg;
     
     // Add event points directly (raw points, not scaled)
     const eventPointsContribution = eventData.totalPoints || 0;
-    overallAvg += eventPointsContribution;
+    overallTotal += eventPointsContribution;
     
     const result = {
       resume: resumeAvg,
       video: videoAvg,
       cover_letter: coverLetterAvg,
-      total: overallAvg,
+      total: overallTotal,
       count: resumeScores.length + videoScores.length + coverLetterScores.length,
       referralBonus: 0, // Referrals no longer contribute to overall score
       eventPointsContribution: eventPointsContribution
     };
     
     // Debug logging
-    console.log('Calculated averages:', {
-      resume: { avg: resumeAvg, count: resumeScores.length },
-      video: { avg: videoAvg, count: videoScores.length },
-      cover_letter: { avg: coverLetterAvg, count: coverLetterScores.length },
-      overall: overallAvg,
+    console.log('Calculated totals:', {
+      resume: { total: resumeAvg, count: resumeScores.length },
+      video: { total: videoAvg, count: videoScores.length },
+      cover_letter: { total: coverLetterAvg, count: coverLetterScores.length },
+      overall: overallTotal,
       referralBonus: 0,
       eventPointsContribution: eventPointsContribution,
       totalCount: result.count
@@ -426,7 +424,7 @@ export default function ApplicationDetail() {
                           <span className="average-grade-total">pts</span>
                         </div>
                         <div className="average-grade-count">
-                          {eventData.events.filter(e => e.attendanceStatus === 'Attended').length} attended
+                          {eventData.events.filter(e => e.rsvpStatus === 'RSVPed' || e.attendanceStatus === 'Attended').filter(e => e.attendanceStatus === 'Attended').length} attended of {eventData.events.filter(e => e.rsvpStatus === 'RSVPed' || e.attendanceStatus === 'Attended').length} relevant
                         </div>
                       </div>
                       
@@ -641,13 +639,15 @@ export default function ApplicationDetail() {
                       Total Event Points: {eventData.totalPoints}
                     </span>
                     <span style={{ fontSize: '0.875rem', color: '#0369a1' }}>
-                      {eventData.events.filter(e => e.attendanceStatus === 'Attended').length} of {eventData.events.length} events attended
+                      {eventData.events.filter(e => e.rsvpStatus === 'RSVPed' || e.attendanceStatus === 'Attended').filter(e => e.attendanceStatus === 'Attended').length} attended of {eventData.events.filter(e => e.rsvpStatus === 'RSVPed' || e.attendanceStatus === 'Attended').length} relevant events
                     </span>
                   </div>
                 </div>
                 
                 <div className="events-list">
-                  {eventData.events.map((event) => (
+                  {eventData.events
+                    .filter(event => event.rsvpStatus === 'RSVPed' || event.attendanceStatus === 'Attended')
+                    .map((event) => (
                     <div 
                       key={event.id} 
                       className="event-item"

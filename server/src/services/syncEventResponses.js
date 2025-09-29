@@ -82,7 +82,7 @@ export async function syncEventAttendance(eventId) {
 
         // Auto-create candidate if not found
         if (!candidate) {
-          if (!transformedData.firstName || !transformedData.lastName || !transformedData.email) {
+          if (!transformedData.firstName || !transformedData.email) {
             console.warn(`Missing required candidate information for attendance response: ${JSON.stringify({
               studentId: transformedData.studentId,
               email: transformedData.email,
@@ -93,12 +93,12 @@ export async function syncEventAttendance(eventId) {
             continue;
           }
 
-          console.log(`Creating new candidate for attendance response: ${transformedData.firstName} ${transformedData.lastName}`);
+          console.log(`Creating new candidate for attendance response: ${transformedData.firstName} ${transformedData.lastName || '[no last name]'}`);
           
           candidate = await prisma.candidate.create({
             data: {
               firstName: transformedData.firstName,
-              lastName: transformedData.lastName,
+              lastName: transformedData.lastName || '',
               email: transformedData.email,
               studentId: transformedData.studentId
             }
@@ -116,7 +116,7 @@ export async function syncEventAttendance(eventId) {
 
         // Send attendance confirmation email
         try {
-          const candidateName = `${candidate.firstName} ${candidate.lastName}`;
+          const candidateName = `${candidate.firstName}${candidate.lastName ? ` ${candidate.lastName}` : ''}`;
           const eventDate = formatEventDate(event.eventStartDate);
           
           await sendAttendanceConfirmation(
@@ -214,7 +214,7 @@ export async function syncEventRSVP(eventId) {
 
         // Auto-create candidate if not found
         if (!candidate) {
-          if (!transformedData.firstName || !transformedData.lastName || !transformedData.email) {
+          if (!transformedData.firstName || !transformedData.email) {
             console.warn(`Missing required candidate information for RSVP response: ${JSON.stringify({
               studentId: transformedData.studentId,
               email: transformedData.email,
@@ -225,12 +225,12 @@ export async function syncEventRSVP(eventId) {
             continue;
           }
 
-          console.log(`Creating new candidate for RSVP response: ${transformedData.firstName} ${transformedData.lastName}`);
+          console.log(`Creating new candidate for RSVP response: ${transformedData.firstName} ${transformedData.lastName || '[no last name]'}`);
           
           candidate = await prisma.candidate.create({
             data: {
               firstName: transformedData.firstName,
-              lastName: transformedData.lastName,
+              lastName: transformedData.lastName || '',
               email: transformedData.email,
               studentId: transformedData.studentId
             }
@@ -248,7 +248,7 @@ export async function syncEventRSVP(eventId) {
 
         // Send RSVP confirmation email
         try {
-          const candidateName = `${candidate.firstName} ${candidate.lastName}`;
+          const candidateName = `${candidate.firstName}${candidate.lastName ? ` ${candidate.lastName}` : ''}`;
           const eventDate = formatEventDate(event.eventStartDate);
           
           await sendRSVPConfirmation(

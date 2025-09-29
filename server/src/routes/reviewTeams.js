@@ -1021,9 +1021,9 @@ router.post('/resume-score', requireAuth, async (req, res) => {
     const { candidateId, assignedGroupId, scoreOne, scoreTwo, scoreThree, notes } = req.body;
     const evaluatorId = req.user.id;
 
-    // Calculate overall score (average of the three scores)
-    const scores = [scoreOne, scoreTwo, scoreThree].filter(score => score !== null && score !== undefined);
-    const overallScore = scores.length > 0 ? scores.reduce((sum, score) => sum + score, 0) / scores.length : 0;
+    // Calculate overall score (sum of the two scores for resume: Content/Relevance/Impact + Structure/Formatting)
+    const scores = [scoreOne, scoreTwo].filter(score => score !== null && score !== undefined);
+    const overallScore = scores.length > 0 ? scores.reduce((sum, score) => sum + score, 0) : 0;
 
     // Check if a score already exists for this candidate and evaluator
     const existingScore = await prisma.resumeScore.findFirst({
@@ -1228,9 +1228,8 @@ router.post('/video-score', requireAuth, async (req, res) => {
     const { candidateId, assignedGroupId, scoreOne, scoreTwo, scoreThree, notes } = req.body;
     const evaluatorId = req.user.id;
 
-    // Calculate overall score (average of the three scores)
-    const scores = [scoreOne, scoreTwo, scoreThree].filter(score => score !== null && score !== undefined);
-    const overallScore = scores.length > 0 ? scores.reduce((sum, score) => sum + score, 0) / scores.length : 0;
+    // Calculate overall score (for video, just use scoreOne since it's a single category)
+    const overallScore = scoreOne || 0;
 
     // Check if a score already exists for this candidate and evaluator
     const existingScore = await prisma.videoScore.findFirst({

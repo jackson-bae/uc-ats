@@ -146,6 +146,8 @@ export function createDynamicEventMapping(formResponse, eventId, configType) {
   }
 
   // Try to extract common fields by analyzing answer values
+  const nameValues = [];
+  
   Object.entries(answers).forEach(([questionId, answerData]) => {
     const value = extractAnswerValue(answerData);
     if (!value) return;
@@ -169,21 +171,41 @@ export function createDynamicEventMapping(formResponse, eventId, configType) {
       console.log(`Found student ID: ${stringValue}`);
     }
     
-    // Name detection - improved logic
-    if (/^[a-zA-Z\s]+$/.test(stringValue) && stringValue.length < 50 && stringValue.length > 1) {
-      const nameParts = stringValue.trim().split(/\s+/);
-      if (nameParts.length >= 1 && nameParts.length <= 3) {
-        if (!mappedData.firstName) {
-          mappedData.firstName = nameParts[0];
-          console.log(`Found first name: ${nameParts[0]}`);
-        }
-        if (nameParts.length > 1 && !mappedData.lastName) {
-          mappedData.lastName = nameParts.slice(1).join(' ');
-          console.log(`Found last name: ${nameParts.slice(1).join(' ')}`);
-        }
-      }
+    // Collect potential name values for later processing
+    if (/^[a-zA-Z\s\-']+$/.test(stringValue) && stringValue.length < 50 && stringValue.length > 1) {
+      nameValues.push(stringValue);
     }
   });
+
+  // Process collected name values to find first and last names
+  if (nameValues.length > 0) {
+    // Sort name values by length (shorter names are more likely to be first names)
+    const sortedNames = nameValues.sort((a, b) => a.length - b.length);
+    
+    // Assign first name (shortest name that looks like a first name)
+    if (!mappedData.firstName && sortedNames.length > 0) {
+      mappedData.firstName = sortedNames[0];
+      console.log(`Found first name: ${sortedNames[0]}`);
+    }
+    
+    // Assign last name (second shortest name, or longest if only one name provided)
+    if (!mappedData.lastName && sortedNames.length > 1) {
+      mappedData.lastName = sortedNames[1];
+      console.log(`Found last name: ${sortedNames[1]}`);
+    } else if (!mappedData.lastName && sortedNames.length === 1) {
+      // If only one name is provided, try to split it
+      const nameParts = sortedNames[0].split(/\s+/);
+      if (nameParts.length > 1) {
+        mappedData.firstName = nameParts[0];
+        mappedData.lastName = nameParts.slice(1).join(' ');
+        console.log(`Split single name into first: ${nameParts[0]}, last: ${nameParts.slice(1).join(' ')}`);
+      } else {
+        // Single name - use it as first name and set last name to empty or a default
+        mappedData.lastName = '';
+        console.log(`Only one name found, setting last name to empty`);
+      }
+    }
+  }
 
   console.log(`Final mapped data:`, JSON.stringify(mappedData, null, 2));
   return mappedData;
