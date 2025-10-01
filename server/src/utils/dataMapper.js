@@ -53,12 +53,23 @@ function transformValue(value, mapping) {
     case 'decimal':
       const numValue = parseFloat(value);
       if (isNaN(numValue)) {
-        // For major GPA, return 0.00 if invalid
-        if (mapping.field === 'majorGpa') {
-          console.warn(`Invalid major GPA value: "${value}". Setting to 0.00.`);
+        // For GPA fields, return 0.00 if invalid instead of null
+        if (mapping.field === 'majorGpa' || mapping.field === 'cumulativeGpa') {
+          console.warn(`Invalid ${mapping.field} value: "${value}". Setting to 0.00.`);
           return 0.00;
         }
         return null;
+      }
+      // For GPA fields, cap at 9.99 to avoid overflow (precision 3, scale 2)
+      if (mapping.field === 'majorGpa' || mapping.field === 'cumulativeGpa') {
+        if (numValue > 9.99) {
+          console.warn(`${mapping.field} value ${numValue} exceeds max 9.99. Capping at 9.99.`);
+          return 9.99;
+        }
+        if (numValue < 0) {
+          console.warn(`${mapping.field} value ${numValue} is negative. Setting to 0.00.`);
+          return 0.00;
+        }
       }
       return numValue;
     
