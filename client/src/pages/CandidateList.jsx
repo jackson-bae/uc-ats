@@ -5,6 +5,7 @@ import apiClient from '../utils/api';
 import AuthenticatedImage from '../components/AuthenticatedImage';
 import ImageCache from '../utils/imageCache';
 import { useAuth } from '../context/AuthContext';
+import AccessControl from '../components/AccessControl';
 import '../styles/CandidateList.css';
 
 export default function CandidateList() {
@@ -61,8 +62,14 @@ export default function CandidateList() {
   const filteredCandidates = candidates.filter(candidate => {
     // Get the latest application for search
     const latestApp = candidate.applications?.[0];
-    const matchesSearch = (latestApp?.firstName + ' ' + latestApp?.lastName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (latestApp?.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    // Use candidate's own name if no application, otherwise use application name
+    const candidateName = latestApp ? 
+      `${latestApp.firstName} ${latestApp.lastName}` : 
+      `${candidate.firstName} ${candidate.lastName}`;
+    const candidateEmail = latestApp?.email || candidate.email;
+    
+    const matchesSearch = candidateName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         candidateEmail.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          (candidate.studentId || '').toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesGroup = !filters.group || 
@@ -128,7 +135,8 @@ export default function CandidateList() {
   }
 
   return (
-    <div className="candidate-list">
+    <AccessControl allowedRoles={['ADMIN', 'MEMBER']}>
+      <div className="candidate-list">
       {/* Simple header */}
       <div className="candidate-list-header">
         <div className="header-top">
@@ -196,7 +204,9 @@ export default function CandidateList() {
                   {candidate.applications && candidate.applications.length > 0 && candidate.applications[0].headshotUrl ? (
                     <AuthenticatedImage
                       src={candidate.applications[0].headshotUrl}
-                      alt={`${candidate.applications[0].firstName} ${candidate.applications[0].lastName}`}
+                      alt={candidate.applications[0] ? 
+                        `${candidate.applications[0].firstName} ${candidate.applications[0].lastName}` : 
+                        `${candidate.firstName} ${candidate.lastName}`}
                       className="candidate-avatar"
                       style={{
                         width: '60px',
@@ -207,13 +217,17 @@ export default function CandidateList() {
                     />
                   ) : (
                     <div className="candidate-avatar-fallback">
-                      {getInitials(candidate.applications?.[0] ? `${candidate.applications[0].firstName} ${candidate.applications[0].lastName}` : 'Unknown')}
+                      {getInitials(candidate.applications?.[0] ? 
+                        `${candidate.applications[0].firstName} ${candidate.applications[0].lastName}` : 
+                        `${candidate.firstName} ${candidate.lastName}`)}
                     </div>
                   )}
                   <div className="candidate-details">
-                    <h3>{candidate.applications?.[0] ? `${candidate.applications[0].firstName} ${candidate.applications[0].lastName}` : 'Unknown Candidate'}</h3>
+                    <h3>{candidate.applications?.[0] ? 
+                      `${candidate.applications[0].firstName} ${candidate.applications[0].lastName}` : 
+                      `${candidate.firstName} ${candidate.lastName}`}</h3>
                     <p className="candidate-meta">
-                      {candidate.studentId || 'N/A'} • {candidate.applications?.[0]?.email || 'N/A'}
+                      {candidate.studentId || 'N/A'} • {candidate.applications?.[0]?.email || candidate.email || 'N/A'}
                     </p>
                     <p className="candidate-meta">
                       Applications: {candidate.applications?.length || 0} • 
@@ -235,5 +249,6 @@ export default function CandidateList() {
         </div>
       )}
     </div>
+    </AccessControl>
   );
 }

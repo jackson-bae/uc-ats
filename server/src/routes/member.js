@@ -155,6 +155,30 @@ router.get('/all-candidates', requireAuth, async (req, res) => {
             orderBy: {
               submittedAt: 'desc'
             }
+          },
+          eventAttendance: {
+            include: {
+              event: {
+                select: {
+                  id: true,
+                  eventName: true,
+                  eventStartDate: true,
+                  eventEndDate: true
+                }
+              }
+            }
+          },
+          eventRsvp: {
+            include: {
+              event: {
+                select: {
+                  id: true,
+                  eventName: true,
+                  eventStartDate: true,
+                  eventEndDate: true
+                }
+              }
+            }
           }
         },
         orderBy: {
@@ -184,6 +208,78 @@ router.get('/all-candidates', requireAuth, async (req, res) => {
     console.error('Error fetching all candidates for member:', error);
     console.error('Error details:', error.message, error.stack);
     res.status(500).json({ error: 'Failed to fetch candidates', details: error.message });
+  }
+});
+
+// Get a specific candidate with all related data
+router.get('/candidate/:id', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log('Fetching candidate details for:', id);
+    
+    const candidate = await prisma.candidate.findUnique({
+      where: { id },
+      include: {
+        assignedGroup: {
+          select: {
+            id: true,
+            memberOne: true,
+            memberTwo: true,
+            memberThree: true,
+            createdAt: true
+          }
+        },
+        applications: {
+          include: {
+            cycle: {
+              select: {
+                id: true,
+                name: true,
+                isActive: true
+              }
+            }
+          },
+          orderBy: {
+            submittedAt: 'desc'
+          }
+        },
+        eventAttendance: {
+          include: {
+            event: {
+              select: {
+                id: true,
+                eventName: true,
+                eventStartDate: true,
+                eventEndDate: true
+              }
+            }
+          }
+        },
+        eventRsvp: {
+          include: {
+            event: {
+              select: {
+                id: true,
+                eventName: true,
+                eventStartDate: true,
+                eventEndDate: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!candidate) {
+      return res.status(404).json({ error: 'Candidate not found' });
+    }
+
+    console.log('Found candidate:', candidate.id);
+    res.json(candidate);
+  } catch (error) {
+    console.error('Error fetching candidate details:', error);
+    console.error('Error details:', error.message, error.stack);
+    res.status(500).json({ error: 'Failed to fetch candidate details', details: error.message });
   }
 });
 
@@ -317,17 +413,29 @@ router.get('/my-team', requireAuth, async (req, res) => {
 
       // Calculate progress for each document type
       // Progress is based on how many team members have scored each document
-      const candidateResumeScores = resumeScores.filter(score => score.candidateId === candidate.id);
-      const candidateCoverLetterScores = coverLetterScores.filter(score => score.candidateId === candidate.id);
-      const candidateVideoScores = videoScores.filter(score => score.candidateId === candidate.id);
+      const candidateResumeScores = resumeScores.filter(score => 
+        score.candidateId === candidate.id && 
+        score.assignedGroupId === userTeam.id &&
+        teamMemberIds.includes(score.evaluatorId));
+      const candidateCoverLetterScores = coverLetterScores.filter(score => 
+        score.candidateId === candidate.id && 
+        score.assignedGroupId === userTeam.id &&
+        teamMemberIds.includes(score.evaluatorId));
+      const candidateVideoScores = videoScores.filter(score => 
+        score.candidateId === candidate.id && 
+        score.assignedGroupId === userTeam.id &&
+        teamMemberIds.includes(score.evaluatorId));
 
       // Calculate progress as percentage of team members who have scored each document
-      const resumeProgress = latestApplication.resumeUrl ? 
-        Math.round((candidateResumeScores.length / teamMemberIds.length) * 100) : 100;
-      const coverLetterProgress = latestApplication.coverLetterUrl ? 
-        Math.round((candidateCoverLetterScores.length / teamMemberIds.length) * 100) : 100;
-      const videoProgress = latestApplication.videoUrl ? 
-        Math.round((candidateVideoScores.length / teamMemberIds.length) * 100) : 100;
+      const resumeProgress = !latestApplication.resumeUrl ? 100 : 
+        (teamMemberIds.length > 0 ? 
+          Math.round((candidateResumeScores.length / teamMemberIds.length) * 100) : 0);
+      const coverLetterProgress = !latestApplication.coverLetterUrl ? 100 : 
+        (teamMemberIds.length > 0 ? 
+          Math.round((candidateCoverLetterScores.length / teamMemberIds.length) * 100) : 0);
+      const videoProgress = !latestApplication.videoUrl ? 100 : 
+        (teamMemberIds.length > 0 ? 
+          Math.round((candidateVideoScores.length / teamMemberIds.length) * 100) : 0);
 
       return {
         id: latestApplication.id,
@@ -1085,6 +1193,124 @@ router.post('/message-admin', requireAuth, async (req, res) => {
       error: 'Failed to send message',
       details: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
+  }
+});
+
+// Flag a document (member access)
+router.post('/flag-document', requireAuth, async (req, res) => {
+  try {
+    const { applicationId, documentType, reason, message } = req.body;
+    const flaggedBy = req.user.id;
+
+    // Validate required fields
+    if (!applicationId || !documentType || !reason) {
+      return res.status(400).json({ error: 'Application ID, document type, and reason are required' });
+    }
+
+    // Validate document type
+    const validDocumentTypes = ['resume', 'coverLetter', 'video'];
+    if (!validDocumentTypes.includes(documentType)) {
+      return res.status(400).json({ error: 'Invalid document type. Must be resume, coverLetter, or video' });
+    }
+
+    // Get the active cycle first
+    const activeCycle = await prisma.recruitingCycle.findFirst({ 
+      where: { isActive: true } 
+    });
+
+    if (!activeCycle) {
+      return res.status(400).json({ error: 'No active recruitment cycle found' });
+    }
+
+    // Check if the member has access to this application (they must be assigned to review it)
+    const memberGroup = await prisma.groups.findFirst({
+      where: {
+        cycleId: activeCycle.id,
+        OR: [
+          { memberOne: flaggedBy },
+          { memberTwo: flaggedBy },
+          { memberThree: flaggedBy }
+        ],
+        assignedCandidates: {
+          some: {
+            applications: {
+              some: {
+                id: applicationId
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!memberGroup) {
+      return res.status(403).json({ error: 'You do not have permission to flag this application' });
+    }
+
+    // Check if document is already flagged
+    const existingFlag = await prisma.flaggedDocument.findFirst({
+      where: {
+        applicationId,
+        documentType,
+        isResolved: false
+      }
+    });
+
+    if (existingFlag) {
+      return res.status(400).json({ error: 'This document is already flagged' });
+    }
+
+    // Create the flag
+    const flaggedDocument = await prisma.flaggedDocument.create({
+      data: {
+        applicationId,
+        documentType,
+        reason,
+        message: message?.trim() || null,
+        flaggedBy,
+        isResolved: false
+      },
+      include: {
+        application: {
+          select: {
+            id: true,
+            studentId: true,
+            email: true
+          }
+        },
+        flagger: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true
+          }
+        }
+      }
+    });
+
+    // Send Slack notification
+    try {
+      const slackMessage = `🚩 Document Flagged\n\n` +
+        `**Application:** Student ${flaggedDocument.application.studentId}\n` +
+        `**Document Type:** ${documentType}\n` +
+        `**Reason:** ${reason}\n` +
+        `**Flagged by:** ${flaggedDocument.flagger.fullName}\n` +
+        `**Message:** ${message || 'No additional details provided'}\n\n` +
+        `Please review this flagged document in the admin panel.`;
+
+      await sendSlackMessage(slackMessage);
+    } catch (slackError) {
+      console.error('Failed to send Slack notification for flagged document:', slackError);
+      // Don't fail the request if Slack notification fails
+    }
+
+    res.status(201).json({
+      message: 'Document flagged successfully',
+      flaggedDocument
+    });
+  } catch (error) {
+    console.error('[POST /api/member/flag-document]', error);
+    res.status(500).json({ error: 'Failed to flag document' });
   }
 });
 

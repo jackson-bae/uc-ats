@@ -8,6 +8,7 @@ import {
 } from '@heroicons/react/24/outline';
 import apiClient from '../utils/api';
 import { useAuth } from '../context/AuthContext';
+import AccessControl from '../components/AccessControl';
 import '../styles/ApplicationList.css';
 
 export default function Candidates() {
@@ -160,7 +161,8 @@ export default function Candidates() {
   }
 
   return (
-    <div className="application-list">
+    <AccessControl allowedRoles={['ADMIN', 'MEMBER']}>
+      <div className="application-list">
       <div className="application-list-header" style={{ alignItems: 'flex-start' }}>
         <div>
           <h1 className="header-title">Applications</h1>
@@ -328,5 +330,6 @@ export default function Candidates() {
         </div>
       )}
     </div>
+    </AccessControl>
   );
 }

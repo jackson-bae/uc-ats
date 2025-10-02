@@ -27,6 +27,7 @@ import {
   Person as PersonIcon
 } from '@mui/icons-material';
 import apiClient from '../utils/api';
+import AccessControl from '../components/AccessControl';
 
 export default function MemberDashboard() {
   const { user } = useAuth();
@@ -145,7 +146,7 @@ export default function MemberDashboard() {
             title: 'Grade Resumes',
             type: 'document',
             documentType: 'resume',
-            dueDate: 'Oct 5th, EOD',
+            dueDate: 'Oct 4th, Morning',
             items: `${applicationsWithResumes.length} items to review`,
             status: 'pending',
             count: applicationsWithResumes.length
@@ -158,7 +159,7 @@ export default function MemberDashboard() {
             title: 'Grade Cover Letters',
             type: 'document',
             documentType: 'coverLetter',
-            dueDate: 'Oct 5th, EOD',
+            dueDate: 'Oct 4th, Morning',
             items: `${applicationsWithCoverLetters.length} items to review`,
             status: 'pending',
             count: applicationsWithCoverLetters.length
@@ -171,7 +172,7 @@ export default function MemberDashboard() {
             title: 'Grade Videos',
             type: 'document',
             documentType: 'video',
-            dueDate: 'Oct 5th, EOD',
+            dueDate: 'Oct 4th, Morning',
             items: `${applicationsWithVideos.length} items to review`,
             status: 'pending',
             count: applicationsWithVideos.length
@@ -298,7 +299,8 @@ export default function MemberDashboard() {
   };
 
   return (
-    <Box sx={{ maxWidth: 1200, mx: 'auto', p: 0 }}>
+    <AccessControl allowedRoles={['ADMIN', 'MEMBER']}>
+      <Box sx={{ maxWidth: 1200, mx: 'auto', p: 0 }}>
       {/* Welcome Section */}
       <Box sx={{ mb: 4 }}>
         <Typography variant="h3" component="h1" sx={{ fontWeight: 700, color: 'primary.dark' }}>
@@ -800,5 +802,6 @@ export default function MemberDashboard() {
         </Paper>
       )}
     </Box>
+    </AccessControl>
   );
 }

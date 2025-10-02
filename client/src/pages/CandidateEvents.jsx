@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { MapPinIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '../context/AuthContext';
 import apiClient from '../utils/api';
+import AccessControl from '../components/AccessControl';
 import '../styles/CandidateEvents.css';
 
 export default function CandidateEvents() {
@@ -134,7 +135,8 @@ export default function CandidateEvents() {
   }
 
   return (
-    <div className="candidate-events-container">
+    <AccessControl allowedRoles={['USER']}>
+      <div className="candidate-events-container">
       <div className="events-header">
         <div className="events-title-section">
           <h1 className="events-title">Events</h1>
@@ -204,5 +206,6 @@ export default function CandidateEvents() {
         )}
       </div>
     </div>
+    </AccessControl>
   );
 }

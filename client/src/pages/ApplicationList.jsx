@@ -5,6 +5,7 @@ import apiClient from '../utils/api';
 import AuthenticatedImage from '../components/AuthenticatedImage';
 import ImageCache from '../utils/imageCache';
 import AddApplicationModal from '../components/AddApplicationModal';
+import AccessControl from '../components/AccessControl';
 import '../styles/ApplicationList.css';
 
 export default function ApplicationList() {
@@ -114,7 +115,8 @@ export default function ApplicationList() {
   }
 
   return (
-    <div className="application-list">
+    <AccessControl allowedRoles={['ADMIN', 'MEMBER']}>
+      <div className="application-list">
       {/* Simple header */}
       <div className="application-list-header">
         <div className="header-top">
@@ -263,5 +265,6 @@ export default function ApplicationList() {
         onSuccess={handleApplicationAdded}
       />
     </div>
+    </AccessControl>
   );
 }

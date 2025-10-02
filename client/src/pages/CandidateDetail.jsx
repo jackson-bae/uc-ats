@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import apiClient from '../utils/api';
 import AuthenticatedImage from '../components/AuthenticatedImage';
+import AccessControl from '../components/AccessControl';
 import '../styles/CandidateDetail.css';
 
 export default function CandidateDetail() {
@@ -14,13 +15,8 @@ export default function CandidateDetail() {
   useEffect(() => {
     const fetchCandidate = async () => {
       try {
-        const data = await apiClient.get(`/member/all-candidates`);
-        const foundCandidate = data.find(c => c.id === id);
-        if (foundCandidate) {
-          setCandidate(foundCandidate);
-        } else {
-          setError('Candidate not found');
-        }
+        const candidate = await apiClient.get(`/member/candidate/${id}`);
+        setCandidate(candidate);
       } catch (err) {
         console.error('Error loading candidate detail:', err);
         setError(err.message);
@@ -38,15 +34,15 @@ export default function CandidateDetail() {
     return nameParts.map(part => part.charAt(0)).join('').toUpperCase().slice(0, 2);
   };
 
-  // Helper function to get candidate display info from applications
+  // Helper function to get candidate display info from applications or candidate data
   const getCandidateDisplayInfo = (candidate) => {
     const latestApp = candidate.applications?.[0];
     if (!latestApp) {
       return {
-        name: 'Unknown Candidate',
-        email: 'N/A',
-        firstName: 'Unknown',
-        lastName: 'Candidate'
+        name: `${candidate.firstName} ${candidate.lastName}`,
+        email: candidate.email,
+        firstName: candidate.firstName,
+        lastName: candidate.lastName
       };
     }
     
@@ -103,7 +99,8 @@ export default function CandidateDetail() {
   const displayInfo = getCandidateDisplayInfo(candidate);
 
   return (
-    <div className="candidate-detail">
+    <AccessControl allowedRoles={['ADMIN', 'MEMBER']}>
+      <div className="candidate-detail">
       {/* Header */}
       <div className="candidate-detail-header">
         <Link to="/candidate-list" className="back-link">
@@ -232,5 +229,6 @@ export default function CandidateDetail() {
         </div>
       </div>
     </div>
+    </AccessControl>
   );
 }

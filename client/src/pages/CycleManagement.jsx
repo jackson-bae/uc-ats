@@ -22,6 +22,7 @@ import {
 } from '@mui/material';
 import { Edit as EditIcon } from '@mui/icons-material';
 import apiClient from '../utils/api';
+import AccessControl from '../components/AccessControl';
 
 export default function CycleManagement() {
   const [cycles, setCycles] = useState([]);
@@ -102,7 +103,8 @@ export default function CycleManagement() {
   }, []);
 
   return (
-    <Box>
+    <AccessControl allowedRoles={['ADMIN', 'MEMBER']}>
+      <Box>
       <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2}>
         <Typography variant="h4">Cycle Management</Typography>
         <Button variant="contained" onClick={() => setCreateOpen(true)}>New Cycle</Button>
@@ -193,5 +195,6 @@ export default function CycleManagement() {
         </DialogActions>
       </Dialog>
     </Box>
+    </AccessControl>
   );
 }

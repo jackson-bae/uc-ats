@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
+import AccessControl from '../components/AccessControl';
 import {
   Box,
   Typography,
@@ -358,7 +359,8 @@ export default function MemberMeetingSlots() {
 
 
   return (
-    <Box sx={{ maxWidth: 1200, mx: 'auto', p: 0 }}>
+    <AccessControl allowedRoles={['ADMIN', 'MEMBER']}>
+      <Box sx={{ maxWidth: 1200, mx: 'auto', p: 0 }}>
       {/* Header */}
       <Box sx={{ mb: 4 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
@@ -798,6 +800,7 @@ export default function MemberMeetingSlots() {
         )}
       </Paper>
     </Box>
+    </AccessControl>
   );
 }
 

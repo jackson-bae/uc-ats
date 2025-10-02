@@ -36,6 +36,7 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import apiClient from '../utils/api';
+import AccessControl from '../components/AccessControl';
 
 const UserManagement = () => {
   const { user } = useAuth();
@@ -220,40 +221,12 @@ const UserManagement = () => {
     }
   };
 
-  if (!user) {
-    return (
-      <Box sx={{ p: 3 }}>
-        <Paper sx={{ p: 4, textAlign: 'center' }}>
-          <Typography variant="h4" gutterBottom>
-            Not Logged In
-          </Typography>
-          <Typography variant="body1" color="text.secondary">
-            Please log in to access this page.
-          </Typography>
-        </Paper>
-      </Box>
-    );
-  }
-
-  if (user.role !== 'ADMIN') {
-    return (
-      <Box sx={{ p: 3 }}>
-        <Paper sx={{ p: 4, textAlign: 'center' }}>
-          <Typography variant="h4" gutterBottom>
-            Access Denied
-          </Typography>
-          <Typography variant="body1" color="text.secondary">
-            You need admin privileges to access this page. Current role: {user.role}
-          </Typography>
-        </Paper>
-      </Box>
-    );
-  }
 
   return (
-    <Box sx={{ 
-      p: 2, 
-      width: '100%', 
+    <AccessControl allowedRoles={['ADMIN']}>
+      <Box sx={{ 
+        p: 2, 
+        width: '100%', 
       maxWidth: 'none',
       minWidth: 0
     }}>
@@ -640,6 +613,7 @@ const UserManagement = () => {
           </form>
                  </Dialog>
        </Box>
+    </AccessControl>
    );
  };
 

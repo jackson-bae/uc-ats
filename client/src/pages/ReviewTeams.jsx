@@ -19,7 +19,7 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { 
+import {
   Box, 
   Paper, 
   Typography, 
@@ -40,7 +40,8 @@ import {
   Select,
   MenuItem,
   Grid,
-  Autocomplete
+  Autocomplete,
+  Alert
 } from '@mui/material';
 import { 
   PlusIcon, 
@@ -52,6 +53,7 @@ import {
   ArrowTopRightOnSquareIcon
 } from '@heroicons/react/24/outline';
 import apiClient from '../utils/api';
+import AccessControl from '../components/AccessControl';
 
 // Draggable Application Component
 function DraggableApplication({ application, teamId, onRemove, onClick, isDragging, editMode }) {
@@ -566,7 +568,8 @@ export default function ReviewTeams() {
   }
 
   return (
-    <Box>
+    <AccessControl allowedRoles={['ADMIN', 'MEMBER']}>
+      <Box>
       {/* Header */}
       <Stack direction="row" alignItems="center" justifyContent="space-between" mb={3}>
         <Typography variant="h4" sx={{ fontWeight: 700, color: 'primary.main' }}>
@@ -651,14 +654,18 @@ export default function ReviewTeams() {
       )}
 
       {/* Total Teams Stats */}
-      <Paper sx={{ p: 3, mb: 3, border: '1px solid', borderColor: 'divider' }}>
-        <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
-          Total Teams
-        </Typography>
-        <Typography variant="h3" sx={{ fontWeight: 700, color: 'primary.main' }}>
-          {teams.length}
-        </Typography>
-      </Paper>
+      <Grid container spacing={3} sx={{ mb: 3 }}>
+        <Grid item xs={12} md={6}>
+          <Paper sx={{ p: 3, border: '1px solid', borderColor: 'divider' }}>
+            <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
+              Total Teams
+            </Typography>
+            <Typography variant="h3" sx={{ fontWeight: 700, color: 'primary.main' }}>
+              {teams.length}
+            </Typography>
+          </Paper>
+        </Grid>
+      </Grid>
 
       {/* Teams List */}
       <DndContext
@@ -716,6 +723,7 @@ export default function ReviewTeams() {
                 <Stack spacing={2}>
                   {(() => {
                     const progress = calculateTeamProgress(team);
+                    
                     return (
                       <>
                         <Box>
@@ -1250,5 +1258,6 @@ export default function ReviewTeams() {
         </DialogActions>
       </Dialog>
     </Box>
+    </AccessControl>
   );
 }

@@ -25,6 +25,7 @@ import {
 } from '@mui/material';
 import { TrashIcon, PencilIcon } from '@heroicons/react/24/outline';
 import apiClient from '../utils/api';
+import AccessControl from '../components/AccessControl';
 
 export default function EventManagement() {
   const [events, setEvents] = useState([]);
@@ -336,7 +337,8 @@ export default function EventManagement() {
   };
 
   return (
-    <Box sx={{ 
+    <AccessControl allowedRoles={['ADMIN', 'MEMBER']}>
+      <Box sx={{ 
       width: '100%', 
       overflow: 'visible',
       maxWidth: 'none',
@@ -782,5 +784,6 @@ export default function EventManagement() {
       </Dialog>
 
     </Box>
+    </AccessControl>
   );
 }

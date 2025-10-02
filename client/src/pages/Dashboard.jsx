@@ -35,6 +35,7 @@ import {
 } from 'recharts';
 import { useAuth } from '../context/AuthContext';
 import apiClient from '../utils/api';
+import AccessControl from '../components/AccessControl';
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -287,7 +288,8 @@ export default function Dashboard() {
   }
 
   return (
-    <Box sx={{ maxWidth: 1200, mx: 'auto', p: 0 }}>
+    <AccessControl allowedRoles={['ADMIN', 'MEMBER']}>
+      <Box sx={{ maxWidth: 1200, mx: 'auto', p: 0 }}>
       {/* Header */}
       <Box sx={{ mb: 4 }}>
         <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2}>
@@ -887,5 +889,6 @@ export default function Dashboard() {
         </Grid>
       )}
     </Box>
+    </AccessControl>
   );
 }

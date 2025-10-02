@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import apiClient from '../utils/api';
 import DocumentGradingModal from '../components/DocumentGradingModal';
 import FlagDocumentModal from '../components/FlagDocumentModal';
+import AccessControl from '../components/AccessControl';
 import {
   Box,
   Typography,
@@ -145,7 +146,7 @@ export default function DocumentGrading() {
         icon: <DocumentIcon />,
         completed: resumeGraded,
         total: applicationsWithResumes,
-        deadline: 'Oct 5th, EOD',
+        deadline: 'Oct 4th, Morning',
         percentage: applicationsWithResumes > 0 ? Math.round((resumeGraded / applicationsWithResumes) * 100) : 100,
         color: 'success'
       },
@@ -154,7 +155,7 @@ export default function DocumentGrading() {
         icon: <EditIcon />,
         completed: coverLetterGraded,
         total: applicationsWithCoverLetters,
-        deadline: 'Oct 5th, EOD',
+        deadline: 'Oct 4th, Morning',
         percentage: applicationsWithCoverLetters > 0 ? Math.round((coverLetterGraded / applicationsWithCoverLetters) * 100) : 100,
         color: 'success'
       },
@@ -163,7 +164,7 @@ export default function DocumentGrading() {
         icon: <VideoIcon />,
         completed: videoGraded,
         total: applicationsWithVideos,
-        deadline: 'Oct 5th, EOD',
+        deadline: 'Oct 4th, Morning',
         percentage: applicationsWithVideos > 0 ? Math.round((videoGraded / applicationsWithVideos) * 100) : 100,
         color: 'success'
       }
@@ -379,7 +380,8 @@ export default function DocumentGrading() {
   console.log('showConfetti:', showConfetti);
 
   return (
-    <Box sx={{ p: 3 }}>
+    <AccessControl allowedRoles={['ADMIN', 'MEMBER']}>
+      <Box sx={{ p: 3 }}>
       {/* Confetti Animation */}
       <Confetti active={showConfetti} />
       
@@ -777,5 +779,6 @@ export default function DocumentGrading() {
         </DialogActions>
       </Dialog>
     </Box>
+    </AccessControl>
   );
 }

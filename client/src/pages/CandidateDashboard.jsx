@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import AccessControl from '../components/AccessControl';
 import '../styles/CandidateDashboard.css';
 
 export default function CandidateDashboard() {
@@ -28,7 +29,8 @@ export default function CandidateDashboard() {
   };
 
   return (
-    <div className="candidate-dashboard-container">
+    <AccessControl allowedRoles={['USER']}>
+      <div className="candidate-dashboard-container">
       <div className="dashboard-header">
         <h1 className="dashboard-title">Welcome, {user?.fullName}!</h1>
         <p className="dashboard-subtitle">
@@ -65,5 +67,6 @@ export default function CandidateDashboard() {
         </div>
       </div>
     </div>
+    </AccessControl>
   );
 }

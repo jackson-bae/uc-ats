@@ -8,6 +8,7 @@ import {
   ChevronDownIcon
 } from '@heroicons/react/24/outline';
 import apiClient from '../utils/api';
+import AccessControl from '../components/AccessControl';
 import '../styles/FirstRoundInterviewInterface.css';
 
 export default function FirstRoundInterviewInterface() {
@@ -347,7 +348,8 @@ export default function FirstRoundInterviewInterface() {
   }
 
   return (
-    <div className="first-round-interview-container">
+    <AccessControl allowedRoles={['ADMIN', 'MEMBER']}>
+      <div className="first-round-interview-container">
       {/* Header */}
       <div className="interview-header">
         <button 
@@ -654,5 +656,6 @@ export default function FirstRoundInterviewInterface() {
         )}
       </div>
     </div>
+    </AccessControl>
   );
 }

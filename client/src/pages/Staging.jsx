@@ -75,6 +75,7 @@ import '../styles/Staging.css';
 import apiClient from '../utils/api';
 import AuthenticatedFileLink from '../components/AuthenticatedFileLink';
 import DocumentPreviewModal from '../components/DocumentPreviewModal';
+import AccessControl from '../components/AccessControl';
 
 // API functions for staging
 const stagingAPI = {
@@ -1115,7 +1116,8 @@ export default function Staging() {
   }
 
   return (
-    <ThemeProvider theme={globalTheme}>
+    <AccessControl allowedRoles={['ADMIN', 'MEMBER']}>
+      <ThemeProvider theme={globalTheme}>
       <CssBaseline />
       <Box className="staging-page">
         {/* Header */}
@@ -2661,5 +2663,6 @@ export default function Staging() {
         </Snackbar>
       </Box>
     </ThemeProvider>
+    </AccessControl>
   );
 }

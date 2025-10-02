@@ -80,6 +80,110 @@ router.get('/', requireAuth, async (req, res) => {
 
     console.log('Starting data transformation');
     
+    // Get all candidate IDs to fetch their scores
+    const allCandidateIds = groups.flatMap(group => 
+      group.assignedCandidates.map(candidate => candidate.id)
+    );
+    
+    // Fetch all scores for these candidates with full details
+    const resumeScores = await prisma.resumeScore.findMany({
+      where: {
+        candidateId: {
+          in: allCandidateIds
+        }
+      },
+      select: {
+        candidateId: true,
+        evaluatorId: true,
+        overallScore: true,
+        assignedGroupId: true,
+        evaluator: {
+          select: {
+            id: true,
+            fullName: true
+          }
+        }
+      }
+    });
+    
+    const coverLetterScores = await prisma.coverLetterScore.findMany({
+      where: {
+        candidateId: {
+          in: allCandidateIds
+        }
+      },
+      select: {
+        candidateId: true,
+        evaluatorId: true,
+        overallScore: true,
+        assignedGroupId: true,
+        evaluator: {
+          select: {
+            id: true,
+            fullName: true
+          }
+        }
+      }
+    });
+    
+    const videoScores = await prisma.videoScore.findMany({
+      where: {
+        candidateId: {
+          in: allCandidateIds
+        }
+      },
+      select: {
+        candidateId: true,
+        evaluatorId: true,
+        overallScore: true,
+        assignedGroupId: true,
+        evaluator: {
+          select: {
+            id: true,
+            fullName: true
+          }
+        }
+      }
+    });
+    
+    // Helper function to detect outlier scores
+    // threshold: minimum point difference to be considered an outlier
+    // teamMemberCount: total number of team members who should grade
+    const detectOutliers = (scores, candidateId, groupId, threshold, teamMemberCount) => {
+      // Filter scores for this specific candidate and group
+      const relevantScores = scores.filter(
+        score => score.candidateId === candidateId && score.assignedGroupId === groupId
+      );
+      
+      // Only detect outliers if ALL team members have submitted their scores
+      if (relevantScores.length < teamMemberCount || teamMemberCount < 2) {
+        return []; // Need all team members to have graded before detecting outliers
+      }
+      
+      const scoreValues = relevantScores.map(s => s.overallScore);
+      const mean = scoreValues.reduce((sum, val) => sum + val, 0) / scoreValues.length;
+      
+      // Detect outliers based on absolute point difference from mean
+      const outliers = [];
+      relevantScores.forEach(score => {
+        const deviationFromMean = Math.abs(score.overallScore - mean);
+        
+        // Only flag as outlier if deviation exceeds the threshold
+        if (deviationFromMean >= threshold) {
+          outliers.push({
+            evaluatorId: score.evaluatorId,
+            evaluatorName: score.evaluator.fullName,
+            score: score.overallScore,
+            mean: Math.round(mean * 10) / 10,
+            deviation: Math.round(deviationFromMean * 10) / 10,
+            isHigher: score.overallScore > mean
+          });
+        }
+      });
+      
+      return outliers;
+    };
+    
     // Transform the data to match the frontend expectations
     const transformedGroups = groups.map(group => {
       const members = [
@@ -87,6 +191,8 @@ router.get('/', requireAuth, async (req, res) => {
         group.memberTwoUser,
         group.memberThreeUser
       ].filter(Boolean);
+      
+      const teamMemberIds = members.map(m => m.id);
 
       const applications = group.assignedCandidates.map(candidate => {
         // Get the latest application for this candidate
@@ -95,6 +201,41 @@ router.get('/', requireAuth, async (req, res) => {
         if (!latestApplication) {
           return null; // Skip candidates without applications
         }
+
+        // Calculate progress for each document type
+        // Progress is based on how many team members have scored each document
+        const candidateResumeScores = resumeScores.filter(score => 
+          score.candidateId === candidate.id && 
+          score.assignedGroupId === group.id &&
+          teamMemberIds.includes(score.evaluatorId));
+        const candidateCoverLetterScores = coverLetterScores.filter(score => 
+          score.candidateId === candidate.id && 
+          score.assignedGroupId === group.id &&
+          teamMemberIds.includes(score.evaluatorId));
+        const candidateVideoScores = videoScores.filter(score => 
+          score.candidateId === candidate.id && 
+          score.assignedGroupId === group.id &&
+          teamMemberIds.includes(score.evaluatorId));
+
+        // Calculate progress as percentage of team members who have scored each document
+        const resumeProgress = !latestApplication.resumeUrl ? 100 : 
+          (teamMemberIds.length > 0 ? 
+            Math.round((candidateResumeScores.length / teamMemberIds.length) * 100) : 0);
+        const coverLetterProgress = !latestApplication.coverLetterUrl ? 100 : 
+          (teamMemberIds.length > 0 ? 
+            Math.round((candidateCoverLetterScores.length / teamMemberIds.length) * 100) : 0);
+        const videoProgress = !latestApplication.videoUrl ? 100 : 
+          (teamMemberIds.length > 0 ? 
+            Math.round((candidateVideoScores.length / teamMemberIds.length) * 100) : 0);
+
+        // Detect outlier scores for this candidate
+        // Resume: 4 points difference minimum
+        // Cover Letter: 2 points difference minimum
+        // Video: 2 points difference minimum
+        // Only flag outliers if all team members have submitted grades
+        const resumeOutliers = detectOutliers(resumeScores, candidate.id, group.id, 4, teamMemberIds.length);
+        const coverLetterOutliers = detectOutliers(coverLetterScores, candidate.id, group.id, 2, teamMemberIds.length);
+        const videoOutliers = detectOutliers(videoScores, candidate.id, group.id, 2, teamMemberIds.length);
 
         return {
           id: latestApplication.id, // Use the actual application ID
@@ -106,10 +247,15 @@ router.get('/', requireAuth, async (req, res) => {
           status: latestApplication.status || 'SUBMITTED',
           email: latestApplication.email,
           submittedAt: latestApplication.submittedAt,
-          resumeProgress: 0, // Will be calculated separately if needed
-          coverLetterProgress: 0,
-          videoProgress: 0,
-          avatar: null
+          resumeProgress,
+          coverLetterProgress,
+          videoProgress,
+          avatar: null,
+          // Outlier information
+          resumeOutliers,
+          coverLetterOutliers,
+          videoOutliers,
+          hasOutliers: resumeOutliers.length > 0 || coverLetterOutliers.length > 0 || videoOutliers.length > 0
         };
       }).filter(Boolean); // Remove null entries
 

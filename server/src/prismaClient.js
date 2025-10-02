@@ -8,10 +8,11 @@ const enhanceDatabaseUrl = (url) => {
   // Add connection pool parameters if not already present
   const urlObj = new URL(url);
   
-  // Set connection pool parameters
-  urlObj.searchParams.set('connection_limit', '10');  // Allow up to 10 connections
-  urlObj.searchParams.set('pool_timeout', '20');      // 20 second pool timeout
-  urlObj.searchParams.set('connect_timeout', '10');   // 10 second connection timeout
+  // Optimized settings for Supabase pooler
+  urlObj.searchParams.set('connection_limit', '20');     // Increased for pooler
+  urlObj.searchParams.set('pool_timeout', '10');         // Reduced for pooler
+  urlObj.searchParams.set('connect_timeout', '5');       // Reduced for pooler
+  urlObj.searchParams.set('pgbouncer', 'true');          // Enable pgbouncer mode
   
   return urlObj.toString();
 };
@@ -24,15 +25,15 @@ const prisma = new PrismaClient({
   },
   log: ['error', 'warn'],
   transactionOptions: {
-    maxWait: 5000,    // Increased to 5s
-    timeout: 10000,   // Increased to 10s
+    maxWait: 2000,    // Reduced for pooler
+    timeout: 5000,    // Reduced for pooler
     isolationLevel: 'ReadCommitted',
   },
-  // Add connection pooling configuration
+  // Optimized for Supabase pooler
   __internal: {
     engine: {
-      connectTimeout: 10000, // 10 seconds
-      queryTimeout: 30000,   // 30 seconds
+      connectTimeout: 5000,  // Reduced for pooler
+      queryTimeout: 15000,   // Reduced for pooler
     }
   }
 });

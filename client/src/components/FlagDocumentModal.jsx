@@ -48,7 +48,7 @@ export default function FlagDocumentModal({
     setError(null);
 
     try {
-      await apiClient.post('/admin/flag-document', {
+      await apiClient.post('/member/flag-document', {
         applicationId: application.id,
         documentType,
         reason,

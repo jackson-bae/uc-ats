@@ -39,6 +39,7 @@ import {
 import globalTheme from '../styles/globalTheme';
 import '../styles/CandidateManagement.css';
 import apiClient from '../utils/api';
+import AccessControl from '../components/AccessControl';
 
 const adminAPI = {
     async fetchStats() {
@@ -651,7 +652,8 @@ export default function CandidateManagement() {
     }
 
     return (
-        <ThemeProvider theme={globalTheme}>
+        <AccessControl allowedRoles={['ADMIN', 'MEMBER']}>
+            <ThemeProvider theme={globalTheme}>
             <CssBaseline />
             <Box className="candidate-management">
                 <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
@@ -1344,5 +1346,6 @@ export default function CandidateManagement() {
             />
             </Box>
         </ThemeProvider>
+        </AccessControl>
     );
 }

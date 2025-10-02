@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import apiClient from '../utils/api';
 import DocumentPreviewModal from '../components/DocumentPreviewModal';
+import AccessControl from '../components/AccessControl';
 import '../styles/CandidateApplications.css';
 
 // Application Detail Modal Component
@@ -292,7 +293,8 @@ export default function CandidateApplications() {
   }
 
   return (
-    <div className="candidate-applications-container">
+    <AccessControl allowedRoles={['USER']}>
+      <div className="candidate-applications-container">
       <div className="applications-header">
         <h1 className="applications-title">My Applications</h1>
         <p className="applications-subtitle">
@@ -354,5 +356,6 @@ export default function CandidateApplications() {
         onClose={closeModal}
       />
     </div>
+    </AccessControl>
   );
 }

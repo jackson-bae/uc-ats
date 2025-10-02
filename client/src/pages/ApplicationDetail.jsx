@@ -4,6 +4,7 @@ import { ArrowLeftIcon, DocumentIcon, ChatBubbleLeftRightIcon, ChevronDownIcon, 
 import apiClient from '../utils/api';
 import AuthenticatedImage from '../components/AuthenticatedImage';
 import DocumentPreviewModal from '../components/DocumentPreviewModal';
+import AccessControl from '../components/AccessControl';
 import '../styles/ApplicationDetail.css';
 
 export default function ApplicationDetail() {
@@ -328,7 +329,8 @@ export default function ApplicationDetail() {
   }
 
   return (
-    <div className="application-detail">
+    <AccessControl allowedRoles={['ADMIN', 'MEMBER']}>
+      <div className="application-detail">
       {/* Header with back button and status */}
       <div className="detail-header">
         <div className="header-left">
@@ -1515,5 +1517,6 @@ export default function ApplicationDetail() {
         </div>
       )}
     </div>
+    </AccessControl>
   );
 } 

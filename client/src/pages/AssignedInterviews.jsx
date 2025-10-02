@@ -18,6 +18,7 @@ import {
   DocumentDuplicateIcon
 } from '@heroicons/react/24/outline';
 import apiClient from '../utils/api';
+import AccessControl from '../components/AccessControl';
 import '../styles/AdminAssignedInterviews.css';
 
 export default function AssignedInterviews() {
@@ -239,7 +240,8 @@ export default function AssignedInterviews() {
   };
 
   return (
-    <div className="admin-assigned-interviews-container">
+    <AccessControl allowedRoles={['ADMIN', 'MEMBER']}>
+      <div className="admin-assigned-interviews-container">
       {/* Group Selection Modal */}
       {groupSelectionOpen && selectedInterviewForStart && (
         <div className="modal-overlay">
@@ -597,5 +599,6 @@ export default function AssignedInterviews() {
         )}
       </div>
     </div>
+    </AccessControl>
   );
 }

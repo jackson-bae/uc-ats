@@ -7,6 +7,7 @@ import {
   DocumentTextIcon
 } from '@heroicons/react/24/outline';
 import apiClient from '../utils/api';
+import AccessControl from '../components/AccessControl';
 import '../styles/InterviewInterface.css';
 
 export default function InterviewInterface() {
@@ -315,7 +316,8 @@ export default function InterviewInterface() {
   }
 
   return (
-    <div className="interview-interface-container">
+    <AccessControl allowedRoles={['ADMIN']}>
+      <div className="interview-interface-container">
       {/* Header */}
       <div className="interview-header">
         <button 
@@ -522,5 +524,6 @@ export default function InterviewInterface() {
         </div>
       )}
     </div>
+    </AccessControl>
   );
 }

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
+import AccessControl from '../components/AccessControl';
 import '../styles/InterviewPreparation.css';
 
 // Icons for the resources
@@ -390,7 +391,8 @@ export default function InterviewPreparation() {
   }
 
   return (
-    <div className="interview-prep-container">
+    <AccessControl allowedRoles={['USER']}>
+      <div className="interview-prep-container">
       <div className="interview-prep-header">
         <div className="header-content">
           <div>
@@ -489,5 +491,6 @@ export default function InterviewPreparation() {
         round={modalState.round}
       />
     </div>
+    </AccessControl>
   );
 }

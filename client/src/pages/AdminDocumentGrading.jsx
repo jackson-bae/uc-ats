@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import apiClient from '../utils/api';
 import DocumentGradingModal from '../components/DocumentGradingModal';
 import FlagDocumentModal from '../components/FlagDocumentModal';
+import AccessControl from '../components/AccessControl';
 import {
   Box,
   Typography,
@@ -112,7 +113,7 @@ export default function AdminDocumentGrading() {
           total: myResumeAssignments,
           gradesCompleted: resumeGradedByMe,
           gradesNeeded: myResumeAssignments,
-          deadline: 'Oct 5th, EOD',
+          deadline: 'Oct 4th, Morning',
           percentage: myResumeAssignments > 0 ? Math.round((resumeGradedByMe / myResumeAssignments) * 100) : 0,
           color: 'success'
         },
@@ -123,7 +124,7 @@ export default function AdminDocumentGrading() {
           total: myCoverLetterAssignments,
           gradesCompleted: coverLetterGradedByMe,
           gradesNeeded: myCoverLetterAssignments,
-          deadline: 'Oct 5th, EOD',
+          deadline: 'Oct 4th, Morning',
           percentage: myCoverLetterAssignments > 0 ? Math.round((coverLetterGradedByMe / myCoverLetterAssignments) * 100) : 0,
           color: 'success'
         },
@@ -134,7 +135,7 @@ export default function AdminDocumentGrading() {
           total: myVideoAssignments,
           gradesCompleted: videoGradedByMe,
           gradesNeeded: myVideoAssignments,
-          deadline: 'Oct 5th, EOD',
+          deadline: 'Oct 4th, Morning',
           percentage: myVideoAssignments > 0 ? Math.round((videoGradedByMe / myVideoAssignments) * 100) : 0,
           color: 'success'
         }
@@ -185,7 +186,7 @@ export default function AdminDocumentGrading() {
           total: applicationsWithResume.length,
           gradesCompleted: totalResumeGradesCompleted,
           gradesNeeded: totalResumeGradesNeeded,
-          deadline: 'Oct 5th, EOD',
+          deadline: 'Oct 4th, Morning',
           percentage: totalResumeGradesNeeded > 0 ? Math.round((totalResumeGradesCompleted / totalResumeGradesNeeded) * 100) : 0,
           color: 'success'
         },
@@ -196,7 +197,7 @@ export default function AdminDocumentGrading() {
           total: applicationsWithCoverLetter.length,
           gradesCompleted: totalCoverLetterGradesCompleted,
           gradesNeeded: totalCoverLetterGradesNeeded,
-          deadline: 'Oct 5th, EOD',
+          deadline: 'Oct 4th, Morning',
           percentage: totalCoverLetterGradesNeeded > 0 ? Math.round((totalCoverLetterGradesCompleted / totalCoverLetterGradesNeeded) * 100) : 0,
           color: 'success'
         },
@@ -207,7 +208,7 @@ export default function AdminDocumentGrading() {
           total: applicationsWithVideo.length,
           gradesCompleted: totalVideoGradesCompleted,
           gradesNeeded: totalVideoGradesNeeded,
-          deadline: 'Oct 5th, EOD',
+          deadline: 'Oct 4th, Morning',
           percentage: totalVideoGradesNeeded > 0 ? Math.round((totalVideoGradesCompleted / totalVideoGradesNeeded) * 100) : 0,
           color: 'success'
         }
@@ -541,7 +542,8 @@ export default function AdminDocumentGrading() {
   };
 
   return (
-    <Box sx={{ p: 3 }}>
+    <AccessControl allowedRoles={['ADMIN']}>
+      <Box sx={{ p: 3 }}>
       {/* Main Title */}
       <Typography variant="h4" component="h1" sx={{ fontWeight: 700, color: 'primary.dark', mb: 4 }}>
         Admin Document Grading
@@ -1113,5 +1115,6 @@ export default function AdminDocumentGrading() {
         documentType={flaggingDocumentType}
       />
     </Box>
+    </AccessControl>
   );
 }

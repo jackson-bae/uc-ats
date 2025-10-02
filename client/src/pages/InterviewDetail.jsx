@@ -43,6 +43,7 @@ import {
   XMarkIcon,
 } from '@heroicons/react/24/outline';
 import apiClient from '../utils/api';
+import AccessControl from '../components/AccessControl';
 
 const INTERVIEW_TYPES = {
   COFFEE_CHAT: {
@@ -259,7 +260,8 @@ export default function InterviewDetail() {
   const rubric = EVALUATION_RUBRICS[interview.type];
 
   return (
-    <Box>
+    <AccessControl allowedRoles={['ADMIN', 'MEMBER']}>
+      <Box>
       {/* Header */}
       <Stack direction="row" alignItems="center" spacing={2} mb={3}>
         <IconButton onClick={() => navigate('/interviews')}>
@@ -552,6 +554,7 @@ export default function InterviewDetail() {
         </DialogContent>
       </Dialog>
     </Box>
+    </AccessControl>
   );
 }
 
