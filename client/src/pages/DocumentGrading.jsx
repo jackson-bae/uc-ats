@@ -130,15 +130,18 @@ export default function DocumentGrading() {
 
   // Calculate progress data based on actual grading completion
   const calculateProgressData = () => {
+    // Ensure applications is an array
+    const apps = Array.isArray(applications) ? applications : [];
+    
     // Count applications that have documents for each category
-    const applicationsWithResumes = applications.filter(app => app.resumeUrl).length;
-    const applicationsWithCoverLetters = applications.filter(app => app.coverLetterUrl).length;
-    const applicationsWithVideos = applications.filter(app => app.videoUrl).length;
+    const applicationsWithResumes = apps.filter(app => app.resumeUrl).length;
+    const applicationsWithCoverLetters = apps.filter(app => app.coverLetterUrl).length;
+    const applicationsWithVideos = apps.filter(app => app.videoUrl).length;
     
     // Count applications that have been graded for each category
-    const resumeGraded = applications.filter(app => app.hasResumeScore).length;
-    const coverLetterGraded = applications.filter(app => app.hasCoverLetterScore).length;
-    const videoGraded = applications.filter(app => app.hasVideoScore).length;
+    const resumeGraded = apps.filter(app => app.hasResumeScore).length;
+    const coverLetterGraded = apps.filter(app => app.hasCoverLetterScore).length;
+    const videoGraded = apps.filter(app => app.hasVideoScore).length;
 
     return [
       {
@@ -175,24 +178,27 @@ export default function DocumentGrading() {
 
   // Check if all documents are completed
   const checkAllDocumentsCompleted = () => {
-    const applicationsWithResumes = applications.filter(app => app.resumeUrl).length;
-    const applicationsWithCoverLetters = applications.filter(app => app.coverLetterUrl).length;
-    const applicationsWithVideos = applications.filter(app => app.videoUrl).length;
+    // Ensure applications is an array
+    const apps = Array.isArray(applications) ? applications : [];
     
-    const resumeGraded = applications.filter(app => app.hasResumeScore).length;
-    const coverLetterGraded = applications.filter(app => app.hasCoverLetterScore).length;
-    const videoGraded = applications.filter(app => app.hasVideoScore).length;
+    const applicationsWithResumes = apps.filter(app => app.resumeUrl).length;
+    const applicationsWithCoverLetters = apps.filter(app => app.coverLetterUrl).length;
+    const applicationsWithVideos = apps.filter(app => app.videoUrl).length;
+    
+    const resumeGraded = apps.filter(app => app.hasResumeScore).length;
+    const coverLetterGraded = apps.filter(app => app.hasCoverLetterScore).length;
+    const videoGraded = apps.filter(app => app.hasVideoScore).length;
 
     const allResumesGraded = applicationsWithResumes === 0 || resumeGraded === applicationsWithResumes;
     const allCoverLettersGraded = applicationsWithCoverLetters === 0 || coverLetterGraded === applicationsWithCoverLetters;
     const allVideosGraded = applicationsWithVideos === 0 || videoGraded === applicationsWithVideos;
 
-    return allResumesGraded && allCoverLettersGraded && allVideosGraded && applications.length > 0;
+    return allResumesGraded && allCoverLettersGraded && allVideosGraded && apps.length > 0;
   };
 
   // Trigger celebration when all documents are completed
   useEffect(() => {
-    if (applications.length > 0 && checkAllDocumentsCompleted() && !hasShownCelebration) {
+    if (Array.isArray(applications) && applications.length > 0 && checkAllDocumentsCompleted() && !hasShownCelebration) {
       console.log('Triggering celebration!');
       setShowConfetti(true);
       setShowCompletionCelebration(true);
@@ -211,7 +217,7 @@ export default function DocumentGrading() {
   }, [user?.id]);
 
   // Filter and sort applications based on current filters
-  const filteredApplications = applications.filter(app => {
+  const filteredApplications = (Array.isArray(applications) ? applications : []).filter(app => {
     const matchesSearch = app.studentId.toString().includes(searchTerm) ||
                          app.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          app.major.toLowerCase().includes(searchTerm.toLowerCase());
@@ -402,7 +408,7 @@ export default function DocumentGrading() {
                 You are assigned to review applications from the following teams:
               </Typography>
               <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                {[...new Set(applications.map(app => app.groupName))].map((teamName, index) => (
+                {[...new Set((Array.isArray(applications) ? applications : []).map(app => app.groupName))].map((teamName, index) => (
                   <Chip
                     key={index}
                     label={teamName}
