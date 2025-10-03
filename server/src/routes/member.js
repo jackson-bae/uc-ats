@@ -822,9 +822,9 @@ router.patch('/meeting-signups/:id/attendance', requireAuth, async (req, res) =>
               .sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt))[0];
 
             if (latestApplication) {
-              console.log(`Adding 3 points to application ${latestApplication.id} for meeting attendance (studentId: ${signup.studentId})`);
+              console.log(`Adding 1 point to application ${latestApplication.id} for meeting attendance (studentId: ${signup.studentId})`);
               
-              // Note: The 3 points will be automatically added when the overall score is calculated
+              // Note: The 1 point will be automatically added when the overall score is calculated
               // in the existing scoring system (similar to referral bonus and event points)
               // No need to store this separately as it's calculated dynamically
             }

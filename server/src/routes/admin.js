@@ -2226,25 +2226,29 @@ router.post('/test-email', async (req, res) => {
 
 // Staging endpoints
 
-// Get staging candidates with comprehensive data and pagination
+// Get staging candidates with comprehensive data and optional pagination
 router.get('/staging/candidates', async (req, res) => {
   try {
-    // Get pagination parameters
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 50; // Default to 50 items per page
-    const skip = (page - 1) * limit;
+    // Get pagination parameters - if not provided, return all candidates
+    const page = parseInt(req.query.page);
+    const limit = parseInt(req.query.limit);
+    const usePagination = page && limit;
+    const skip = usePagination ? (page - 1) * limit : 0;
 
     const active = await prisma.recruitingCycle.findFirst({ where: { isActive: true } });
     if (!active) {
-      return res.json({ candidates: [], total: 0, page, totalPages: 0, hasNextPage: false, hasPrevPage: false });
+      return usePagination ? res.json({ candidates: [], total: 0, page, totalPages: 0, hasNextPage: false, hasPrevPage: false }) : res.json([]);
     }
 
-    // Get total count for pagination
-    const totalCount = await prisma.application.count({
-      where: { cycleId: active.id }
-    });
+    // Get total count for pagination (only if using pagination)
+    let totalCount = 0;
+    if (usePagination) {
+      totalCount = await prisma.application.count({
+        where: { cycleId: active.id }
+      });
+    }
 
-    const applications = await prisma.application.findMany({
+    const queryOptions = {
       where: { cycleId: active.id },
       include: {
         candidate: {
@@ -2316,10 +2320,16 @@ router.get('/staging/candidates', async (req, res) => {
           }
         }
       },
-      orderBy: { submittedAt: 'desc' },
-      skip: skip,
-      take: limit
-    }).catch((error) => {
+      orderBy: { submittedAt: 'desc' }
+    };
+
+    // Add pagination options only if using pagination
+    if (usePagination) {
+      queryOptions.skip = skip;
+      queryOptions.take = limit;
+    }
+
+    const applications = await prisma.application.findMany(queryOptions).catch((error) => {
       console.error('Error fetching staging candidates:', error);
       return []; // Return empty array if query fails
     });
@@ -2346,16 +2356,16 @@ router.get('/staging/candidates', async (req, res) => {
       if (avgVideo > 0) overallScore += avgVideo;
 
 
-      // Add event points contribution (3 points per attended event, matching application detail page)
+      // Add event points contribution (1 point per attended event, matching application detail page)
       const eventAttendance = await prisma.eventAttendance.findMany({
         where: { candidateId: app.candidateId },
         include: { event: true }
       });
 
-      const totalEventPoints = eventAttendance.length * 3; // 3 points per attended event
+      const totalEventPoints = eventAttendance.length * 1; // 1 point per attended event
       overallScore += totalEventPoints;
 
-      // Add meeting attendance bonus (3 points for attending "Get to Know UC")
+      // Add meeting attendance bonus (1 point for attending "Get to Know UC")
       const meetingAttendance = await prisma.meetingSignup.findFirst({
         where: { 
           studentId: app.studentId,
@@ -2364,7 +2374,7 @@ router.get('/staging/candidates', async (req, res) => {
       });
 
       if (meetingAttendance) {
-        overallScore += 3;
+        overallScore += 1;
       }
 
 
@@ -2442,19 +2452,26 @@ router.get('/staging/candidates', async (req, res) => {
       };
     }));
 
-    const totalPages = Math.ceil(totalCount / limit);
-    
-    res.json({
-      candidates: stagingCandidates,
-      total: totalCount,
-      page: page,
-      totalPages: totalPages,
-      hasNextPage: page < totalPages,
-      hasPrevPage: page > 1
-    });
+    if (usePagination) {
+      const totalPages = Math.ceil(totalCount / limit);
+      res.json({
+        candidates: stagingCandidates,
+        total: totalCount,
+        page: page,
+        totalPages: totalPages,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1
+      });
+    } else {
+      res.json(stagingCandidates);
+    }
   } catch (error) {
     console.error('[GET /api/admin/staging/candidates]', error);
-    res.status(500).json({ error: 'Failed to fetch staging candidates' });
+    if (usePagination) {
+      res.json({ candidates: [], total: 0, page: 1, totalPages: 0, hasNextPage: false, hasPrevPage: false });
+    } else {
+      res.json([]);
+    }
   }
 });
 

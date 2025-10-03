@@ -415,7 +415,7 @@ export default function ApplicationDetail() {
                         )}
                         {calculatedAverages.eventPointsContribution > 0 && (
                           <div className="average-grade-count" style={{ color: '#059669', fontWeight: '600' }}>
-                            +{Math.floor(calculatedAverages.eventPointsContribution / 3)} events
+                            +{Math.floor(calculatedAverages.eventPointsContribution)} events
                           </div>
                         )}
                       </div>

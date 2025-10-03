@@ -891,7 +891,7 @@ router.get('/:id/grades/average', requireAuth, async (req, res) => {
       eventPointsContribution = totalEventPoints;
       overallAverage += eventPointsContribution;
 
-      // Add meeting attendance bonus (3 points for attending "Get to Know UC")
+      // Add meeting attendance bonus (1 point for attending "Get to Know UC")
       const meetingAttendance = await prisma.meetingSignup.findFirst({
         where: { 
           studentId: application.studentId,
@@ -900,7 +900,7 @@ router.get('/:id/grades/average', requireAuth, async (req, res) => {
       });
 
       if (meetingAttendance) {
-        overallAverage += 3;
+        overallAverage += 1;
       }
     }
 
@@ -1025,7 +1025,7 @@ router.get('/:id/events', requireAuth, async (req, res) => {
           ...event,
           rsvpStatus: rsvp ? 'RSVPed' : 'Not RSVPed',
           attendanceStatus: attendance ? 'Attended' : 'Not Attended',
-          points: attendance ? 3 : 0
+          points: attendance ? 1 : 0
         };
       })
     );
@@ -1056,7 +1056,7 @@ router.get('/:id/events', requireAuth, async (req, res) => {
         eventLocation: meetingAttendance.slot.location,
         rsvpStatus: 'RSVPed',
         attendanceStatus: 'Attended',
-        points: 3,
+        points: 1,
         isMeeting: true,
         memberName: meetingAttendance.slot.member.fullName
       });
