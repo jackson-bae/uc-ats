@@ -1814,9 +1814,14 @@ router.post('/interviews/:id/start', async (req, res) => {
   }
 });
 
-// Get all applications for admin document grading
+// Get all applications for admin document grading with pagination
 router.get('/applications', async (req, res) => {
   try {
+    // Get pagination parameters
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50; // Default to 50 items per page
+    const skip = (page - 1) * limit;
+
     // Get the active cycle first
     let activeCycle = null;
     try {
@@ -1828,10 +1833,22 @@ router.get('/applications', async (req, res) => {
     }
     
     if (!activeCycle) {
-      return res.json([]);
+      return res.json({ applications: [], total: 0, page, totalPages: 0 });
     }
 
-    // Get all applications for the active cycle directly with error handling
+    // Get total count for pagination
+    let totalCount = 0;
+    try {
+      totalCount = await prisma.application.count({
+        where: {
+          cycleId: activeCycle.id
+        }
+      });
+    } catch (error) {
+      console.error('Error fetching application count:', error);
+    }
+
+    // Get paginated applications for the active cycle
     let applications = [];
     try {
       applications = await prisma.application.findMany({
@@ -1848,11 +1865,13 @@ router.get('/applications', async (req, res) => {
         },
         orderBy: {
           submittedAt: 'desc'
-        }
+        },
+        skip: skip,
+        take: limit
       });
     } catch (error) {
       console.error('Error fetching applications:', error);
-      return res.json([]); // Return empty array if query fails
+      return res.json({ applications: [], total: 0, page, totalPages: 0 }); // Return empty result if query fails
     }
 
     // Get all groups and their members for the active cycle with error handling
@@ -2063,11 +2082,20 @@ router.get('/applications', async (req, res) => {
       });
     });
 
-    res.json(transformedApplications);
+    const totalPages = Math.ceil(totalCount / limit);
+    
+    res.json({
+      applications: transformedApplications,
+      total: totalCount,
+      page: page,
+      totalPages: totalPages,
+      hasNextPage: page < totalPages,
+      hasPrevPage: page > 1
+    });
   } catch (error) {
     console.error('Error fetching admin applications:', error);
-    // Return empty array instead of error to prevent dashboard from breaking
-    res.json([]);
+    // Return empty result instead of error to prevent dashboard from breaking
+    res.json({ applications: [], total: 0, page: 1, totalPages: 0, hasNextPage: false, hasPrevPage: false });
   }
 });
 
@@ -2179,13 +2207,23 @@ router.post('/test-email', async (req, res) => {
 
 // Staging endpoints
 
-// Get staging candidates with comprehensive data
+// Get staging candidates with comprehensive data and pagination
 router.get('/staging/candidates', async (req, res) => {
   try {
+    // Get pagination parameters
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50; // Default to 50 items per page
+    const skip = (page - 1) * limit;
+
     const active = await prisma.recruitingCycle.findFirst({ where: { isActive: true } });
     if (!active) {
-      return res.json([]);
+      return res.json({ candidates: [], total: 0, page, totalPages: 0, hasNextPage: false, hasPrevPage: false });
     }
+
+    // Get total count for pagination
+    const totalCount = await prisma.application.count({
+      where: { cycleId: active.id }
+    });
 
     const applications = await prisma.application.findMany({
       where: { cycleId: active.id },
@@ -2259,7 +2297,9 @@ router.get('/staging/candidates', async (req, res) => {
           }
         }
       },
-      orderBy: { submittedAt: 'desc' }
+      orderBy: { submittedAt: 'desc' },
+      skip: skip,
+      take: limit
     }).catch((error) => {
       console.error('Error fetching staging candidates:', error);
       return []; // Return empty array if query fails
@@ -2383,7 +2423,16 @@ router.get('/staging/candidates', async (req, res) => {
       };
     }));
 
-    res.json(stagingCandidates);
+    const totalPages = Math.ceil(totalCount / limit);
+    
+    res.json({
+      candidates: stagingCandidates,
+      total: totalCount,
+      page: page,
+      totalPages: totalPages,
+      hasNextPage: page < totalPages,
+      hasPrevPage: page > 1
+    });
   } catch (error) {
     console.error('[GET /api/admin/staging/candidates]', error);
     res.status(500).json({ error: 'Failed to fetch staging candidates' });

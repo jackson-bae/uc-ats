@@ -79,16 +79,16 @@ import AccessControl from '../components/AccessControl';
 
 // API functions for staging
 const stagingAPI = {
-  async fetchCandidates() {
-    return await apiClient.get('/admin/staging/candidates');
+  async fetchCandidates(page = 1, limit = 50) {
+    return await apiClient.get(`/admin/staging/candidates?page=${page}&limit=${limit}`);
   },
 
   async fetchActiveCycle() {
     return await apiClient.get('/admin/cycles/active');
   },
 
-  async fetchAdminApplications() {
-    return await apiClient.get('/admin/applications');
+  async fetchAdminApplications(page = 1, limit = 50) {
+    return await apiClient.get(`/admin/applications?page=${page}&limit=${limit}`);
   },
 
   async updateApproval(applicationId, approved) {
@@ -457,6 +457,16 @@ export default function Staging() {
   const [reviewTeams, setReviewTeams] = useState([]); // Add review teams state
   const [adminApplications, setAdminApplications] = useState([]); // Add admin applications state
 
+  // Pagination state
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 50,
+    total: 0,
+    totalPages: 0,
+    hasNextPage: false,
+    hasPrevPage: false
+  });
+
   const [loading, setLoading] = useState(true);
   const [currentCycle, setCurrentCycle] = useState(null);
   const [gradingCompleteByCandidate, setGradingCompleteByCandidate] = useState({});
@@ -533,6 +543,20 @@ export default function Staging() {
   const [evaluationSummaries, setEvaluationSummaries] = useState({});
   const [evaluationSummariesFirstRound, setEvaluationSummariesFirstRound] = useState({});
 
+  // Pagination control functions
+  const handlePageChange = (newPage) => {
+    setPagination(prev => ({ ...prev, page: newPage }));
+  };
+
+  const handleLimitChange = (newLimit) => {
+    setPagination(prev => ({ ...prev, limit: newLimit, page: 1 }));
+  };
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    setPagination(prev => ({ ...prev, page: 1 }));
+  }, [filters]);
+
   // Decision state
   const [currentDecision, setCurrentDecision] = useState({
     candidateId: null,
@@ -552,20 +576,35 @@ export default function Staging() {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const [candidatesData, activeCycle, adminApplicationsData, eventsData, reviewTeamsData, existingDecisionsData] = await Promise.all([
-          stagingAPI.fetchCandidates(),
+        const [candidatesResponse, activeCycle, adminApplicationsResponse, eventsData, reviewTeamsData, existingDecisionsData] = await Promise.all([
+          stagingAPI.fetchCandidates(pagination.page, pagination.limit),
           stagingAPI.fetchActiveCycle(),
-          stagingAPI.fetchAdminApplications(),
+          stagingAPI.fetchAdminApplications(pagination.page, pagination.limit),
           stagingAPI.fetchEventAttendance(),
           stagingAPI.fetchReviewTeams(),
           stagingAPI.loadExistingDecisions()
         ]);
+        
+        // Handle paginated responses
+        const candidatesData = candidatesResponse.candidates || candidatesResponse;
+        const adminApplicationsData = adminApplicationsResponse.applications || adminApplicationsResponse;
         
         setCandidates(candidatesData);
         setCurrentCycle(activeCycle);
         setAdminApplications(adminApplicationsData || []); // Store admin applications data
         setEvents(eventsData || []); // Store events data
         setReviewTeams(reviewTeamsData || []); // Store review teams data
+        
+        // Update pagination state if response includes pagination metadata
+        if (candidatesResponse.total !== undefined) {
+          setPagination(prev => ({
+            ...prev,
+            total: candidatesResponse.total,
+            totalPages: candidatesResponse.totalPages,
+            hasNextPage: candidatesResponse.hasNextPage,
+            hasPrevPage: candidatesResponse.hasPrevPage
+          }));
+        }
 
         // Load existing decisions from database
         if (existingDecisionsData && existingDecisionsData.decisions) {
@@ -616,7 +655,7 @@ export default function Staging() {
     };
 
     fetchData();
-  }, []);
+  }, [pagination.page, pagination.limit]);
 
   // Fetch evaluation summaries when coffee chat tab is active
   useEffect(() => {
@@ -638,19 +677,36 @@ export default function Staging() {
     }
   }, [currentTab, adminApplications]);
 
-  const fetchCandidates = async () => {
+  const fetchCandidates = async (page = pagination.page, limit = pagination.limit) => {
     try {
-      const [data, adminApplicationsData, eventsData, reviewTeamsData, existingDecisionsData] = await Promise.all([
-        stagingAPI.fetchCandidates(),
-        stagingAPI.fetchAdminApplications(),
+      const [candidatesResponse, adminApplicationsResponse, eventsData, reviewTeamsData, existingDecisionsData] = await Promise.all([
+        stagingAPI.fetchCandidates(page, limit),
+        stagingAPI.fetchAdminApplications(page, limit),
         stagingAPI.fetchEventAttendance(),
         stagingAPI.fetchReviewTeams(),
         stagingAPI.loadExistingDecisions()
       ]);
-      setCandidates(data);
+      
+      // Handle paginated responses
+      const candidatesData = candidatesResponse.candidates || candidatesResponse;
+      const adminApplicationsData = adminApplicationsResponse.applications || adminApplicationsResponse;
+      
+      setCandidates(candidatesData);
       setAdminApplications(adminApplicationsData || []); // Update admin applications data
       setEvents(eventsData || []); // Update events data
       setReviewTeams(reviewTeamsData || []); // Update review teams data
+      
+      // Update pagination state if response includes pagination metadata
+      if (candidatesResponse.total !== undefined) {
+        setPagination(prev => ({
+          ...prev,
+          page: page,
+          total: candidatesResponse.total,
+          totalPages: candidatesResponse.totalPages,
+          hasNextPage: candidatesResponse.hasNextPage,
+          hasPrevPage: candidatesResponse.hasPrevPage
+        }));
+      }
       
       // Update inline decisions with fresh data from database
       if (existingDecisionsData && existingDecisionsData.decisions) {
@@ -1107,6 +1163,12 @@ export default function Staging() {
     return b.scores.overall - a.scores.overall;
   });
 
+  // Apply client-side pagination to filtered results
+  const paginatedCandidates = filteredCandidates.slice(
+    (pagination.page - 1) * pagination.limit,
+    pagination.page * pagination.limit
+  );
+
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
@@ -1330,22 +1392,25 @@ export default function Staging() {
               </Button>
             </Box>
             
-            <TableContainer sx={{ overflowX: 'auto', maxWidth: '100%' }}>
-              <Table sx={{ minWidth: 1200 }}>
+            <TableContainer sx={{ width: '100%' }}>
+              <Table sx={{ width: '100%', tableLayout: 'fixed' }}>
                 <TableHead>
                   <TableRow>
-                    <TableCell>Rank</TableCell>
-                    <TableCell>Scores</TableCell>
-                    <TableCell>Candidate</TableCell>
-                    <TableCell>Grading Status</TableCell>
-                    <TableCell>Review Team</TableCell>
-                    <TableCell>Referral</TableCell>
-                    <TableCell>Attendance</TableCell>
-                    <TableCell>Decisions</TableCell>
+                    <TableCell sx={{ width: '8%' }}>Rank</TableCell>
+                    <TableCell sx={{ width: '12%' }}>Scores</TableCell>
+                    <TableCell sx={{ width: '18%' }}>Candidate</TableCell>
+                    <TableCell sx={{ width: '14%' }}>Grading Status</TableCell>
+                    <TableCell sx={{ width: '14%' }}>Review Team</TableCell>
+                    <TableCell sx={{ width: '10%' }}>Referral</TableCell>
+                    <TableCell sx={{ width: '12%' }}>Attendance</TableCell>
+                    <TableCell sx={{ width: '12%' }}>Decisions</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {filteredCandidates.map((candidate, index) => (
+                  {paginatedCandidates.map((candidate, index) => {
+                    // Calculate the correct rank based on current page and items per page
+                    const actualRank = ((pagination.page - 1) * pagination.limit) + index + 1;
+                    return (
                     <TableRow key={candidate.id} hover sx={{ cursor: 'pointer' }} onClick={async () => {
                       try {
                         setAppModalLoading(true);
@@ -1390,7 +1455,7 @@ export default function Staging() {
                             minWidth: '50px'
                           }}
                         >
-                          #{index + 1}
+                          #{actualRank}
                         </Typography>
                       </TableCell>
                       <TableCell>
@@ -1577,10 +1642,53 @@ export default function Staging() {
                       </TableCell>
                       
                     </TableRow>
-                  ))}
+                    );
+                  })}
                 </TableBody>
               </Table>
             </TableContainer>
+            
+            {/* Pagination Controls */}
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2, px: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Typography variant="body2" color="text.secondary">
+                  Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, filteredCandidates.length)} of {filteredCandidates.length} candidates
+                </Typography>
+                <FormControl size="small" sx={{ minWidth: 80 }}>
+                  <InputLabel>Per page</InputLabel>
+                  <Select
+                    value={pagination.limit}
+                    label="Per page"
+                    onChange={(e) => handleLimitChange(e.target.value)}
+                  >
+                    <MenuItem value={25}>25</MenuItem>
+                    <MenuItem value={50}>50</MenuItem>
+                    <MenuItem value={100}>100</MenuItem>
+                  </Select>
+                </FormControl>
+              </Box>
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  disabled={pagination.page <= 1}
+                  onClick={() => handlePageChange(pagination.page - 1)}
+                >
+                  Previous
+                </Button>
+                <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', px: 2 }}>
+                  Page {pagination.page} of {Math.ceil(filteredCandidates.length / pagination.limit)}
+                </Typography>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  disabled={pagination.page >= Math.ceil(filteredCandidates.length / pagination.limit)}
+                  onClick={() => handlePageChange(pagination.page + 1)}
+                >
+                  Next
+                </Button>
+              </Box>
+            </Box>
           </CardContent>
         </Card>
         )}
@@ -1616,13 +1724,13 @@ export default function Staging() {
               </Stack>
             </Box>
             <TableContainer>
-              <Table>
+              <Table sx={{ minWidth: 1000 }}>
                 <TableHead>
                   <TableRow>
-                    <TableCell>Rank</TableCell>
-                    <TableCell>Application</TableCell>
-                    <TableCell>Evaluation Summary</TableCell>
-                    <TableCell>Decisions</TableCell>
+                    <TableCell sx={{ width: '80px' }}>Rank</TableCell>
+                    <TableCell sx={{ width: '250px' }}>Application</TableCell>
+                    <TableCell sx={{ width: '300px' }}>Evaluation Summary</TableCell>
+                    <TableCell sx={{ width: '200px', minWidth: '180px' }}>Decisions</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -1814,6 +1922,48 @@ export default function Staging() {
                 </TableBody>
               </Table>
             </TableContainer>
+            
+            {/* Pagination Controls */}
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2, px: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Typography variant="body2" color="text.secondary">
+                  Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} candidates
+                </Typography>
+                <FormControl size="small" sx={{ minWidth: 80 }}>
+                  <InputLabel>Per page</InputLabel>
+                  <Select
+                    value={pagination.limit}
+                    label="Per page"
+                    onChange={(e) => handleLimitChange(e.target.value)}
+                  >
+                    <MenuItem value={25}>25</MenuItem>
+                    <MenuItem value={50}>50</MenuItem>
+                    <MenuItem value={100}>100</MenuItem>
+                  </Select>
+                </FormControl>
+              </Box>
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  disabled={!pagination.hasPrevPage}
+                  onClick={() => handlePageChange(pagination.page - 1)}
+                >
+                  Previous
+                </Button>
+                <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', px: 2 }}>
+                  Page {pagination.page} of {pagination.totalPages}
+                </Typography>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  disabled={!pagination.hasNextPage}
+                  onClick={() => handlePageChange(pagination.page + 1)}
+                >
+                  Next
+                </Button>
+              </Box>
+            </Box>
           </CardContent>
         </Card>
         )}
@@ -1841,13 +1991,13 @@ export default function Staging() {
               </Button>
             </Box>
             <TableContainer>
-              <Table>
+              <Table sx={{ minWidth: 1000 }}>
                 <TableHead>
                   <TableRow>
-                    <TableCell>Rank</TableCell>
-                    <TableCell>Application</TableCell>
-                    <TableCell>Evaluation Summary</TableCell>
-                    <TableCell>Decisions</TableCell>
+                    <TableCell sx={{ width: '80px' }}>Rank</TableCell>
+                    <TableCell sx={{ width: '250px' }}>Application</TableCell>
+                    <TableCell sx={{ width: '300px' }}>Evaluation Summary</TableCell>
+                    <TableCell sx={{ width: '200px', minWidth: '180px' }}>Decisions</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -1959,6 +2109,48 @@ export default function Staging() {
                 </TableBody>
               </Table>
             </TableContainer>
+            
+            {/* Pagination Controls */}
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2, px: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Typography variant="body2" color="text.secondary">
+                  Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} candidates
+                </Typography>
+                <FormControl size="small" sx={{ minWidth: 80 }}>
+                  <InputLabel>Per page</InputLabel>
+                  <Select
+                    value={pagination.limit}
+                    label="Per page"
+                    onChange={(e) => handleLimitChange(e.target.value)}
+                  >
+                    <MenuItem value={25}>25</MenuItem>
+                    <MenuItem value={50}>50</MenuItem>
+                    <MenuItem value={100}>100</MenuItem>
+                  </Select>
+                </FormControl>
+              </Box>
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  disabled={!pagination.hasPrevPage}
+                  onClick={() => handlePageChange(pagination.page - 1)}
+                >
+                  Previous
+                </Button>
+                <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', px: 2 }}>
+                  Page {pagination.page} of {pagination.totalPages}
+                </Typography>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  disabled={!pagination.hasNextPage}
+                  onClick={() => handlePageChange(pagination.page + 1)}
+                >
+                  Next
+                </Button>
+              </Box>
+            </Box>
           </CardContent>
         </Card>
         )}
@@ -2112,6 +2304,48 @@ export default function Staging() {
                 </TableBody>
               </Table>
             </TableContainer>
+            
+            {/* Pagination Controls */}
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2, px: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Typography variant="body2" color="text.secondary">
+                  Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} candidates
+                </Typography>
+                <FormControl size="small" sx={{ minWidth: 80 }}>
+                  <InputLabel>Per page</InputLabel>
+                  <Select
+                    value={pagination.limit}
+                    label="Per page"
+                    onChange={(e) => handleLimitChange(e.target.value)}
+                  >
+                    <MenuItem value={25}>25</MenuItem>
+                    <MenuItem value={50}>50</MenuItem>
+                    <MenuItem value={100}>100</MenuItem>
+                  </Select>
+                </FormControl>
+              </Box>
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  disabled={!pagination.hasPrevPage}
+                  onClick={() => handlePageChange(pagination.page - 1)}
+                >
+                  Previous
+                </Button>
+                <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', px: 2 }}>
+                  Page {pagination.page} of {pagination.totalPages}
+                </Typography>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  disabled={!pagination.hasNextPage}
+                  onClick={() => handlePageChange(pagination.page + 1)}
+                >
+                  Next
+                </Button>
+              </Box>
+            </Box>
           </CardContent>
         </Card>
         )}
