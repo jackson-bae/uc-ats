@@ -79,16 +79,16 @@ import AccessControl from '../components/AccessControl';
 
 // API functions for staging
 const stagingAPI = {
-  async fetchCandidates(page = 1, limit = 50) {
-    return await apiClient.get(`/admin/staging/candidates?page=${page}&limit=${limit}`);
+  async fetchCandidates() {
+    return await apiClient.get('/admin/staging/candidates');
   },
 
   async fetchActiveCycle() {
     return await apiClient.get('/admin/cycles/active');
   },
 
-  async fetchAdminApplications(page = 1, limit = 50) {
-    return await apiClient.get(`/admin/applications?page=${page}&limit=${limit}`);
+  async fetchAdminApplications() {
+    return await apiClient.get('/admin/applications');
   },
 
   async updateApproval(applicationId, approved) {
@@ -577,9 +577,9 @@ export default function Staging() {
       try {
         setLoading(true);
         const [candidatesResponse, activeCycle, adminApplicationsResponse, eventsData, reviewTeamsData, existingDecisionsData] = await Promise.all([
-          stagingAPI.fetchCandidates(pagination.page, pagination.limit),
+          stagingAPI.fetchCandidates(),
           stagingAPI.fetchActiveCycle(),
-          stagingAPI.fetchAdminApplications(pagination.page, pagination.limit),
+          stagingAPI.fetchAdminApplications(),
           stagingAPI.fetchEventAttendance(),
           stagingAPI.fetchReviewTeams(),
           stagingAPI.loadExistingDecisions()
@@ -595,16 +595,14 @@ export default function Staging() {
         setEvents(eventsData || []); // Store events data
         setReviewTeams(reviewTeamsData || []); // Store review teams data
         
-        // Update pagination state if response includes pagination metadata
-        if (candidatesResponse.total !== undefined) {
-          setPagination(prev => ({
-            ...prev,
-            total: candidatesResponse.total,
-            totalPages: candidatesResponse.totalPages,
-            hasNextPage: candidatesResponse.hasNextPage,
-            hasPrevPage: candidatesResponse.hasPrevPage
-          }));
-        }
+        // Update pagination state based on total candidates count
+        setPagination(prev => ({
+          ...prev,
+          total: candidatesData.length,
+          totalPages: Math.ceil(candidatesData.length / prev.limit),
+          hasNextPage: prev.page < Math.ceil(candidatesData.length / prev.limit),
+          hasPrevPage: prev.page > 1
+        }));
 
         // Load existing decisions from database
         if (existingDecisionsData && existingDecisionsData.decisions) {
@@ -655,7 +653,7 @@ export default function Staging() {
     };
 
     fetchData();
-  }, [pagination.page, pagination.limit]);
+  }, []);
 
   // Fetch evaluation summaries when coffee chat tab is active
   useEffect(() => {
@@ -677,11 +675,11 @@ export default function Staging() {
     }
   }, [currentTab, adminApplications]);
 
-  const fetchCandidates = async (page = pagination.page, limit = pagination.limit) => {
+  const fetchCandidates = async () => {
     try {
       const [candidatesResponse, adminApplicationsResponse, eventsData, reviewTeamsData, existingDecisionsData] = await Promise.all([
-        stagingAPI.fetchCandidates(page, limit),
-        stagingAPI.fetchAdminApplications(page, limit),
+        stagingAPI.fetchCandidates(),
+        stagingAPI.fetchAdminApplications(),
         stagingAPI.fetchEventAttendance(),
         stagingAPI.fetchReviewTeams(),
         stagingAPI.loadExistingDecisions()
@@ -696,17 +694,14 @@ export default function Staging() {
       setEvents(eventsData || []); // Update events data
       setReviewTeams(reviewTeamsData || []); // Update review teams data
       
-      // Update pagination state if response includes pagination metadata
-      if (candidatesResponse.total !== undefined) {
-        setPagination(prev => ({
-          ...prev,
-          page: page,
-          total: candidatesResponse.total,
-          totalPages: candidatesResponse.totalPages,
-          hasNextPage: candidatesResponse.hasNextPage,
-          hasPrevPage: candidatesResponse.hasPrevPage
-        }));
-      }
+      // Update pagination state based on total candidates count
+      setPagination(prev => ({
+        ...prev,
+        total: candidatesData.length,
+        totalPages: Math.ceil(candidatesData.length / prev.limit),
+        hasNextPage: prev.page < Math.ceil(candidatesData.length / prev.limit),
+        hasPrevPage: prev.page > 1
+      }));
       
       // Update inline decisions with fresh data from database
       if (existingDecisionsData && existingDecisionsData.decisions) {

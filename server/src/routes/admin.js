@@ -1814,13 +1814,14 @@ router.post('/interviews/:id/start', async (req, res) => {
   }
 });
 
-// Get all applications for admin document grading with pagination
+// Get all applications for admin document grading with optional pagination
 router.get('/applications', async (req, res) => {
   try {
-    // Get pagination parameters
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 50; // Default to 50 items per page
-    const skip = (page - 1) * limit;
+    // Get pagination parameters - if not provided, return all applications
+    const page = parseInt(req.query.page);
+    const limit = parseInt(req.query.limit);
+    const usePagination = page && limit;
+    const skip = usePagination ? (page - 1) * limit : 0;
 
     // Get the active cycle first
     let activeCycle = null;
@@ -1833,25 +1834,27 @@ router.get('/applications', async (req, res) => {
     }
     
     if (!activeCycle) {
-      return res.json({ applications: [], total: 0, page, totalPages: 0 });
+      return usePagination ? res.json({ applications: [], total: 0, page, totalPages: 0 }) : res.json([]);
     }
 
-    // Get total count for pagination
+    // Get total count for pagination (only if using pagination)
     let totalCount = 0;
-    try {
-      totalCount = await prisma.application.count({
-        where: {
-          cycleId: activeCycle.id
-        }
-      });
-    } catch (error) {
-      console.error('Error fetching application count:', error);
+    if (usePagination) {
+      try {
+        totalCount = await prisma.application.count({
+          where: {
+            cycleId: activeCycle.id
+          }
+        });
+      } catch (error) {
+        console.error('Error fetching application count:', error);
+      }
     }
 
-    // Get paginated applications for the active cycle
+    // Get applications for the active cycle
     let applications = [];
     try {
-      applications = await prisma.application.findMany({
+      const queryOptions = {
         where: {
           cycleId: activeCycle.id
         },
@@ -1865,13 +1868,19 @@ router.get('/applications', async (req, res) => {
         },
         orderBy: {
           submittedAt: 'desc'
-        },
-        skip: skip,
-        take: limit
-      });
+        }
+      };
+
+      // Add pagination options only if using pagination
+      if (usePagination) {
+        queryOptions.skip = skip;
+        queryOptions.take = limit;
+      }
+
+      applications = await prisma.application.findMany(queryOptions);
     } catch (error) {
       console.error('Error fetching applications:', error);
-      return res.json({ applications: [], total: 0, page, totalPages: 0 }); // Return empty result if query fails
+      return usePagination ? res.json({ applications: [], total: 0, page, totalPages: 0 }) : res.json([]);
     }
 
     // Get all groups and their members for the active cycle with error handling
@@ -2082,20 +2091,30 @@ router.get('/applications', async (req, res) => {
       });
     });
 
-    const totalPages = Math.ceil(totalCount / limit);
-    
-    res.json({
-      applications: transformedApplications,
-      total: totalCount,
-      page: page,
-      totalPages: totalPages,
-      hasNextPage: page < totalPages,
-      hasPrevPage: page > 1
-    });
+    // Return response based on whether pagination was used
+    if (usePagination) {
+      const totalPages = Math.ceil(totalCount / limit);
+      
+      res.json({
+        applications: transformedApplications,
+        total: totalCount,
+        page: page,
+        totalPages: totalPages,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1
+      });
+    } else {
+      // Return just the applications array for backward compatibility
+      res.json(transformedApplications);
+    }
   } catch (error) {
     console.error('Error fetching admin applications:', error);
-    // Return empty result instead of error to prevent dashboard from breaking
-    res.json({ applications: [], total: 0, page: 1, totalPages: 0, hasNextPage: false, hasPrevPage: false });
+    // Return appropriate response based on pagination usage
+    if (usePagination) {
+      res.json({ applications: [], total: 0, page: 1, totalPages: 0, hasNextPage: false, hasPrevPage: false });
+    } else {
+      res.json([]);
+    }
   }
 });
 
