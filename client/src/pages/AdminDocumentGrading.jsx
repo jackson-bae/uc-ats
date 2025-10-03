@@ -86,12 +86,14 @@ export default function AdminDocumentGrading() {
 
   // Calculate progress data based on actual grading completion
   const calculateProgressData = () => {
-    const totalApplications = applications.length;
+    // Ensure applications is an array
+    const apps = Array.isArray(applications) ? applications : [];
+    const totalApplications = apps.length;
     
     // Filter applications that have the required documents
-    const applicationsWithResume = applications.filter(app => app.resumeUrl);
-    const applicationsWithCoverLetter = applications.filter(app => app.coverLetterUrl);
-    const applicationsWithVideo = applications.filter(app => app.videoUrl);
+    const applicationsWithResume = apps.filter(app => app.resumeUrl);
+    const applicationsWithCoverLetter = apps.filter(app => app.coverLetterUrl);
+    const applicationsWithVideo = apps.filter(app => app.videoUrl);
     
     if (gradeOnlyAssigned) {
       // When "Grade Only Assigned" is toggled on, show admin's personal progress
@@ -237,7 +239,7 @@ export default function AdminDocumentGrading() {
   }, [tabValue]);
 
   // Filter and sort applications based on current filters
-  const filteredApplications = applications.filter(app => {
+  const filteredApplications = (Array.isArray(applications) ? applications : []).filter(app => {
     const matchesSearch = app.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          app.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          app.major.toLowerCase().includes(searchTerm.toLowerCase());
@@ -421,10 +423,21 @@ export default function AdminDocumentGrading() {
     try {
       setLoading(true);
       const response = await apiClient.get('/admin/applications');
-      setApplications(response);
-      setError(null);
+      
+      // Handle paginated response structure
+      const applicationsData = response.applications || response;
+      
+      if (Array.isArray(applicationsData)) {
+        setApplications(applicationsData);
+        setError(null);
+      } else {
+        console.error('No applications data received or invalid format:', response);
+        setApplications([]);
+        setError('No applications data received or invalid format');
+      }
     } catch (err) {
       console.error('Error fetching all applications:', err);
+      setApplications([]);
       setError('Failed to load applications. Please try again.');
     } finally {
       setLoading(false);
@@ -437,10 +450,19 @@ export default function AdminDocumentGrading() {
     try {
       setLoading(true);
       const response = await apiClient.get(`/review-teams/member-applications/${user.id}`);
-      setApplications(response);
-      setError(null);
+      
+      // Check if response is an array, if not, log the issue and set empty array
+      if (Array.isArray(response)) {
+        setApplications(response);
+        setError(null);
+      } else {
+        console.error('No applications data received or invalid format:', response);
+        setApplications([]);
+        setError('No applications data received or invalid format');
+      }
     } catch (err) {
       console.error('Error fetching member applications:', err);
+      setApplications([]);
       setError('Failed to load applications. Please try again.');
     } finally {
       setLoading(false);
@@ -572,7 +594,7 @@ export default function AdminDocumentGrading() {
                     You are assigned to review applications from the following teams:
                   </Typography>
                   <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                    {[...new Set(applications.map(app => app.groupName))].map((teamName, index) => (
+                    {[...new Set((Array.isArray(applications) ? applications : []).map(app => app.groupName))].map((teamName, index) => (
                       <Chip
                         key={index}
                         label={teamName}

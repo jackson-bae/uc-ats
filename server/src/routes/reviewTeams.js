@@ -1073,6 +1073,7 @@ router.get('/member-applications/:memberId', requireAuth, async (req, res) => {
 
     // Transform the data
     const applications = [];
+    console.log('Starting to process candidates:', candidates.length);
     
     candidates.forEach(candidate => {
       const latestApplication = candidate.applications[0];
@@ -1140,10 +1141,18 @@ router.get('/member-applications/:memberId', requireAuth, async (req, res) => {
     });
 
     console.log('Applications processed:', applications.length);
+    
+    // Ensure we always return an array
+    if (!Array.isArray(applications)) {
+      console.error('Applications is not an array:', applications);
+      return res.json([]);
+    }
+    
     res.json(applications);
   } catch (error) {
     console.error('Error fetching member applications:', error);
-    res.status(500).json({ error: 'Failed to fetch member applications', details: error.message });
+    // Return empty array instead of error object to prevent frontend filter errors
+    res.json([]);
   }
 });
 

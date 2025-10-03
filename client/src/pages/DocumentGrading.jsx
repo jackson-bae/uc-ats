@@ -343,10 +343,19 @@ export default function DocumentGrading() {
     try {
       setLoading(true);
       const response = await apiClient.get(`/review-teams/member-applications/${user.id}`);
-      setApplications(response);
-      setError(null);
+      
+      // Check if response is an array, if not, log the issue and set empty array
+      if (Array.isArray(response)) {
+        setApplications(response);
+        setError(null);
+      } else {
+        console.error('No applications data received or invalid format:', response);
+        setApplications([]);
+        setError('No applications data received or invalid format');
+      }
     } catch (err) {
       console.error('Error fetching member applications:', err);
+      setApplications([]);
       setError('Failed to load applications. Please try again.');
     } finally {
       setLoading(false);
