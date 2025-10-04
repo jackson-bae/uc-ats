@@ -883,10 +883,12 @@ export default function Staging() {
 
   const handleInlineDecisionChange = async (item, value, phase = 'resume') => {
     try {
+      console.log('Saving decision:', { itemId: item.id, value, phase });
       
       // Save decision to database immediately
       // Note: item.id is the application ID (works for both candidates and applications)
-      await stagingAPI.saveDecision(item.id, value, phase);
+      const response = await stagingAPI.saveDecision(item.id, value, phase);
+      console.log('Decision save response:', response);
 
       // Update local UI selection
       setInlineDecisions(prev => ({ ...prev, [item.id]: value }));
@@ -898,6 +900,7 @@ export default function Staging() {
       await fetchCandidates();
     } catch (error) {
       console.error('Error saving inline decision:', error);
+      console.error('Error details:', error.response?.data || error.message);
       setSnackbar({ open: true, message: 'Failed to save decision', severity: 'error' });
       
       // Revert the UI change if save failed

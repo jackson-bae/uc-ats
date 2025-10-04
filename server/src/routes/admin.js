@@ -2236,6 +2236,7 @@ router.get('/staging/candidates', async (req, res) => {
     const skip = usePagination ? (page - 1) * limit : 0;
 
     const active = await prisma.recruitingCycle.findFirst({ where: { isActive: true } });
+    console.log('Active cycle:', active ? active.id : 'No active cycle found');
     if (!active) {
       return usePagination ? res.json({ candidates: [], total: 0, page, totalPages: 0, hasNextPage: false, hasPrevPage: false }) : res.json([]);
     }
@@ -2248,75 +2249,26 @@ router.get('/staging/candidates', async (req, res) => {
       });
     }
 
+    // Optimized query - only get essential data first
     const queryOptions = {
       where: { cycleId: active.id },
       include: {
         candidate: {
-          include: {
-            assignedGroup: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            studentId: true,
+            assignedGroupId: true,
+            // Only get basic referral info
+            referrals: {
               select: {
                 id: true,
-                memberOneUser: {
-                  select: {
-                    id: true,
-                    fullName: true,
-                    email: true
-                  }
-                },
-                memberTwoUser: {
-                  select: {
-                    id: true,
-                    fullName: true,
-                    email: true
-                  }
-                },
-                memberThreeUser: {
-                  select: {
-                    id: true,
-                    fullName: true,
-                    email: true
-                  }
-                }
-              }
-            },
-            eventAttendance: {
-              include: {
-                event: true
-              }
-            },
-            eventRsvp: {
-              include: {
-                event: true
-              }
-            },
-            resumeScores: {
-              include: {
-                evaluator: {
-                  select: {
-                    fullName: true
-                  }
-                }
-              }
-            },
-            coverLetterScores: {
-              include: {
-                evaluator: {
-                  select: {
-                    fullName: true
-                  }
-                }
-              }
-            },
-            videoScores: {
-              include: {
-                evaluator: {
-                  select: {
-                    fullName: true
-                  }
-                }
-              }
-            },
-            referrals: true
+                referrerName: true
+              },
+              take: 1 // Only need one referral
+            }
           }
         }
       },
@@ -2334,14 +2286,122 @@ router.get('/staging/candidates', async (req, res) => {
       return []; // Return empty array if query fails
     });
 
-
-    const stagingCandidates = await Promise.all(applications.map(async app => {
-      // Calculate average scores - convert to numbers to avoid string concatenation
-      const resumeScores = app.candidate.resumeScores.map(s => parseFloat(s.overallScore));
-      const coverLetterScores = app.candidate.coverLetterScores.map(s => parseFloat(s.overallScore));
-      const videoScores = app.candidate.videoScores.map(s => parseFloat(s.overallScore));
+    console.log(`Found ${applications.length} applications for staging candidates`);
 
 
+    // Get all candidate IDs and student IDs for batch queries
+    const candidateIds = applications.map(app => app.candidateId).filter(Boolean);
+    const studentIds = applications.map(app => app.studentId).filter(Boolean);
+    const reviewTeamIds = applications.map(app => app.candidate?.assignedGroupId).filter(Boolean);
+    
+    console.log(`Found ${candidateIds.length} candidate IDs, ${studentIds.length} student IDs, ${reviewTeamIds.length} review team IDs`);
+    console.log('Prisma object:', typeof prisma, prisma ? 'defined' : 'undefined');
+
+    // Batch fetch all related data in parallel
+    console.log('Starting batch queries...');
+    
+    const allResumeScores = await prisma.resumeScore.findMany({
+      where: { candidateId: { in: candidateIds } },
+      select: { candidateId: true, overallScore: true }
+    });
+    console.log('Resume scores fetched:', allResumeScores.length);
+    
+    const allCoverLetterScores = await prisma.coverLetterScore.findMany({
+      where: { candidateId: { in: candidateIds } },
+      select: { candidateId: true, overallScore: true }
+    });
+    console.log('Cover letter scores fetched:', allCoverLetterScores.length);
+    
+    const allVideoScores = await prisma.videoScore.findMany({
+      where: { candidateId: { in: candidateIds } },
+      select: { candidateId: true, overallScore: true }
+    });
+    console.log('Video scores fetched:', allVideoScores.length);
+    
+    const allEventAttendance = await prisma.eventAttendance.findMany({
+      where: { candidateId: { in: candidateIds } },
+      select: { candidateId: true, event: { select: { eventName: true } } }
+    });
+    console.log('Event attendance fetched:', allEventAttendance.length);
+    
+    const allMeetingAttendance = await prisma.meetingSignup.findMany({
+      where: { 
+        studentId: { in: studentIds },
+        attended: true
+      },
+      select: { studentId: true }
+    });
+    console.log('Meeting attendance fetched:', allMeetingAttendance.length);
+    
+    const allReviewTeams = await prisma.groups.findMany({
+      where: { id: { in: reviewTeamIds } },
+      select: {
+        id: true,
+        memberOneUser: { select: { fullName: true } },
+        memberTwoUser: { select: { fullName: true } },
+        memberThreeUser: { select: { fullName: true } }
+      }
+    });
+    console.log('Review teams fetched:', allReviewTeams.length);
+
+    // Create lookup maps for efficient data access
+    const resumeScoresMap = new Map();
+    const coverLetterScoresMap = new Map();
+    const videoScoresMap = new Map();
+    const eventAttendanceMap = new Map();
+    const meetingAttendanceSet = new Set(allMeetingAttendance.map(ma => ma.studentId));
+    const reviewTeamsMap = new Map();
+
+    // Populate lookup maps
+    allResumeScores.forEach(score => {
+      if (!resumeScoresMap.has(score.candidateId)) resumeScoresMap.set(score.candidateId, []);
+      resumeScoresMap.get(score.candidateId).push(parseFloat(score.overallScore));
+    });
+
+    allCoverLetterScores.forEach(score => {
+      if (!coverLetterScoresMap.has(score.candidateId)) coverLetterScoresMap.set(score.candidateId, []);
+      coverLetterScoresMap.get(score.candidateId).push(parseFloat(score.overallScore));
+    });
+
+    allVideoScores.forEach(score => {
+      if (!videoScoresMap.has(score.candidateId)) videoScoresMap.set(score.candidateId, []);
+      videoScoresMap.get(score.candidateId).push(parseFloat(score.overallScore));
+    });
+
+    allEventAttendance.forEach(att => {
+      if (!eventAttendanceMap.has(att.candidateId)) eventAttendanceMap.set(att.candidateId, []);
+      eventAttendanceMap.get(att.candidateId).push(att.event.eventName);
+    });
+
+    allReviewTeams.forEach(team => {
+      const members = [
+        team.memberOneUser,
+        team.memberTwoUser,
+        team.memberThreeUser
+      ].filter(Boolean);
+
+      reviewTeamsMap.set(team.id, {
+        id: team.id,
+        name: members.length > 0 
+          ? `Team ${team.id.slice(-4)} (${members.map(m => m.fullName.split(' ')[0]).join(', ')})`
+          : `Team ${team.id.slice(-4)}`,
+        members: members,
+        memberCount: members.length
+      });
+    });
+
+    // Process applications with pre-fetched data (no more async operations)
+    // Filter out applications without candidates
+    const validApplications = applications.filter(app => app.candidate);
+    console.log(`Processing ${validApplications.length} valid applications (${applications.length - validApplications.length} without candidates)`);
+    
+    const stagingCandidates = validApplications.map(app => {
+      // Get scores from maps
+      const resumeScores = resumeScoresMap.get(app.candidateId) || [];
+      const coverLetterScores = coverLetterScoresMap.get(app.candidateId) || [];
+      const videoScores = videoScoresMap.get(app.candidateId) || [];
+
+      // Calculate averages
       const avgResume = resumeScores.length > 0 ? 
         resumeScores.reduce((a, b) => a + b, 0) / resumeScores.length : 0;
       const avgCoverLetter = coverLetterScores.length > 0 ? 
@@ -2349,39 +2409,27 @@ router.get('/staging/candidates', async (req, res) => {
       const avgVideo = videoScores.length > 0 ? 
         videoScores.reduce((a, b) => a + b, 0) / videoScores.length : 0;
 
-      // Calculate overall total by summing all document scores (not averaging)
+      // Calculate overall total by summing all document scores
       let overallScore = 0;
       if (avgResume > 0) overallScore += avgResume;
       if (avgCoverLetter > 0) overallScore += avgCoverLetter;
       if (avgVideo > 0) overallScore += avgVideo;
 
-
-      // Add event points contribution (1 point per attended event, matching application detail page)
-      const eventAttendance = await prisma.eventAttendance.findMany({
-        where: { candidateId: app.candidateId },
-        include: { event: true }
-      });
-
-      const totalEventPoints = eventAttendance.length * 1; // 1 point per attended event
+      // Add event points (1 point per attended event)
+      const attendedEvents = eventAttendanceMap.get(app.candidateId) || [];
+      const totalEventPoints = attendedEvents.length * 1;
       overallScore += totalEventPoints;
 
       // Add meeting attendance bonus (1 point for attending "Get to Know UC")
-      const meetingAttendance = await prisma.meetingSignup.findFirst({
-        where: { 
-          studentId: app.studentId,
-          attended: true
-        }
-      });
-
-      if (meetingAttendance) {
+      if (meetingAttendanceSet.has(app.studentId)) {
         overallScore += 1;
       }
 
 
-      // Build attendance object
+      // Build attendance object from pre-fetched data
       const attendance = {};
-      app.candidate.eventAttendance.forEach(att => {
-        attendance[att.event.eventName] = true;
+      attendedEvents.forEach(eventName => {
+        attendance[eventName] = true;
       });
 
       // Use the actual currentRound from the database, fallback to status-based calculation
@@ -2393,32 +2441,17 @@ router.get('/staging/candidates', async (req, res) => {
         else if (app.status === 'REJECTED') currentRound = 4; // Final Decision
       }
 
-      // Build review team information
-      let reviewTeam = null;
-      if (app.candidate.assignedGroup) {
-        const members = [
-          app.candidate.assignedGroup.memberOneUser,
-          app.candidate.assignedGroup.memberTwoUser,
-          app.candidate.assignedGroup.memberThreeUser
-        ].filter(Boolean);
-
-        reviewTeam = {
-          id: app.candidate.assignedGroup.id,
-          name: members.length > 0 
-            ? `Team ${app.candidate.assignedGroup.id.slice(-4)} (${members.map(m => m.fullName.split(' ')[0]).join(', ')})`
-            : `Team ${app.candidate.assignedGroup.id.slice(-4)}`,
-          members: members,
-          memberCount: members.length
-        };
-      }
+      // Get review team information from pre-fetched data
+      const reviewTeam = app.candidate.assignedGroupId ? 
+        (reviewTeamsMap.get(app.candidate.assignedGroupId) || null) : null;
 
       return {
         id: app.id,
         candidateId: app.candidateId,
-        firstName: app.firstName,
-        lastName: app.lastName,
-        email: app.email,
-        studentId: app.studentId,
+        firstName: app.candidate.firstName,
+        lastName: app.candidate.lastName,
+        email: app.candidate.email,
+        studentId: app.candidate.studentId,
         major: app.major1,
         graduationYear: app.graduationYear,
         cumulativeGpa: parseFloat(app.cumulativeGpa),
@@ -2450,8 +2483,10 @@ router.get('/staging/candidates', async (req, res) => {
         referral: app.candidate.referrals && app.candidate.referrals.length > 0 ? app.candidate.referrals[0] : null,
         notes: ''
       };
-    }));
+    });
 
+    console.log(`Processed ${stagingCandidates.length} staging candidates`);
+    
     if (usePagination) {
       const totalPages = Math.ceil(totalCount / limit);
       res.json({
@@ -2467,6 +2502,11 @@ router.get('/staging/candidates', async (req, res) => {
     }
   } catch (error) {
     console.error('[GET /api/admin/staging/candidates]', error);
+    // Check if pagination was requested from query params
+    const page = parseInt(req.query.page);
+    const limit = parseInt(req.query.limit);
+    const usePagination = page && limit;
+    
     if (usePagination) {
       res.json({ candidates: [], total: 0, page: 1, totalPages: 0, hasNextPage: false, hasPrevPage: false });
     } else {
@@ -2767,7 +2807,7 @@ router.get('/existing-decisions', async (req, res) => {
       return res.json({ decisions: {} });
     }
 
-    // Get all applications for the current cycle
+    // Get all applications for the current cycle with their comments
     const applications = await prisma.application.findMany({
       where: {
         cycleId: active.id
@@ -2775,19 +2815,38 @@ router.get('/existing-decisions', async (req, res) => {
       select: {
         id: true,
         candidateId: true,
-        approved: true
+        approved: true,
+        comments: {
+          select: {
+            content: true,
+            createdAt: true
+          },
+          orderBy: {
+            createdAt: 'desc'
+          }
+        }
       }
     });
 
     // Convert to decisions object using application ID as key (matches frontend usage)
     const decisions = {};
     applications.forEach(app => {
+      // First check the approved field for final decisions
       if (app.approved === true) {
-        decisions[app.id] = 'yes'; // Use application ID as key
+        decisions[app.id] = 'yes';
       } else if (app.approved === false) {
-        decisions[app.id] = 'no'; // Use application ID as key
+        decisions[app.id] = 'no';
+      } else if (app.approved === null) {
+        // Check comments for intermediate decisions (maybe_yes, maybe_no)
+        const latestComment = app.comments[0];
+        if (latestComment && latestComment.content) {
+          if (latestComment.content.includes('Maybe - Yes')) {
+            decisions[app.id] = 'maybe_yes';
+          } else if (latestComment.content.includes('Maybe - No')) {
+            decisions[app.id] = 'maybe_no';
+          }
+        }
       }
-      // Note: approved === null means no decision yet
     });
 
     res.json({ decisions });
