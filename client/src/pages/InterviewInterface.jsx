@@ -28,12 +28,13 @@ export default function InterviewInterface() {
   const [groupSearchTerm, setGroupSearchTerm] = useState('');
   const [selectedGroups, setSelectedGroups] = useState([]);
   const [interviewData, setInterviewData] = useState({});
+  const [allEvaluationsSaved, setAllEvaluationsSaved] = useState(false);
+  const [showNextActionModal, setShowNextActionModal] = useState(false);
 
 
   const decisionOptions = [
     { value: 'YES', label: 'Yes', color: 'green' },
     { value: 'MAYBE_YES', label: 'Maybe-Yes', color: 'light-green' },
-    { value: 'UNSURE', label: 'Unsure', color: 'yellow' },
     { value: 'MAYBE_NO', label: 'Maybe-No', color: 'orange' },
     { value: 'NO', label: 'No', color: 'red' }
   ];
@@ -72,6 +73,19 @@ export default function InterviewInterface() {
         console.log('=== THIS IS THE ADMIN INTERVIEW INTERFACE ===');
         setInterview(interviewRes);
         
+        // Parse interview description to get application groups
+        let parsedDescription = {};
+        try {
+          parsedDescription = typeof interviewRes.description === 'string' 
+            ? JSON.parse(interviewRes.description) 
+            : interviewRes.description || {};
+        } catch (e) {
+          console.warn('Failed to parse interview description:', e);
+        }
+        
+        console.log('Parsed interview description:', parsedDescription);
+        console.log('Application groups:', parsedDescription.applicationGroups);
+        
         // Load applications for selected groups
         console.log('Loading applications for groups:', groupIds);
         console.log('API URL:', `/admin/interviews/${interviewId}/applications?groupIds=${groupIds.join(',')}`);
@@ -96,10 +110,13 @@ export default function InterviewInterface() {
         });
         setEvaluations(evaluationsMap);
 
-        // Load interview data for group selection
-        console.log('Loading interview data...');
-        const interviewDataRes = await apiClient.get(`/admin/interviews/${interviewId}`);
-        setInterviewData(interviewDataRes);
+        // Set interview data with parsed description for group selection
+        console.log('Setting interview data with parsed description...');
+        const interviewDataWithGroups = {
+          ...interviewRes,
+          applicationGroups: parsedDescription.applicationGroups || []
+        };
+        setInterviewData(interviewDataWithGroups);
         
       } catch (error) {
         console.error('Failed to load interview data:', error);
@@ -229,7 +246,8 @@ export default function InterviewInterface() {
       });
       
       await Promise.all(promises);
-      alert('All evaluations saved successfully');
+      setAllEvaluationsSaved(true);
+      setShowNextActionModal(true);
     } catch (error) {
       console.error('Failed to save evaluations:', error);
       alert('Failed to save evaluations');
@@ -266,6 +284,21 @@ export default function InterviewInterface() {
     setGroupSelectionOpen(false);
     setSelectedGroups([]);
     setGroupSearchTerm('');
+  };
+
+  const handleInterviewAnotherGroup = () => {
+    setShowNextActionModal(false);
+    setGroupSelectionOpen(true);
+    setSelectedGroups([]);
+    setGroupSearchTerm('');
+  };
+
+  const handleBackToDashboard = () => {
+    navigate('/admin/assigned-interviews');
+  };
+
+  const handleCloseNextActionModal = () => {
+    setShowNextActionModal(false);
   };
 
   const hasGroupBeenEvaluated = (groupId) => {
@@ -336,12 +369,14 @@ export default function InterviewInterface() {
         </div>
         
         <div className="header-actions">
-          <button 
-            className="btn-secondary"
-            onClick={handleInterviewNextGroup}
-          >
-            Select Groups
-          </button>
+          {!allEvaluationsSaved && (
+            <button 
+              className="btn-secondary"
+              onClick={handleInterviewNextGroup}
+            >
+              Select Groups
+            </button>
+          )}
           <button 
             className="btn-primary"
             onClick={saveAllEvaluations}
@@ -364,7 +399,27 @@ export default function InterviewInterface() {
               <div className="application-header">
                 <div className="applicant-info">
                   <div className="applicant-avatar">
-                    <UserIcon className="avatar-icon" />
+                    {application.headshotUrl ? (
+                      <img
+                        src={application.headshotUrl}
+                        alt={application.name}
+                        className="avatar-image"
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          borderRadius: '50%',
+                          objectFit: 'cover'
+                        }}
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          e.currentTarget.nextSibling.style.display = 'flex';
+                        }}
+                      />
+                    ) : null}
+                    <UserIcon 
+                      className="avatar-icon" 
+                      style={{ display: application.headshotUrl ? 'none' : 'flex' }}
+                    />
                   </div>
                   <div className="applicant-details">
                     <h3>{application.name}</h3>
@@ -518,6 +573,37 @@ export default function InterviewInterface() {
                 disabled={selectedGroups.length === 0}
               >
                 {selectedGroups.length === 0 ? 'Select Groups' : `Review Groups (${selectedGroups.length})`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Next Action Modal */}
+      {showNextActionModal && (
+        <div className="modal-overlay">
+          <div className="modal-content next-action-modal">
+            <div className="modal-header">
+              <h3>All Evaluations Saved Successfully!</h3>
+              <button className="icon-btn" onClick={handleCloseNextActionModal}>
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <p>What would you like to do next?</p>
+            </div>
+            <div className="modal-footer">
+              <button 
+                className="btn-secondary" 
+                onClick={handleInterviewAnotherGroup}
+              >
+                Interview Another Group
+              </button>
+              <button 
+                className="btn-primary" 
+                onClick={handleBackToDashboard}
+              >
+                Back to Dashboard
               </button>
             </div>
           </div>

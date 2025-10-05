@@ -900,7 +900,8 @@ router.get('/interviews/:id/applications', requireAuth, async (req, res) => {
         graduationYear: true,
         resumeUrl: true,
         coverLetterUrl: true,
-        videoUrl: true
+        videoUrl: true,
+        headshotUrl: true
       }
     });
     

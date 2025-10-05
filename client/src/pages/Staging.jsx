@@ -28,8 +28,8 @@ import {
   ThemeProvider,
   CssBaseline,
   Card,
-  CardContent,
   Grid,
+  CardContent,
   Divider,
   Badge,
   Tooltip,
@@ -68,7 +68,8 @@ import {
   Send as SendIcon,
   FilterList as FilterListIcon,
   Search as SearchIcon,
-  Clear as ClearIcon
+  Clear as ClearIcon,
+  Download as DownloadIcon
 } from '@mui/icons-material';
 import globalTheme from '../styles/globalTheme';
 import '../styles/Staging.css';
@@ -146,7 +147,7 @@ const stagingAPI = {
   },
 
   async processDecisions() {
-    return await apiClient.post('/admin/process-decisions', {});
+    return await apiClient.post('/admin/process-decisions', { sendEmails: false });
   },
 
   async processCoffeeDecisions() {
@@ -491,9 +492,10 @@ export default function Staging() {
   const [pushAllLoading, setPushAllLoading] = useState(false);
   const [pushAllPreview, setPushAllPreview] = useState({ 
     totalApproved: 0, 
-    invalidDecisions: 0, 
-    invalidDecisionCandidates: [] 
+    invalidDecisions: 0,
+    invalidDecisionCandidates: []
   });
+  const [demographics, setDemographics] = useState({ graduationYear: {}, gender: {} });
   const [appModalOpen, setAppModalOpen] = useState(false);
   const [appModalLoading, setAppModalLoading] = useState(false);
   const [appModal, setAppModal] = useState(null);
@@ -595,6 +597,9 @@ export default function Staging() {
         setEvents(eventsData || []); // Store events data
         setReviewTeams(reviewTeamsData || []); // Store review teams data
         
+        // Calculate demographics after initial data load
+        calculateDemographics(candidatesData);
+        
         // Update pagination state based on total candidates count
         setPagination(prev => ({
           ...prev,
@@ -693,6 +698,9 @@ export default function Staging() {
       setAdminApplications(adminApplicationsData || []); // Update admin applications data
       setEvents(eventsData || []); // Update events data
       setReviewTeams(reviewTeamsData || []); // Update review teams data
+      
+      // Calculate demographics after data is loaded
+      calculateDemographics(candidatesData);
       
       // Update pagination state based on total candidates count
       setPagination(prev => ({
@@ -881,6 +889,70 @@ export default function Staging() {
     setFinalDecisionDialogOpen(true);
   };
 
+  const calculateDemographics = (candidatesData) => {
+    // Initialize with specific categories
+    const graduationYearBreakdown = {
+      '2026': { total: 0, yes: 0, no: 0, maybe: 0, pending: 0 },
+      '2027': { total: 0, yes: 0, no: 0, maybe: 0, pending: 0 },
+      '2028': { total: 0, yes: 0, no: 0, maybe: 0, pending: 0 },
+      '2029': { total: 0, yes: 0, no: 0, maybe: 0, pending: 0 }
+    };
+    
+    const genderBreakdown = {
+      'Male': { total: 0, yes: 0, no: 0, maybe: 0, pending: 0 },
+      'Female': { total: 0, yes: 0, no: 0, maybe: 0, pending: 0 },
+      'Other': { total: 0, yes: 0, no: 0, maybe: 0, pending: 0 }
+    };
+    
+    candidatesData.forEach(candidate => {
+      // Graduation year breakdown - map to specific years
+      let year = candidate.graduationYear;
+      if (!year || !['2026', '2027', '2028', '2029'].includes(year)) {
+        year = '2026'; // Default to 2026 if not in our list
+      }
+      
+      graduationYearBreakdown[year].total++;
+      
+      // Get decision for this candidate
+      const decision = inlineDecisions[candidate.id] || '';
+      if (decision === 'yes') {
+        graduationYearBreakdown[year].yes++;
+      } else if (decision === 'no') {
+        graduationYearBreakdown[year].no++;
+      } else if (decision === 'maybe_yes' || decision === 'maybe_no') {
+        graduationYearBreakdown[year].maybe++;
+      } else {
+        graduationYearBreakdown[year].pending++;
+      }
+      
+      // Gender breakdown - normalize to our categories
+      let gender = candidate.gender;
+      if (!gender) {
+        gender = 'Other';
+      } else if (gender.toLowerCase() === 'male' || gender.toLowerCase() === 'm') {
+        gender = 'Male';
+      } else if (gender.toLowerCase() === 'female' || gender.toLowerCase() === 'f') {
+        gender = 'Female';
+      } else {
+        gender = 'Other';
+      }
+      
+      genderBreakdown[gender].total++;
+      
+      if (decision === 'yes') {
+        genderBreakdown[gender].yes++;
+      } else if (decision === 'no') {
+        genderBreakdown[gender].no++;
+      } else if (decision === 'maybe_yes' || decision === 'maybe_no') {
+        genderBreakdown[gender].maybe++;
+      } else {
+        genderBreakdown[gender].pending++;
+      }
+    });
+    
+    setDemographics({ graduationYear: graduationYearBreakdown, gender: genderBreakdown });
+  };
+
   const handleInlineDecisionChange = async (item, value, phase = 'resume') => {
     try {
       console.log('Saving decision:', { itemId: item.id, value, phase });
@@ -1036,9 +1108,10 @@ export default function Staging() {
       // Show success message with results
       const { summary } = result;
       if (summary) {
+        const emailMessage = currentTab === 0 ? 'No emails sent (resume review round)' : `${summary.emailsSent} emails sent`;
         setSnackbar({ 
           open: true, 
-          message: `Successfully processed ${summary.totalApplications} candidates: ${summary.accepted} accepted, ${summary.rejected} rejected. ${summary.emailsSent} emails sent.`, 
+          message: `Successfully processed ${summary.totalApplications} candidates: ${summary.accepted} accepted, ${summary.rejected} rejected. ${emailMessage}.`, 
           severity: 'success' 
         });
       } else {
@@ -1077,6 +1150,87 @@ export default function Staging() {
       console.error('Error fixing invalid decision:', error);
       setSnackbar({ open: true, message: 'Failed to update decision', severity: 'error' });
     }
+  };
+
+  const handleExportDecisions = () => {
+    // Use adminApplications as the data source since it contains the actual candidate data
+    const dataSource = adminApplications || [];
+    
+    if (dataSource.length === 0) {
+      setSnackbar({ 
+        open: true, 
+        message: 'No candidate data available to export', 
+        severity: 'warning' 
+      });
+      return;
+    }
+    
+    // Create a dialog to let user choose export options
+    const exportDialog = window.confirm(
+      'Choose export option:\n\n' +
+      'OK = Export all candidates with decisions (Yes/No)\n' +
+      'Cancel = Export all candidates regardless of decision status'
+    );
+    
+    let candidatesToExport = dataSource;
+    
+    if (exportDialog) {
+      // Export only candidates with Yes/No decisions
+      candidatesToExport = dataSource.filter(app => 
+        app.approved === true || app.approved === false
+      );
+    }
+    
+    // Create CSV content
+    const csvHeaders = ['Name', 'Email', 'Student ID', 'Decision'];
+    const csvRows = candidatesToExport.map(app => {
+      const name = app.name || `${app.firstName || ''} ${app.lastName || ''}`.trim();
+      
+      // Try different possible email field names
+      const email = app.email || app.applicationEmail || app.candidateEmail || '';
+      const studentId = app.studentId || '';
+      const decision = app.approved === true ? 'Yes' : 
+                     app.approved === false ? 'No' : 'Pending';
+      
+      // Debug: Log the first few entries to see what data we're getting
+      if (candidatesToExport.indexOf(app) < 3) {
+        console.log('Export data for app:', {
+          name,
+          email,
+          studentId,
+          decision,
+          availableFields: Object.keys(app),
+          emailField: app.email,
+          applicationEmail: app.applicationEmail,
+          candidateEmail: app.candidateEmail,
+          fullApp: app
+        });
+      }
+      
+      return [name, email, studentId, decision];
+    });
+    
+    // Combine headers and rows
+    const csvContent = [csvHeaders, ...csvRows]
+      .map(row => row.map(field => `"${field}"`).join(','))
+      .join('\n');
+    
+    // Create and download file
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `candidate_decisions_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    setSnackbar({ 
+      open: true, 
+      message: `Exported ${candidatesToExport.length} candidates to CSV`, 
+      severity: 'success' 
+    });
   };
 
   const filteredCandidates = candidates.filter(candidate => {
@@ -1190,7 +1344,23 @@ export default function Staging() {
               Review candidates, track attendance, evaluate scores, and make decisions
             </Typography>
           </Box>
-          <Box>
+          <Box display="flex" alignItems="center" gap={2}>
+            <Button
+              variant="outlined"
+              startIcon={<DownloadIcon />}
+              onClick={handleExportDecisions}
+              sx={{ 
+                borderColor: 'primary.main',
+                color: 'primary.main',
+                '&:hover': {
+                  borderColor: 'primary.dark',
+                  backgroundColor: 'primary.light',
+                  color: 'primary.dark'
+                }
+              }}
+            >
+              Export Decisions
+            </Button>
             <Chip 
               label={currentCycle ? `Current Cycle: ${currentCycle.name}` : 'No Active Cycle'}
               color={currentCycle ? 'primary' : 'default'}
@@ -1219,6 +1389,107 @@ export default function Staging() {
               <Tab label="First Round" />
               <Tab label="Final Round" />
             </Tabs>
+          </CardContent>
+        </Card>
+
+        {/* Demographics Section */}
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+              📊 Demographics Overview
+            </Typography>
+            
+            <Grid container spacing={3}>
+              {/* Graduation Year Breakdown */}
+              <Grid item xs={12} md={6}>
+                <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main', mb: 2 }}>
+                  By Graduation Year
+                </Typography>
+                <Stack spacing={2}>
+                  {['2026', '2027', '2028', '2029'].map((year) => {
+                    const stats = demographics.graduationYear[year] || { total: 0, yes: 0, no: 0, maybe: 0, pending: 0 };
+                    return (
+                      <Box key={year} sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1, bgcolor: 'background.paper' }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 2, color: 'text.primary' }}>
+                          Class of {year} ({stats.total} total)
+                        </Typography>
+                        <Grid container spacing={1}>
+                          <Grid item xs={3}>
+                            <Box sx={{ textAlign: 'center', p: 1.5, bgcolor: 'success.light', borderRadius: 1, border: '1px solid', borderColor: 'success.main' }}>
+                              <Typography variant="caption" display="block" sx={{ fontWeight: 'bold', color: 'success.dark' }}>Yes</Typography>
+                              <Typography variant="h6" sx={{ color: 'success.dark', fontWeight: 'bold' }}>{stats.yes}</Typography>
+                            </Box>
+                          </Grid>
+                          <Grid item xs={3}>
+                            <Box sx={{ textAlign: 'center', p: 1.5, bgcolor: 'error.light', borderRadius: 1, border: '1px solid', borderColor: 'error.main' }}>
+                              <Typography variant="caption" display="block" sx={{ fontWeight: 'bold', color: 'error.dark' }}>No</Typography>
+                              <Typography variant="h6" sx={{ color: 'error.dark', fontWeight: 'bold' }}>{stats.no}</Typography>
+                            </Box>
+                          </Grid>
+                          <Grid item xs={3}>
+                            <Box sx={{ textAlign: 'center', p: 1.5, bgcolor: 'warning.light', borderRadius: 1, border: '1px solid', borderColor: 'warning.main' }}>
+                              <Typography variant="caption" display="block" sx={{ fontWeight: 'bold', color: 'warning.dark' }}>Maybe</Typography>
+                              <Typography variant="h6" sx={{ color: 'warning.dark', fontWeight: 'bold' }}>{stats.maybe}</Typography>
+                            </Box>
+                          </Grid>
+                          <Grid item xs={3}>
+                            <Box sx={{ textAlign: 'center', p: 1.5, bgcolor: 'grey.100', borderRadius: 1, border: '1px solid', borderColor: 'grey.300' }}>
+                              <Typography variant="caption" display="block" sx={{ fontWeight: 'bold', color: 'grey.700' }}>Pending</Typography>
+                              <Typography variant="h6" sx={{ color: 'grey.700', fontWeight: 'bold' }}>{stats.pending}</Typography>
+                            </Box>
+                          </Grid>
+                        </Grid>
+                      </Box>
+                    );
+                  })}
+                </Stack>
+              </Grid>
+
+              {/* Gender Breakdown */}
+              <Grid item xs={12} md={6}>
+                <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main', mb: 2 }}>
+                  By Gender
+                </Typography>
+                <Stack spacing={2}>
+                  {['Male', 'Female', 'Other'].map((gender) => {
+                    const stats = demographics.gender[gender] || { total: 0, yes: 0, no: 0, maybe: 0, pending: 0 };
+                    return (
+                      <Box key={gender} sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1, bgcolor: 'background.paper' }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 2, color: 'text.primary' }}>
+                          {gender} ({stats.total} total)
+                        </Typography>
+                        <Grid container spacing={1}>
+                          <Grid item xs={3}>
+                            <Box sx={{ textAlign: 'center', p: 1.5, bgcolor: 'success.light', borderRadius: 1, border: '1px solid', borderColor: 'success.main' }}>
+                              <Typography variant="caption" display="block" sx={{ fontWeight: 'bold', color: 'success.dark' }}>Yes</Typography>
+                              <Typography variant="h6" sx={{ color: 'success.dark', fontWeight: 'bold' }}>{stats.yes}</Typography>
+                            </Box>
+                          </Grid>
+                          <Grid item xs={3}>
+                            <Box sx={{ textAlign: 'center', p: 1.5, bgcolor: 'error.light', borderRadius: 1, border: '1px solid', borderColor: 'error.main' }}>
+                              <Typography variant="caption" display="block" sx={{ fontWeight: 'bold', color: 'error.dark' }}>No</Typography>
+                              <Typography variant="h6" sx={{ color: 'error.dark', fontWeight: 'bold' }}>{stats.no}</Typography>
+                            </Box>
+                          </Grid>
+                          <Grid item xs={3}>
+                            <Box sx={{ textAlign: 'center', p: 1.5, bgcolor: 'warning.light', borderRadius: 1, border: '1px solid', borderColor: 'warning.main' }}>
+                              <Typography variant="caption" display="block" sx={{ fontWeight: 'bold', color: 'warning.dark' }}>Maybe</Typography>
+                              <Typography variant="h6" sx={{ color: 'warning.dark', fontWeight: 'bold' }}>{stats.maybe}</Typography>
+                            </Box>
+                          </Grid>
+                          <Grid item xs={3}>
+                            <Box sx={{ textAlign: 'center', p: 1.5, bgcolor: 'grey.100', borderRadius: 1, border: '1px solid', borderColor: 'grey.300' }}>
+                              <Typography variant="caption" display="block" sx={{ fontWeight: 'bold', color: 'grey.700' }}>Pending</Typography>
+                              <Typography variant="h6" sx={{ color: 'grey.700', fontWeight: 'bold' }}>{stats.pending}</Typography>
+                            </Box>
+                          </Grid>
+                        </Grid>
+                      </Box>
+                    );
+                  })}
+                </Stack>
+              </Grid>
+            </Grid>
           </CardContent>
         </Card>
 
@@ -1377,7 +1648,7 @@ export default function Staging() {
             </Typography>
             <Box mb={2} display="flex" justifyContent="space-between" alignItems="center">
               <Typography variant="body2" color="text.secondary">
-                ⚠️ All candidates must have a "Yes" or "No" decision. "Yes" advances to Coffee Chats, "No" receives rejection email.
+                ⚠️ All candidates must have a "Yes" or "No" decision. "Yes" advances to Coffee Chats (no email), "No" marks as rejected (no email).
               </Typography>
               <Button variant="contained" color="primary" startIcon={<SkipNextIcon />} onClick={openPushAll}>
                 Process All Decisions
@@ -2648,12 +2919,22 @@ export default function Staging() {
             <Stack spacing={2} sx={{ mt: 1 }}>
               <Alert severity="info">
                 <Typography variant="subtitle2" gutterBottom>
-                  📧 This will send emails and advance candidates to the next round
+                  {currentTab === 0 ? '🔄 This will advance candidates to the next round (no emails sent)' : '📧 This will send emails and advance candidates to the next round'}
                 </Typography>
                 <Typography variant="body2">
-                  • <strong>Yes</strong> decisions: Acceptance emails + advance to Coffee Chats round<br/>
-                  • <strong>No</strong> decisions: Rejection emails + mark as rejected<br/>
-                  • This action cannot be easily undone
+                  {currentTab === 0 ? (
+                    <>
+                      • <strong>Yes</strong> decisions: Advance to Coffee Chats round (no email)<br/>
+                      • <strong>No</strong> decisions: Mark as rejected (no email)<br/>
+                      • This action cannot be easily undone
+                    </>
+                  ) : (
+                    <>
+                      • <strong>Yes</strong> decisions: Acceptance emails + advance to next round<br/>
+                      • <strong>No</strong> decisions: Rejection emails + mark as rejected<br/>
+                      • This action cannot be easily undone
+                    </>
+                  )}
                 </Typography>
               </Alert>
               
@@ -2757,7 +3038,7 @@ export default function Staging() {
               />
               <FormControlLabel
                 control={<Checkbox checked={pushAllAcknowledge} onChange={(e) => setPushAllAcknowledge(e.target.checked)} />}
-                label="I understand this will send emails and advance candidates to the next round"
+                label={currentTab === 0 ? "I understand this will advance candidates to the next round (no emails will be sent)" : "I understand this will send emails and advance candidates to the next round"}
               />
             </Stack>
           </DialogContent>

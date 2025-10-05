@@ -2139,3 +2139,314 @@
   color: var(--text-secondary);
   line-height: 1.4;
 }
+
+/* Evaluations Section Styles */
+.no-evaluations {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.no-evaluations-icon {
+  width: 3rem;
+  height: 3rem;
+  color: var(--text-muted);
+  margin-bottom: 1rem;
+}
+
+.no-evaluations p {
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+.evaluations-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.evaluation-item {
+  background: var(--bg-white);
+  border: 1px solid var(--border-light);
+  border-radius: var(--border-radius);
+  padding: 1rem;
+  transition: all 0.2s ease;
+}
+
+.evaluation-item:hover {
+  border-color: var(--border-medium);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.evaluation-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0.75rem;
+}
+
+.evaluation-candidate {
+  flex: 1;
+}
+
+.candidate-name {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 0.25rem 0;
+}
+
+.candidate-details {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.evaluation-decision {
+  padding: 0.375rem 0.75rem;
+  border-radius: var(--border-radius);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+  min-width: 80px;
+  text-align: center;
+}
+
+.decision-yes {
+  background-color: #dcfce7;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
+.decision-maybe-yes {
+  background-color: #f0fdf4;
+  color: #15803d;
+  border: 1px solid #dcfce7;
+}
+
+.decision-maybe-no {
+  background-color: #fff7ed;
+  color: #c2410c;
+  border: 1px solid #fed7aa;
+}
+
+.decision-no {
+  background-color: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+
+.decision-none {
+  background-color: var(--bg-gray-light);
+  color: var(--text-muted);
+  border: 1px solid var(--border-light);
+}
+
+.evaluation-notes {
+  margin: 0.75rem 0;
+  padding: 0.75rem;
+  background: var(--bg-gray-light);
+  border-radius: var(--border-radius);
+  border: 1px solid var(--border-light);
+}
+
+.evaluation-notes .notes-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+  margin-bottom: 0.5rem;
+  display: block;
+}
+
+.evaluation-notes .notes-content {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.evaluation-meta {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.5rem;
+}
+
+.evaluation-date {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* Updated Evaluation Header Styles */
+.evaluation-candidate {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1;
+}
+
+.candidate-photo {
+  flex-shrink: 0;
+}
+
+.candidate-headshot-fallback {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background-color: var(--bg-gray-light);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.candidate-info {
+  flex: 1;
+}
+
+.evaluator-info {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 0.25rem;
+}
+
+.evaluation-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.edit-evaluation-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--border-radius);
+  background: var(--bg-white);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.edit-evaluation-btn:hover {
+  background-color: var(--bg-gray-light);
+  border-color: var(--border-focus);
+  color: var(--text-primary);
+}
+
+.edit-icon {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* Edit Evaluation Modal Styles */
+.edit-evaluation-modal {
+  max-width: 500px;
+  width: 90%;
+}
+
+.candidate-info-modal {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-left: 1rem;
+}
+
+.modal-candidate-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.modal-evaluator-name {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.modal-candidate-photo {
+  flex-shrink: 0;
+}
+
+.modal-candidate-name {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.form-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.75rem;
+}
+
+.decision-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.decision-option {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border-light);
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.decision-option:hover {
+  background-color: var(--bg-gray-light);
+  border-color: var(--border-medium);
+}
+
+.decision-option input[type="radio"] {
+  margin: 0;
+}
+
+.decision-option input[type="radio"]:checked + .decision-label {
+  font-weight: 600;
+}
+
+.decision-label {
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.form-textarea {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--border-radius);
+  font-size: 0.875rem;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 100px;
+  transition: border-color 0.2s ease;
+}
+
+.form-textarea:focus {
+  outline: none;
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}

@@ -29,7 +29,6 @@ export default function FirstRoundInterviewInterface() {
   const decisionOptions = [
     { value: 'YES', label: 'Yes', color: 'green' },
     { value: 'MAYBE_YES', label: 'Maybe-Yes', color: 'light-green' },
-    { value: 'UNSURE', label: 'Unsure', color: 'yellow' },
     { value: 'MAYBE_NO', label: 'Maybe-No', color: 'orange' },
     { value: 'NO', label: 'No', color: 'red' }
   ];

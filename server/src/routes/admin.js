@@ -557,6 +557,10 @@ router.post('/process-decisions', async (req, res) => {
   try {
     console.log('Starting decision processing...');
     
+    // Check if emails should be sent (default to true for backward compatibility)
+    const sendEmails = req.body.sendEmails !== false;
+    console.log('Send emails:', sendEmails);
+    
     const active = await prisma.recruitingCycle.findFirst({ where: { isActive: true } });
     if (!active) {
       return res.status(400).json({ error: 'No active recruiting cycle' });
@@ -676,31 +680,36 @@ router.post('/process-decisions', async (req, res) => {
             approved: updatedApp.approved
           });
 
-          // Send acceptance email
-          let emailResult;
-          try {
-            emailResult = await sendAcceptanceEmail(
-              application.email, // Use application email
-              `${application.firstName} ${application.lastName}`,
-              active.name
-            );
-            console.log(`Acceptance email result for ${application.email}:`, emailResult);
-          } catch (emailError) {
-            console.error(`Error sending acceptance email to ${application.email}:`, emailError);
-            emailResult = { success: false, error: emailError.message };
+          // Send acceptance email (only if sendEmails is true)
+          let emailResult = { success: true }; // Default to success if emails are disabled
+          if (sendEmails) {
+            try {
+              emailResult = await sendAcceptanceEmail(
+                application.email, // Use application email
+                `${application.firstName} ${application.lastName}`,
+                active.name
+              );
+              console.log(`Acceptance email result for ${application.email}:`, emailResult);
+            } catch (emailError) {
+              console.error(`Error sending acceptance email to ${application.email}:`, emailError);
+              emailResult = { success: false, error: emailError.message };
+            }
+          } else {
+            console.log(`Skipping acceptance email for ${application.email} (emails disabled)`);
           }
 
           if (emailResult.success) {
-            results.emailsSent++;
+            if (sendEmails) results.emailsSent++;
             results.accepted.push({
               applicationId: application.id,
               candidateId: application.candidate.id,
               candidateName: `${application.firstName} ${application.lastName}`,
               email: application.email,
-              emailSent: true
+              emailSent: sendEmails,
+              emailSkipped: !sendEmails
             });
           } else {
-            results.emailsFailed++;
+            if (sendEmails) results.emailsFailed++;
             results.accepted.push({
               applicationId: application.id,
               candidateId: application.candidate.id,
@@ -722,26 +731,36 @@ router.post('/process-decisions', async (req, res) => {
             }
           });
 
-          // Send rejection email
-          const emailResult = await sendRejectionEmail(
-            application.email, // Use application email
-            `${application.firstName} ${application.lastName}`,
-            active.name
-          );
-
-          console.log(`Rejection email result for ${application.email}:`, emailResult);
+          // Send rejection email (only if sendEmails is true)
+          let emailResult = { success: true }; // Default to success if emails are disabled
+          if (sendEmails) {
+            try {
+              emailResult = await sendRejectionEmail(
+                application.email, // Use application email
+                `${application.firstName} ${application.lastName}`,
+                active.name
+              );
+              console.log(`Rejection email result for ${application.email}:`, emailResult);
+            } catch (emailError) {
+              console.error(`Error sending rejection email to ${application.email}:`, emailError);
+              emailResult = { success: false, error: emailError.message };
+            }
+          } else {
+            console.log(`Skipping rejection email for ${application.email} (emails disabled)`);
+          }
 
           if (emailResult.success) {
-            results.emailsSent++;
+            if (sendEmails) results.emailsSent++;
             results.rejected.push({
               applicationId: application.id,
               candidateId: application.candidate.id,
               candidateName: `${application.firstName} ${application.lastName}`,
               email: application.email,
-              emailSent: true
+              emailSent: sendEmails,
+              emailSkipped: !sendEmails
             });
           } else {
-            results.emailsFailed++;
+            if (sendEmails) results.emailsFailed++;
             results.rejected.push({
               applicationId: application.id,
               candidateId: application.candidate.id,
@@ -2913,7 +2932,8 @@ router.get('/interviews/:id/applications', async (req, res) => {
         graduationYear: true,
         resumeUrl: true,
         coverLetterUrl: true,
-        videoUrl: true
+        videoUrl: true,
+        headshotUrl: true
       }
     });
     

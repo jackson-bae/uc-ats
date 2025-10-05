@@ -6,16 +6,14 @@ import {
   ClockIcon,
   MapPinIcon,
   UserGroupIcon,
-  CheckIcon,
-  DocumentTextIcon,
-  ArrowDownTrayIcon,
-  ArrowTopRightOnSquareIcon,
   PlayIcon,
   EyeIcon,
   PlusIcon,
   XMarkIcon,
   UsersIcon,
-  DocumentDuplicateIcon
+  DocumentTextIcon,
+  PencilIcon,
+  CheckIcon
 } from '@heroicons/react/24/outline';
 import apiClient from '../utils/api';
 import AccessControl from '../components/AccessControl';
@@ -32,6 +30,21 @@ export default function AssignedInterviews() {
   const [groupSearchTerm, setGroupSearchTerm] = useState('');
   const [selectedGroups, setSelectedGroups] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
+  const [evaluations, setEvaluations] = useState({});
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editingEvaluation, setEditingEvaluation] = useState(null);
+  const [editFormData, setEditFormData] = useState({
+    decision: '',
+    notes: ''
+  });
+  const [saving, setSaving] = useState(false);
+
+  const decisionOptions = [
+    { value: 'YES', label: 'Yes', color: 'green' },
+    { value: 'MAYBE_YES', label: 'Maybe-Yes', color: 'light-green' },
+    { value: 'MAYBE_NO', label: 'Maybe-No', color: 'orange' },
+    { value: 'NO', label: 'No', color: 'red' }
+  ];
 
   // Get current user information
   useEffect(() => {
@@ -86,20 +99,23 @@ export default function AssignedInterviews() {
           initialData[interview.id] = {
             memberGroups: parsed?.memberGroups || [],
             applicationGroups: parsed?.applicationGroups || [],
-            groupAssignments: parsed?.groupAssignments || {},
-            actionItems: parsed?.actionItems || {
-              reviewInstructions: false,
-              fillQuestions: false,
-              createMarketSizing: false,
-              reviewResumes: false
-            },
-            resources: parsed?.resources || [
-              { id: 1, name: 'Interview Instructions Guide', url: '#' },
-              { id: 2, name: 'Interview Questions Bank', url: '#' }
-            ]
+            groupAssignments: parsed?.groupAssignments || {}
           };
         });
         setInterviewData(initialData);
+
+        // Load evaluations for each interview
+        const evaluationsData = {};
+        for (const interview of ivs) {
+          try {
+            const evaluationsRes = await apiClient.get(`/member/evaluations?interviewId=${interview.id}`);
+            evaluationsData[interview.id] = evaluationsRes;
+          } catch (error) {
+            console.warn(`Failed to load evaluations for interview ${interview.id}:`, error);
+            evaluationsData[interview.id] = [];
+          }
+        }
+        setEvaluations(evaluationsData);
       } catch (e) {
         console.error('Failed to load interview data', e);
       }
@@ -107,18 +123,6 @@ export default function AssignedInterviews() {
     loadMemberInterviews();
   }, []);
 
-  const handleActionItemToggle = (interviewId, item) => {
-    setInterviewData(prev => ({
-      ...prev,
-      [interviewId]: {
-        ...prev[interviewId],
-        actionItems: {
-          ...prev[interviewId]?.actionItems,
-          [item]: !prev[interviewId]?.actionItems?.[item]
-        }
-      }
-    }));
-  };
 
   const handleStartInterview = (interviewId) => {
     setSelectedInterviewForStart(interviewId);
@@ -190,12 +194,71 @@ export default function AssignedInterviews() {
     setExpandedInterviewId(expandedInterviewId === id ? null : id);
   };
 
-  const handleDownloadResource = (resourceName) => {
-    console.log(`Downloading ${resourceName}`);
+
+  const getDecisionColor = (decision) => {
+    switch (decision) {
+      case 'YES': return 'decision-yes';
+      case 'MAYBE_YES': return 'decision-maybe-yes';
+      case 'MAYBE_NO': return 'decision-maybe-no';
+      case 'NO': return 'decision-no';
+      default: return 'decision-none';
+    }
   };
 
-  const handleOpenResource = (resourceName) => {
-    console.log(`Opening ${resourceName}`);
+  const getDecisionLabel = (decision) => {
+    switch (decision) {
+      case 'YES': return 'Yes';
+      case 'MAYBE_YES': return 'Maybe-Yes';
+      case 'MAYBE_NO': return 'Maybe-No';
+      case 'NO': return 'No';
+      default: return 'Not evaluated';
+    }
+  };
+
+  const handleEditEvaluation = (evaluation) => {
+    setEditingEvaluation(evaluation);
+    setEditFormData({
+      decision: evaluation.decision || '',
+      notes: evaluation.notes || ''
+    });
+    setEditModalOpen(true);
+  };
+
+  const handleCloseEditModal = () => {
+    setEditModalOpen(false);
+    setEditingEvaluation(null);
+    setEditFormData({ decision: '', notes: '' });
+  };
+
+  const handleSaveEvaluation = async () => {
+    if (!editingEvaluation) return;
+    
+    try {
+      setSaving(true);
+      await apiClient.post('/member/evaluations', {
+        interviewId: editingEvaluation.interviewId,
+        applicationId: editingEvaluation.applicationId,
+        decision: editFormData.decision,
+        notes: editFormData.notes
+      });
+      
+      // Update the evaluations state
+      setEvaluations(prev => ({
+        ...prev,
+        [editingEvaluation.interviewId]: prev[editingEvaluation.interviewId].map(evaluation => 
+          evaluation.id === editingEvaluation.id 
+            ? { ...evaluation, decision: editFormData.decision, notes: editFormData.notes, updatedAt: new Date().toISOString() }
+            : evaluation
+        )
+      }));
+      
+      handleCloseEditModal();
+    } catch (error) {
+      console.error('Failed to save evaluation:', error);
+      alert('Failed to save evaluation');
+    } finally {
+      setSaving(false);
+    }
   };
 
   // Find which member group the current user belongs to for a given interview
@@ -358,10 +421,7 @@ export default function AssignedInterviews() {
             const endDate = new Date(interview.endDate);
             const isSelected = interview.id === selectedInterviewId;
             const isExpanded = expandedInterviewId === interview.id;
-            const data = interviewData[interview.id] || { 
-              actionItems: {}, 
-              resources: [] 
-            };
+            const data = interviewData[interview.id] || {};
             
             return (
               <div 
@@ -493,76 +553,90 @@ export default function AssignedInterviews() {
                         );
                       })()}
 
-                      {/* Action Items Section */}
-                      <div className="expanded-section">
-                        <h3 className="expanded-section-title">Action Items</h3>
-                        <div className="action-items-grid">
-                          <label className="action-item-checkbox">
-                            <input
-                              type="checkbox"
-                              checked={data.actionItems?.reviewInstructions || false}
-                              onChange={() => handleActionItemToggle(interview.id, 'reviewInstructions')}
-                            />
-                            <span className="checkmark"></span>
-                            <span>Review Interview Instructions Guide</span>
-                          </label>
-                          <label className="action-item-checkbox">
-                            <input
-                              type="checkbox"
-                              checked={data.actionItems?.fillQuestions || false}
-                              onChange={() => handleActionItemToggle(interview.id, 'fillQuestions')}
-                            />
-                            <span className="checkmark"></span>
-                            <span>Fill Out Interview Questions</span>
-                          </label>
-                          <label className="action-item-checkbox">
-                            <input
-                              type="checkbox"
-                              checked={data.actionItems?.createMarketSizing || false}
-                              onChange={() => handleActionItemToggle(interview.id, 'createMarketSizing')}
-                            />
-                            <span className="checkmark"></span>
-                            <span>Create Market Sizing Questions</span>
-                          </label>
-                          <label className="action-item-checkbox">
-                            <input
-                              type="checkbox"
-                              checked={data.actionItems?.reviewResumes || false}
-                              onChange={() => handleActionItemToggle(interview.id, 'reviewResumes')}
-                            />
-                            <span className="checkmark"></span>
-                            <span>Review Applicant Resumes</span>
-                          </label>
-                        </div>
-                      </div>
 
-                      {/* Resources Section */}
+                      {/* My Evaluations Section */}
                       <div className="expanded-section">
-                        <h3 className="expanded-section-title">Resources</h3>
-                        <div className="resources-grid">
-                          {data.resources?.map(resource => (
-                            <div key={resource.id} className="resource-item">
-                              <DocumentTextIcon className="resource-icon" />
-                              <span className="resource-name">{resource.name}</span>
-                              <div className="resource-actions">
-                                <button 
-                                  className="resource-btn"
-                                  onClick={() => handleDownloadResource(resource.name)}
-                                  title="Download"
-                                >
-                                  <ArrowDownTrayIcon className="resource-action-icon" />
-                                </button>
-                                <button 
-                                  className="resource-btn"
-                                  onClick={() => handleOpenResource(resource.name)}
-                                  title="Open"
-                                >
-                                  <ArrowTopRightOnSquareIcon className="resource-action-icon" />
-                                </button>
-                              </div>
+                        <h3 className="expanded-section-title">My Evaluations</h3>
+                        {(() => {
+                          const interviewEvaluations = evaluations[interview.id] || [];
+                          return interviewEvaluations.length === 0 ? (
+                            <div className="no-evaluations">
+                              <DocumentTextIcon className="no-evaluations-icon" />
+                              <p>No evaluations completed yet</p>
                             </div>
-                          ))}
-                        </div>
+                          ) : (
+                            <div className="evaluations-list">
+                              {interviewEvaluations.map((evaluation) => {
+                                const application = evaluation.application;
+                                return (
+                                  <div key={evaluation.id} className="evaluation-item">
+                                    <div className="evaluation-header">
+                                      <div className="evaluation-candidate">
+                                        <div className="candidate-photo">
+                                          {application.headshotUrl ? (
+                                            <img
+                                              src={application.headshotUrl}
+                                              alt={`${application.firstName} ${application.lastName}`}
+                                              className="candidate-headshot"
+                                              style={{
+                                                width: '48px',
+                                                height: '48px',
+                                                borderRadius: '50%',
+                                                objectFit: 'cover'
+                                              }}
+                                              onError={(e) => {
+                                                e.currentTarget.style.display = 'none';
+                                                e.currentTarget.nextSibling.style.display = 'flex';
+                                              }}
+                                            />
+                                          ) : null}
+                                          <div 
+                                            className="candidate-headshot-fallback"
+                                            style={{ display: application.headshotUrl ? 'none' : 'flex' }}
+                                          >
+                                            {(application.firstName?.[0] || '') + (application.lastName?.[0] || '')}
+                                          </div>
+                                        </div>
+                                        <div className="candidate-info">
+                                          <h4 className="candidate-name">
+                                            {application.firstName} {application.lastName}
+                                          </h4>
+                                          <p className="candidate-details">
+                                            {application.major1} • Class of {application.graduationYear}
+                                          </p>
+                                        </div>
+                                      </div>
+                                      <div className="evaluation-actions">
+                                        <div className={`evaluation-decision ${getDecisionColor(evaluation.decision)}`}>
+                                          {getDecisionLabel(evaluation.decision)}
+                                        </div>
+                                        <button 
+                                          className="edit-evaluation-btn"
+                                          onClick={() => handleEditEvaluation(evaluation)}
+                                          title="Edit evaluation"
+                                        >
+                                          <PencilIcon className="edit-icon" />
+                                        </button>
+                                      </div>
+                                    </div>
+                                    {evaluation.notes && (
+                                      <div className="evaluation-notes">
+                                        <p className="notes-label">Notes:</p>
+                                        <p className="notes-content">{evaluation.notes}</p>
+                                      </div>
+                                    )}
+                                    <div className="evaluation-meta">
+                                      <span className="evaluation-date">
+                                        {new Date(evaluation.updatedAt).toLocaleDateString()} at{' '}
+                                        {new Date(evaluation.updatedAt).toLocaleTimeString()}
+                                      </span>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
                   )}
@@ -598,6 +672,86 @@ export default function AssignedInterviews() {
           })
         )}
       </div>
+
+      {/* Edit Evaluation Modal */}
+      {editModalOpen && editingEvaluation && (
+        <div className="modal-overlay">
+          <div className="modal-content edit-evaluation-modal">
+            <div className="modal-header">
+              <h3>Edit Evaluation</h3>
+              <div className="candidate-info-modal">
+                {editingEvaluation.application.headshotUrl && (
+                  <img
+                    src={editingEvaluation.application.headshotUrl}
+                    alt={`${editingEvaluation.application.firstName} ${editingEvaluation.application.lastName}`}
+                    className="modal-candidate-photo"
+                    style={{
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '50%',
+                      objectFit: 'cover'
+                    }}
+                  />
+                )}
+                <span className="modal-candidate-name">
+                  {editingEvaluation.application.firstName} {editingEvaluation.application.lastName}
+                </span>
+              </div>
+              <button className="icon-btn" onClick={handleCloseEditModal}>
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="form-group">
+                <label className="form-label">Decision</label>
+                <div className="decision-options">
+                  {decisionOptions.map(option => (
+                    <label key={option.value} className="decision-option">
+                      <input
+                        type="radio"
+                        name="decision"
+                        value={option.value}
+                        checked={editFormData.decision === option.value}
+                        onChange={(e) => setEditFormData(prev => ({ ...prev, decision: e.target.value }))}
+                      />
+                      <span className={`decision-label ${option.color}`}>
+                        {option.label}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Notes</label>
+                <textarea
+                  className="form-textarea"
+                  value={editFormData.notes}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, notes: e.target.value }))}
+                  placeholder="Add your evaluation notes here..."
+                  rows={4}
+                />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button 
+                className="btn-secondary" 
+                onClick={handleCloseEditModal}
+                disabled={saving}
+              >
+                Cancel
+              </button>
+              <button 
+                className="btn-primary" 
+                onClick={handleSaveEvaluation}
+                disabled={saving}
+              >
+                <CheckIcon className="btn-icon" />
+                {saving ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
     </AccessControl>
   );

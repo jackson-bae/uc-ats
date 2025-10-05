@@ -7,9 +7,6 @@ import {
   MapPinIcon,
   UserGroupIcon,
   CheckIcon,
-  DocumentTextIcon,
-  ArrowDownTrayIcon,
-  ArrowTopRightOnSquareIcon,
   PlayIcon,
   EyeIcon,
   PlusIcon,
@@ -50,12 +47,6 @@ export default function AdminAssignedInterviews() {
   const [selectedInterviewForStart, setSelectedInterviewForStart] = useState(null);
   const [groupSearchTerm, setGroupSearchTerm] = useState('');
   const [selectedGroups, setSelectedGroups] = useState([]);
-  const [editingActionItems, setEditingActionItems] = useState(false);
-  const [editingResources, setEditingResources] = useState(false);
-  const [newActionItem, setNewActionItem] = useState('');
-  const [newResource, setNewResource] = useState({ name: '', url: '' });
-  const [actionItems, setActionItems] = useState({});
-  const [resources, setResources] = useState({});
 
   // Fetch initial data
   useEffect(() => {
@@ -252,13 +243,11 @@ export default function AdminAssignedInterviews() {
     setEditedInterview(null);
   };
 
-  const toggleExpandInterview = async (id) => {
+  const toggleExpandInterview = (id) => {
     if (expandedInterviewId === id) {
       setExpandedInterviewId(null);
     } else {
       setExpandedInterviewId(id);
-      // Load action items and resources when expanding
-      await loadInterviewData(id);
     }
   };
 
@@ -408,145 +397,9 @@ export default function AdminAssignedInterviews() {
     }
   };
 
-  const handleDownloadResource = (resourceName) => {
-    console.log(`Downloading ${resourceName}`);
-  };
 
-  const handleOpenResource = (resourceName) => {
-    console.log(`Opening ${resourceName}`);
-  };
 
-  // Load action items and resources for a specific interview
-  const loadInterviewData = async (interviewId) => {
-    try {
-      const [actionItemsRes, resourcesRes] = await Promise.allSettled([
-        apiClient.get(`/admin/interviews/${interviewId}/action-items`),
-        apiClient.get(`/admin/interviews/${interviewId}/resources`)
-      ]);
 
-      const actionItemsData = actionItemsRes.status === 'fulfilled' ? actionItemsRes.value : [];
-      const resourcesData = resourcesRes.status === 'fulfilled' ? resourcesRes.value : [];
-
-      setActionItems(prev => ({
-        ...prev,
-        [interviewId]: actionItemsData
-      }));
-
-      setResources(prev => ({
-        ...prev,
-        [interviewId]: resourcesData
-      }));
-    } catch (error) {
-      console.error('Failed to load interview data:', error);
-    }
-  };
-
-  // Action Items Management
-  const addCustomActionItem = async (interviewId) => {
-    if (!newActionItem.trim()) return;
-    
-    try {
-      const response = await apiClient.post(`/admin/interviews/${interviewId}/action-items`, {
-        title: newActionItem.trim(),
-        order: (actionItems[interviewId]?.length || 0)
-      });
-      
-      setActionItems(prev => ({
-        ...prev,
-        [interviewId]: [...(prev[interviewId] || []), response]
-      }));
-      setNewActionItem('');
-    } catch (error) {
-      console.error('Failed to add action item:', error);
-      alert('Failed to add action item');
-    }
-  };
-
-  const removeCustomActionItem = async (interviewId, actionItemId) => {
-    try {
-      await apiClient.delete(`/admin/interviews/${interviewId}/action-items/${actionItemId}`);
-      
-      setActionItems(prev => ({
-        ...prev,
-        [interviewId]: (prev[interviewId] || []).filter(item => item.id !== actionItemId)
-      }));
-    } catch (error) {
-      console.error('Failed to remove action item:', error);
-      alert('Failed to remove action item');
-    }
-  };
-
-  const updateActionItem = async (interviewId, actionItemId, updates) => {
-    try {
-      const response = await apiClient.patch(`/admin/interviews/${interviewId}/action-items/${actionItemId}`, updates);
-      
-      setActionItems(prev => ({
-        ...prev,
-        [interviewId]: (prev[interviewId] || []).map(item => 
-          item.id === actionItemId ? response : item
-        )
-      }));
-    } catch (error) {
-      console.error('Failed to update action item:', error);
-      alert('Failed to update action item');
-    }
-  };
-
-  const toggleActionItemCompletion = async (interviewId, actionItemId, isCompleted) => {
-    await updateActionItem(interviewId, actionItemId, { isCompleted });
-  };
-
-  // Resources Management
-  const addCustomResource = async (interviewId) => {
-    if (!newResource.name.trim() || !newResource.url.trim()) return;
-    
-    try {
-      const response = await apiClient.post(`/admin/interviews/${interviewId}/resources`, {
-        title: newResource.name.trim(),
-        url: newResource.url.trim(),
-        order: (resources[interviewId]?.length || 0)
-      });
-      
-      setResources(prev => ({
-        ...prev,
-        [interviewId]: [...(prev[interviewId] || []), response]
-      }));
-      setNewResource({ name: '', url: '' });
-    } catch (error) {
-      console.error('Failed to add resource:', error);
-      alert('Failed to add resource');
-    }
-  };
-
-  const removeCustomResource = async (interviewId, resourceId) => {
-    try {
-      await apiClient.delete(`/admin/interviews/${interviewId}/resources/${resourceId}`);
-      
-      setResources(prev => ({
-        ...prev,
-        [interviewId]: (prev[interviewId] || []).filter(r => r.id !== resourceId)
-      }));
-    } catch (error) {
-      console.error('Failed to remove resource:', error);
-      alert('Failed to remove resource');
-    }
-  };
-
-  const updateResource = async (interviewId, resourceId, updates) => {
-    try {
-      const response = await apiClient.patch(`/admin/interviews/${interviewId}/resources/${resourceId}`, updates);
-      
-      setResources(prev => ({
-        ...prev,
-        [interviewId]: (prev[interviewId] || []).map(r => 
-          r.id === resourceId ? response : r
-        )
-      }));
-    } catch (error) {
-      console.error('Failed to update resource:', error);
-      alert('Failed to update resource');
-    }
-  };
 
   return (
     <AccessControl allowedRoles={['ADMIN']}>
@@ -907,186 +760,6 @@ export default function AdminAssignedInterviews() {
                   {/* Expanded Content */}
                   {isExpanded && (
                     <div className="interview-expanded-content">
-                      {/* Action Items Section */}
-                      <div className="expanded-section">
-                        <div className="expanded-section-header">
-                          <h3 className="expanded-section-title">Action Items</h3>
-                          <div className="section-actions">
-                            <button 
-                              className="btn-secondary small" 
-                              onClick={() => setEditingActionItems(!editingActionItems)}
-                            >
-                              {editingActionItems ? 'Done Editing' : 'Edit Items'}
-                            </button>
-                          </div>
-                        </div>
-                        
-                        <div className="action-items-grid">
-                          {(actionItems[interview.id] || []).map((actionItem) => (
-                            <div key={actionItem.id} className="action-item-container">
-                              <label className="action-item-checkbox">
-                                <input
-                                  type="checkbox"
-                                  checked={actionItem.isCompleted || false}
-                                  onChange={(e) => toggleActionItemCompletion(interview.id, actionItem.id, e.target.checked)}
-                                />
-                                <span className="checkmark"></span>
-                                {editingActionItems ? (
-                                  <input
-                                    type="text"
-                                    value={actionItem.title}
-                                    onChange={(e) => updateActionItem(interview.id, actionItem.id, { title: e.target.value })}
-                                    className="action-item-input"
-                                    onBlur={() => {
-                                      if (!actionItem.title.trim()) {
-                                        removeCustomActionItem(interview.id, actionItem.id);
-                                      }
-                                    }}
-                                  />
-                                ) : (
-                                  <span>{actionItem.title}</span>
-                                )}
-                              </label>
-                              {editingActionItems && (
-                                <button
-                                  className="action-item-remove-btn"
-                                  onClick={() => removeCustomActionItem(interview.id, actionItem.id)}
-                                  title="Remove action item"
-                                >
-                                  <XMarkIcon className="btn-icon" />
-                                </button>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                        
-                        {editingActionItems && (
-                          <div className="add-action-item-section">
-                            <div className="add-item-input-group">
-                              <input
-                                type="text"
-                                value={newActionItem}
-                                onChange={(e) => setNewActionItem(e.target.value)}
-                                placeholder="Enter new action item..."
-                                className="add-item-input"
-                                onKeyPress={(e) => {
-                                  if (e.key === 'Enter') {
-                                    addCustomActionItem(interview.id);
-                                  }
-                                }}
-                              />
-                              <button
-                                className="btn-primary small"
-                                onClick={() => addCustomActionItem(interview.id)}
-                                disabled={!newActionItem.trim()}
-                              >
-                                <PlusIcon className="btn-icon" />
-                                Add
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Resources Section */}
-                      <div className="expanded-section">
-                        <div className="expanded-section-header">
-                          <h3 className="expanded-section-title">Resources</h3>
-                          <div className="section-actions">
-                            <button 
-                              className="btn-secondary small" 
-                              onClick={() => setEditingResources(!editingResources)}
-                            >
-                              {editingResources ? 'Done Editing' : 'Edit Resources'}
-                            </button>
-                          </div>
-                        </div>
-                        
-                        <div className="resources-grid">
-                          {(resources[interview.id] || []).map(resource => (
-                            <div key={resource.id} className="resource-item">
-                              <DocumentTextIcon className="resource-icon" />
-                              {editingResources ? (
-                                <div className="resource-edit-fields">
-                                  <input
-                                    type="text"
-                                    value={resource.title}
-                                    onChange={(e) => updateResource(interview.id, resource.id, { title: e.target.value })}
-                                    className="resource-name-input"
-                                    placeholder="Resource name"
-                                  />
-                                  <input
-                                    type="url"
-                                    value={resource.url}
-                                    onChange={(e) => updateResource(interview.id, resource.id, { url: e.target.value })}
-                                    className="resource-url-input"
-                                    placeholder="Resource URL"
-                                  />
-                                </div>
-                              ) : (
-                                <span className="resource-name">{resource.title}</span>
-                              )}
-                              <div className="resource-actions">
-                                {editingResources ? (
-                                  <button 
-                                    className="resource-btn remove"
-                                    onClick={() => removeCustomResource(interview.id, resource.id)}
-                                    title="Remove resource"
-                                  >
-                                    <TrashIcon className="resource-action-icon" />
-                                  </button>
-                                ) : (
-                                  <>
-                                    <button 
-                                      className="resource-btn"
-                                      onClick={() => handleDownloadResource(resource.title)}
-                                      title="Download"
-                                    >
-                                      <ArrowDownTrayIcon className="resource-action-icon" />
-                                    </button>
-                                    <button 
-                                      className="resource-btn"
-                                      onClick={() => window.open(resource.url, '_blank')}
-                                      title="Open"
-                                    >
-                                      <ArrowTopRightOnSquareIcon className="resource-action-icon" />
-                                    </button>
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                        
-                        {editingResources && (
-                          <div className="add-resource-section">
-                            <div className="add-resource-input-group">
-                              <input
-                                type="text"
-                                value={newResource.name}
-                                onChange={(e) => setNewResource({ ...newResource, name: e.target.value })}
-                                placeholder="Resource name..."
-                                className="add-resource-input"
-                              />
-                              <input
-                                type="url"
-                                value={newResource.url}
-                                onChange={(e) => setNewResource({ ...newResource, url: e.target.value })}
-                                placeholder="Resource URL..."
-                                className="add-resource-input"
-                              />
-                              <button
-                                className="btn-primary small"
-                                onClick={() => addCustomResource(interview.id)}
-                                disabled={!newResource.name.trim() || !newResource.url.trim()}
-                              >
-                                <PlusIcon className="btn-icon" />
-                                Add
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
 
                       {/* Groups Section */}
                       <div className="expanded-section">
