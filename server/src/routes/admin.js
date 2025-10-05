@@ -2090,6 +2090,7 @@ router.get('/applications', async (req, res) => {
         resumeUrl: app.resumeUrl,
         coverLetterUrl: app.coverLetterUrl,
         videoUrl: app.videoUrl,
+        headshotUrl: app.headshotUrl,
         hasResumeScore: resumeStatus.completed,
         hasCoverLetterScore: coverLetterStatus.completed,
         hasVideoScore: videoStatus.completed,
@@ -2482,6 +2483,7 @@ router.get('/staging/candidates', async (req, res) => {
         isFirstGeneration: app.isFirstGeneration,
         gender: app.gender,
         phoneNumber: app.phoneNumber,
+        headshotUrl: app.headshotUrl,
         attendance,
         reviewTeam,
         scores: {
@@ -2714,8 +2716,8 @@ router.post('/save-decision', async (req, res) => {
     
     console.log('Saving decision:', { candidateId, decision, phase });
     
-    if (!candidateId || !decision) {
-      return res.status(400).json({ error: 'Missing required fields: candidateId and decision' });
+    if (!candidateId) {
+      return res.status(400).json({ error: 'Missing required field: candidateId' });
     }
 
     // Find the application for this candidate in the active cycle
@@ -2783,6 +2785,17 @@ router.post('/save-decision', async (req, res) => {
         comments: {
           create: {
             content: `${phase === 'coffee' ? 'Coffee Chat' : 'Resume Review'} decision: Maybe - No (needs final decision)`,
+            userId: userId
+          }
+        }
+      };
+    } else if (decision === '' || decision === null || decision === undefined) {
+      // Handle empty decision - clear the approved field
+      updateData = {
+        approved: null,
+        comments: {
+          create: {
+            content: `${phase === 'coffee' ? 'Coffee Chat' : 'Resume Review'} decision: Cleared`,
             userId: userId
           }
         }

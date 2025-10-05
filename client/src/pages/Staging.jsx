@@ -75,6 +75,7 @@ import globalTheme from '../styles/globalTheme';
 import '../styles/Staging.css';
 import apiClient from '../utils/api';
 import AuthenticatedFileLink from '../components/AuthenticatedFileLink';
+import AuthenticatedImage from '../components/AuthenticatedImage';
 import DocumentPreviewModal from '../components/DocumentPreviewModal';
 import AccessControl from '../components/AccessControl';
 
@@ -502,6 +503,13 @@ export default function Staging() {
   const [interviewEvaluations, setInterviewEvaluations] = useState([]);
   const [evaluationsLoading, setEvaluationsLoading] = useState(false);
   
+  // Coffee chat interview filter
+  const [coffeeChatInterviewFilter, setCoffeeChatInterviewFilter] = useState('all');
+  const [coffeeChatInterviews, setCoffeeChatInterviews] = useState([]);
+  
+  // Coffee chat decision filter
+  const [coffeeChatDecisionFilter, setCoffeeChatDecisionFilter] = useState('all');
+  
   // Document scores for modal
   const [modalResumeScores, setModalResumeScores] = useState([]);
   const [modalCoverLetterScores, setModalCoverLetterScores] = useState([]);
@@ -598,7 +606,7 @@ export default function Staging() {
         setReviewTeams(reviewTeamsData || []); // Store review teams data
         
         // Calculate demographics after initial data load
-        calculateDemographics(candidatesData);
+        calculateDemographics(candidatesData, false);
         
         // Update pagination state based on total candidates count
         setPagination(prev => ({
@@ -663,12 +671,47 @@ export default function Staging() {
   // Fetch evaluation summaries when coffee chat tab is active
   useEffect(() => {
     if (currentTab === 1 && adminApplications.length > 0) {
-      const coffeeChatApps = adminApplications.filter(app => app.status === 'UNDER_REVIEW');
+      const coffeeChatApps = adminApplications.filter(app => String(app.currentRound) === '2');
       if (coffeeChatApps.length > 0) {
         fetchCoffeeChatEvaluations(coffeeChatApps);
       }
     }
   }, [currentTab, adminApplications]);
+
+  // Fetch coffee chat interviews when coffee chat tab is active
+  useEffect(() => {
+    if (currentTab === 1) {
+      fetchCoffeeChatInterviews();
+    }
+  }, [currentTab]);
+
+  // Recalculate demographics when tab changes
+  useEffect(() => {
+    if (currentTab === 0) {
+      // Resume Review tab - use all candidates
+      if (candidates && candidates.length > 0) {
+        calculateDemographics(candidates, false);
+      }
+    } else if (currentTab === 1) {
+      // Coffee Chat tab - use coffee chat applications
+      if (adminApplications && adminApplications.length > 0) {
+        const coffeeChatApps = adminApplications.filter(app => String(app.currentRound) === '2');
+        calculateDemographics(coffeeChatApps, true);
+      }
+    } else if (currentTab === 2) {
+      // First Round tab - use first round applications
+      if (adminApplications && adminApplications.length > 0) {
+        const firstRoundApps = adminApplications.filter(app => String(app.currentRound) === '3' && app.candidate);
+        calculateDemographics(firstRoundApps, true);
+      }
+    } else if (currentTab === 3) {
+      // Final Round tab - use final round applications
+      if (adminApplications && adminApplications.length > 0) {
+        const finalRoundApps = adminApplications.filter(app => String(app.currentRound) === '4' && app.candidate);
+        calculateDemographics(finalRoundApps, true);
+      }
+    }
+  }, [currentTab, candidates, adminApplications, inlineDecisions]);
 
   // Fetch evaluation summaries when first round tab is active
   useEffect(() => {
@@ -700,7 +743,7 @@ export default function Staging() {
       setReviewTeams(reviewTeamsData || []); // Update review teams data
       
       // Calculate demographics after data is loaded
-      calculateDemographics(candidatesData);
+      calculateDemographics(candidatesData, false);
       
       // Update pagination state based on total candidates count
       setPagination(prev => ({
@@ -769,11 +812,61 @@ export default function Staging() {
       'NO': 0
     };
     
-    const totalScore = evaluations.reduce((sum, evaluation) => {
-      return sum + (decisionScores[evaluation.decision] || 0);
+    // Filter out evaluations without decisions (null, undefined, or empty string)
+    const evaluationsWithDecisions = evaluations.filter(evaluation => 
+      evaluation.decision && 
+      evaluation.decision.trim() !== '' && 
+      decisionScores.hasOwnProperty(evaluation.decision)
+    );
+    
+    // If no evaluations have decisions, return 0
+    if (evaluationsWithDecisions.length === 0) return 0;
+    
+    const totalScore = evaluationsWithDecisions.reduce((sum, evaluation) => {
+      return sum + decisionScores[evaluation.decision];
     }, 0);
     
-    return totalScore / evaluations.length; // Average score
+    return totalScore / evaluationsWithDecisions.length; // Average score of only evaluations with decisions
+  };
+
+  // Function to fetch coffee chat interviews from server
+  const fetchCoffeeChatInterviews = async () => {
+    try {
+      const interviews = await apiClient.get('/admin/interviews');
+      const coffeeChatInterviews = interviews.filter(interview => 
+        interview.interviewType === 'COFFEE_CHAT'
+      );
+      setCoffeeChatInterviews(coffeeChatInterviews);
+    } catch (error) {
+      console.error('Error fetching coffee chat interviews:', error);
+      setCoffeeChatInterviews([]);
+    }
+  };
+
+  // Function to get applications assigned to a specific interview
+  const getApplicationsForInterview = (interviewId) => {
+    const interview = coffeeChatInterviews.find(i => i.id === interviewId);
+    if (!interview) return [];
+
+    // Parse interview configuration to get application groups
+    let config = {};
+    try {
+      config = typeof interview.description === 'string' 
+        ? JSON.parse(interview.description) 
+        : interview.description || {};
+    } catch (e) {
+      console.warn('Failed to parse interview description:', e);
+      return [];
+    }
+
+    // Get all application IDs from the interview's application groups
+    const applicationIds = new Set();
+    config.applicationGroups?.forEach(group => {
+      group.applicationIds?.forEach(appId => applicationIds.add(appId));
+    });
+
+    // Filter admin applications to only include those assigned to this interview
+    return adminApplications.filter(app => applicationIds.has(app.id));
   };
 
   // Function to fetch evaluation summaries for coffee chat applications
@@ -889,7 +982,7 @@ export default function Staging() {
     setFinalDecisionDialogOpen(true);
   };
 
-  const calculateDemographics = (candidatesData) => {
+  const calculateDemographics = (data, isApplicationData = false) => {
     // Initialize with specific categories
     const graduationYearBreakdown = {
       '2026': { total: 0, yes: 0, no: 0, maybe: 0, pending: 0 },
@@ -904,9 +997,28 @@ export default function Staging() {
       'Other': { total: 0, yes: 0, no: 0, maybe: 0, pending: 0 }
     };
     
-    candidatesData.forEach(candidate => {
+    data.forEach((item, index) => {
+      // For application data, we need to access the candidate info differently
+      const candidate = isApplicationData ? item.candidate : item;
+      
+      // Skip if candidate is undefined or null (only for candidate data, not application data)
+      if (!isApplicationData && !candidate) {
+        console.warn('Skipping item with undefined candidate:', item);
+        return;
+      }
+      
+      // For application data, use the application's own graduationYear and gender fields
+      // For candidate data, use the candidate's fields
+      let year, gender;
+      if (isApplicationData) {
+        year = item.year || item.graduationYear; // Application data has 'year' field
+        gender = item.gender;
+      } else {
+        year = candidate.graduationYear;
+        gender = candidate.gender;
+      }
+      
       // Graduation year breakdown - map to specific years
-      let year = candidate.graduationYear;
       if (!year || !['2026', '2027', '2028', '2029'].includes(year)) {
         year = '2026'; // Default to 2026 if not in our list
       }
@@ -914,7 +1026,15 @@ export default function Staging() {
       graduationYearBreakdown[year].total++;
       
       // Get decision for this candidate
-      const decision = inlineDecisions[candidate.id] || '';
+      let decision = '';
+      if (isApplicationData) {
+        // For applications, check both inline decisions and database decisions
+        decision = inlineDecisions[item.id] || (item.approved === true ? 'yes' : item.approved === false ? 'no' : '');
+      } else {
+        // For candidates, use inline decisions
+        decision = inlineDecisions[candidate.id] || '';
+      }
+      
       if (decision === 'yes') {
         graduationYearBreakdown[year].yes++;
       } else if (decision === 'no') {
@@ -926,7 +1046,6 @@ export default function Staging() {
       }
       
       // Gender breakdown - normalize to our categories
-      let gender = candidate.gender;
       if (!gender) {
         gender = 'Other';
       } else if (gender.toLowerCase() === 'male' || gender.toLowerCase() === 'm') {
@@ -1010,8 +1129,8 @@ export default function Staging() {
   const openPushAllCoffee = async () => {
     try {
       const adminCandidates = await stagingAPI.fetchAdminCandidates();
-      // Consider only applications in Coffee Chat round (UNDER_REVIEW for round 2)
-      const coffeeCandidates = adminCandidates.filter(c => c.status === 'UNDER_REVIEW');
+      // Consider only applications in Coffee Chat round (currentRound === '2')
+      const coffeeCandidates = adminCandidates.filter(c => String(c.currentRound) === '2');
 
       const invalidDecisions = coffeeCandidates.filter(c => {
         // Only count as valid if in phase 2 AND decision is yes/no
@@ -1991,22 +2110,81 @@ export default function Staging() {
                   Process All Decisions
                 </Button>
               </Stack>
+              
+              {/* Filters */}
+              <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+                <Typography variant="body2" fontWeight="medium">
+                  Filter by Interview:
+                </Typography>
+                <FormControl size="small" sx={{ minWidth: 200 }}>
+                  <Select
+                    value={coffeeChatInterviewFilter}
+                    onChange={(e) => setCoffeeChatInterviewFilter(e.target.value)}
+                    displayEmpty
+                  >
+                    <MenuItem value="all">All Interviews</MenuItem>
+                    {coffeeChatInterviews.map((interview) => (
+                      <MenuItem key={interview.id} value={interview.id}>
+                        {interview.title}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                
+                <Typography variant="body2" fontWeight="medium" sx={{ ml: 2 }}>
+                  Filter by Decision:
+                </Typography>
+                <FormControl size="small" sx={{ minWidth: 150 }}>
+                  <Select
+                    value={coffeeChatDecisionFilter}
+                    onChange={(e) => setCoffeeChatDecisionFilter(e.target.value)}
+                    displayEmpty
+                  >
+                    <MenuItem value="all">All Decisions</MenuItem>
+                    <MenuItem value="yes">Yes</MenuItem>
+                    <MenuItem value="maybe_yes">Maybe - Yes</MenuItem>
+                    <MenuItem value="maybe_no">Maybe - No</MenuItem>
+                    <MenuItem value="no">No</MenuItem>
+                    <MenuItem value="pending">Pending</MenuItem>
+                  </Select>
+                </FormControl>
+              </Box>
             </Box>
             <TableContainer>
               <Table sx={{ minWidth: 1000 }}>
                 <TableHead>
                   <TableRow>
                     <TableCell sx={{ width: '80px' }}>Rank</TableCell>
-                    <TableCell sx={{ width: '250px' }}>Application</TableCell>
+                    <TableCell sx={{ width: '320px' }}>Application</TableCell>
                     <TableCell sx={{ width: '300px' }}>Evaluation Summary</TableCell>
                     <TableCell sx={{ width: '200px', minWidth: '180px' }}>Decisions</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {(() => {
-                    // Filter for applications that are approved (true) - these should be in coffee chat round
-                    // TEMPORARY: Using status filter since approved field isn't working from backend
-                    const filteredApps = adminApplications.filter(app => app.status === 'UNDER_REVIEW');
+                    // Filter for applications in coffee chat round (currentRound === '2')
+                    let filteredApps = adminApplications.filter(app => String(app.currentRound) === '2');
+                    
+                    // Apply interview filter if not "all"
+                    if (coffeeChatInterviewFilter !== 'all') {
+                      const interviewApps = getApplicationsForInterview(coffeeChatInterviewFilter);
+                      filteredApps = filteredApps.filter(app => 
+                        interviewApps.some(interviewApp => interviewApp.id === app.id)
+                      );
+                    }
+                    
+                    // Apply decision filter if not "all"
+                    if (coffeeChatDecisionFilter !== 'all') {
+                      filteredApps = filteredApps.filter(app => {
+                        const decision = inlineDecisions[app.id] || (app.approved === true ? 'yes' : app.approved === false ? 'no' : '');
+                        
+                        if (coffeeChatDecisionFilter === 'pending') {
+                          return !decision || decision === '';
+                        } else {
+                          return decision === coffeeChatDecisionFilter;
+                        }
+                      });
+                    }
                     
                     // Sort applications by ranking score (highest first)
                     const sortedApps = filteredApps.sort((a, b) => {
@@ -2056,16 +2234,51 @@ export default function Staging() {
                             </Box>
                           </TableCell>
                           <TableCell>
-                            <Box>
-                              <Typography variant="subtitle2" fontWeight="bold">
-                                {application.name}
-                              </Typography>
-                              <Typography variant="body2" color="text.secondary">
-                                {application.email}
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                {application.major} • {application.year} • GPA: {application.gpa}
-                              </Typography>
+                            <Box display="flex" alignItems="center" gap={2}>
+                              {/* Headshot */}
+                              <Box sx={{ 
+                                width: 48, 
+                                height: 48, 
+                                borderRadius: '50%', 
+                                overflow: 'hidden',
+                                flexShrink: 0,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                backgroundColor: '#f5f5f5'
+                              }}>
+                                {application.headshotUrl ? (
+                                  <AuthenticatedImage
+                                    src={application.headshotUrl}
+                                    alt={application.name}
+                                    style={{
+                                      width: '100%',
+                                      height: '100%',
+                                      objectFit: 'cover'
+                                    }}
+                                  />
+                                ) : (
+                                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
+                                    <PersonIcon sx={{ color: '#666', fontSize: 24 }} />
+                                    <Typography variant="caption" sx={{ fontSize: '8px', color: '#999' }}>
+                                      No photo
+                                    </Typography>
+                                  </Box>
+                                )}
+                              </Box>
+                              
+                              {/* Application Details */}
+                              <Box>
+                                <Typography variant="subtitle2" fontWeight="bold">
+                                  {application.name}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                  {application.email}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  {application.major} • {application.year} • GPA: {application.gpa}
+                                </Typography>
+                              </Box>
                             </Box>
                           </TableCell>
                           <TableCell>
@@ -2162,14 +2375,6 @@ export default function Staging() {
                               
                               {/* Decision indicators for coffee chat round */}
                               {/* Removed info text for cleaner interface */}
-                              
-                              {displayDecision === 'no' && (
-                                <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                  <Alert severity="error" sx={{ py: 0, px: 1, fontSize: '0.7rem' }}>
-                                    ❌ Already rejected - will not advance further
-                                  </Alert>
-                                </Box>
-                              )}
                               
                               {/* Show intermediate decision indicators if they exist */}
                               {/* Note: For coffee chat round, we don't show previous round decisions */}
@@ -2622,7 +2827,39 @@ export default function Staging() {
         {/* Application Detail Modal */}
         <Dialog open={appModalOpen} onClose={() => setAppModalOpen(false)} maxWidth="md" fullWidth>
           <DialogTitle>
-            {appModal ? `${appModal.firstName} ${appModal.lastName}` : 'Application'}
+            <Box display="flex" alignItems="center" gap={2}>
+              {/* Headshot */}
+              <Box sx={{ 
+                width: 80, 
+                height: 80, 
+                borderRadius: '50%', 
+                overflow: 'hidden',
+                flexShrink: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: '#f5f5f5'
+              }}>
+                {appModal?.headshotUrl ? (
+                  <AuthenticatedImage
+                    src={appModal.headshotUrl}
+                    alt={appModal ? `${appModal.firstName} ${appModal.lastName}` : 'Application'}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover'
+                    }}
+                  />
+                ) : (
+                  <PersonIcon sx={{ color: '#666', fontSize: 40 }} />
+                )}
+              </Box>
+              
+              {/* Name */}
+              <Typography variant="h6">
+                {appModal ? `${appModal.firstName} ${appModal.lastName}` : 'Application'}
+              </Typography>
+            </Box>
           </DialogTitle>
           <DialogContent>
             {appModalLoading ? (
@@ -3016,7 +3253,7 @@ export default function Staging() {
                 {currentTab === 1 ? (
                   // Coffee Chats: count only phase 2 applications with yes/no decisions
                   (() => {
-                    const coffeeApps = (adminApplications || []).filter(app => app.status === 'UNDER_REVIEW');
+                    const coffeeApps = (adminApplications || []).filter(app => String(app.currentRound) === '2');
                     const toProcess = coffeeApps.filter(app => {
                       const localDecision = inlineDecisions[app.id];
                       const dbDecision = app.approved === true ? 'yes' : app.approved === false ? 'no' : '';
