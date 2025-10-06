@@ -1227,7 +1227,9 @@ export default function Staging() {
       // Show success message with results
       const { summary } = result;
       if (summary) {
-        const emailMessage = currentTab === 0 ? 'No emails sent (resume review round)' : `${summary.emailsSent} emails sent`;
+        const emailMessage = currentTab === 0 ? 'No emails sent (resume review round)' : 
+                           currentTab === 1 ? 'No emails sent (coffee chat round)' :
+                           `${summary.emailsSent} emails sent`;
         setSnackbar({ 
           open: true, 
           message: `Successfully processed ${summary.totalApplications} candidates: ${summary.accepted} accepted, ${summary.rejected} rejected. ${emailMessage}.`, 
@@ -1284,18 +1286,49 @@ export default function Staging() {
       return;
     }
     
+    // Filter by current round based on active tab
+    let roundFilteredData = dataSource;
+    let roundName = 'all rounds';
+    
+    if (currentTab === 0) {
+      // Resume Review tab - filter for currentRound === '1'
+      roundFilteredData = dataSource.filter(app => String(app.currentRound) === '1');
+      roundName = 'Resume Review';
+    } else if (currentTab === 1) {
+      // Coffee Chat tab - filter for currentRound === '2'
+      roundFilteredData = dataSource.filter(app => String(app.currentRound) === '2');
+      roundName = 'Coffee Chat';
+    } else if (currentTab === 2) {
+      // First Round tab - filter for currentRound === '3'
+      roundFilteredData = dataSource.filter(app => String(app.currentRound) === '3');
+      roundName = 'First Round';
+    } else if (currentTab === 3) {
+      // Final Round tab - filter for currentRound === '4'
+      roundFilteredData = dataSource.filter(app => String(app.currentRound) === '4');
+      roundName = 'Final Round';
+    }
+    
+    if (roundFilteredData.length === 0) {
+      setSnackbar({ 
+        open: true, 
+        message: `No candidates found in ${roundName} round`, 
+        severity: 'warning' 
+      });
+      return;
+    }
+    
     // Create a dialog to let user choose export options
     const exportDialog = window.confirm(
-      'Choose export option:\n\n' +
-      'OK = Export all candidates with decisions (Yes/No)\n' +
+      `Export ${roundName} Round Decisions:\n\n` +
+      'OK = Export candidates with decisions (Yes/No)\n' +
       'Cancel = Export all candidates regardless of decision status'
     );
     
-    let candidatesToExport = dataSource;
+    let candidatesToExport = roundFilteredData;
     
     if (exportDialog) {
       // Export only candidates with Yes/No decisions
-      candidatesToExport = dataSource.filter(app => 
+      candidatesToExport = roundFilteredData.filter(app => 
         app.approved === true || app.approved === false
       );
     }
@@ -1339,7 +1372,7 @@ export default function Staging() {
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
-    link.setAttribute('download', `candidate_decisions_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `${roundName.toLowerCase().replace(' ', '_')}_decisions_${new Date().toISOString().split('T')[0]}.csv`);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
@@ -1347,7 +1380,7 @@ export default function Staging() {
     
     setSnackbar({ 
       open: true, 
-      message: `Exported ${candidatesToExport.length} candidates to CSV`, 
+      message: `Exported ${candidatesToExport.length} ${roundName} candidates to CSV`, 
       severity: 'success' 
     });
   };
@@ -3156,7 +3189,9 @@ export default function Staging() {
             <Stack spacing={2} sx={{ mt: 1 }}>
               <Alert severity="info">
                 <Typography variant="subtitle2" gutterBottom>
-                  {currentTab === 0 ? '🔄 This will advance candidates to the next round (no emails sent)' : '📧 This will send emails and advance candidates to the next round'}
+                  {currentTab === 0 ? '🔄 This will advance candidates to the next round (no emails sent)' : 
+                   currentTab === 1 ? '🔄 This will advance candidates to the next round (no emails sent)' :
+                   '📧 This will send emails and advance candidates to the next round'}
                 </Typography>
                 <Typography variant="body2">
                   {currentTab === 0 ? (

@@ -3357,21 +3357,8 @@ router.post('/process-coffee-decisions', async (req, res) => {
       });
     }
 
-    let sendCoffeeChatAcceptanceEmail, sendCoffeeChatRejectionEmail;
-    try {
-      const emailModule = await import('../services/emailNotifications.js');
-      sendCoffeeChatAcceptanceEmail = emailModule.sendCoffeeChatAcceptanceEmail;
-      sendCoffeeChatRejectionEmail = emailModule.sendCoffeeChatRejectionEmail;
-      if (typeof sendCoffeeChatAcceptanceEmail !== 'function' || typeof sendCoffeeChatRejectionEmail !== 'function') {
-        throw new Error('Coffee chat email service functions not found');
-      }
-    } catch (importError) {
-      console.error('Failed to import coffee chat email services:', importError);
-      return res.status(500).json({ 
-        error: 'Failed to import coffee chat email services', 
-        details: importError.message 
-      });
-    }
+    // Disable email sending for coffee chat decisions
+    console.log('Email sending disabled for coffee chat decisions');
 
     const results = {
       accepted: [],
@@ -3406,38 +3393,15 @@ router.post('/process-coffee-decisions', async (req, res) => {
             }
           });
 
-          let emailResult;
-          try {
-            emailResult = await sendCoffeeChatAcceptanceEmail(
-              application.email,
-              `${application.firstName} ${application.lastName}`,
-              active.name
-            );
-          } catch (emailError) {
-            console.error(`Error sending coffee chat acceptance email to ${application.email}:`, emailError);
-            emailResult = { success: false, error: emailError.message };
-          }
-
-          if (emailResult.success) {
-            results.emailsSent++;
-            results.accepted.push({
-              applicationId: application.id,
-              candidateId: application.candidate.id,
-              candidateName: `${application.firstName} ${application.lastName}`,
-              email: application.email,
-              emailSent: true
-            });
-          } else {
-            results.emailsFailed++;
-            results.accepted.push({
-              applicationId: application.id,
-              candidateId: application.candidate.id,
-              candidateName: `${application.firstName} ${application.lastName}`,
-              email: application.email,
-              emailSent: false,
-              emailError: emailResult.error
-            });
-          }
+          // Email sending disabled for coffee chat decisions
+          results.accepted.push({
+            applicationId: application.id,
+            candidateId: application.candidate.id,
+            candidateName: `${application.firstName} ${application.lastName}`,
+            email: application.email,
+            emailSent: false,
+            note: 'Email sending disabled for coffee chat decisions'
+          });
         } else if (decision === 'no') {
           // Keep in Coffee Chat round but reset decision for reconsideration
           await prisma.application.update({
@@ -3471,15 +3435,15 @@ router.post('/process-coffee-decisions', async (req, res) => {
     }
 
     res.json({
-      message: 'Coffee chat decision processing completed',
+      message: 'Coffee chat decision processing completed (no emails sent)',
       results,
       summary: {
         totalApplications: applications.length,
         accepted: results.accepted.length,
         rejected: results.rejected.length,
         errors: results.errors.length,
-        emailsSent: results.emailsSent,
-        emailsFailed: results.emailsFailed
+        emailsSent: 0, // No emails sent for coffee chat decisions
+        emailsFailed: 0
       },
       note: 'Accepted candidates moved to First Round Interviews (round 3). "No" candidates remain in Coffee Chats (round 2) for reconsideration.'
     });
