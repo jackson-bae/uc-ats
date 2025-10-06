@@ -510,6 +510,13 @@ export default function Staging() {
   // Coffee chat decision filter
   const [coffeeChatDecisionFilter, setCoffeeChatDecisionFilter] = useState('all');
   
+  // First Round interview filter
+  const [firstRoundInterviewFilter, setFirstRoundInterviewFilter] = useState('all');
+  const [firstRoundInterviews, setFirstRoundInterviews] = useState([]);
+  
+  // First Round decision filter
+  const [firstRoundDecisionFilter, setFirstRoundDecisionFilter] = useState('all');
+  
   // Document scores for modal
   const [modalResumeScores, setModalResumeScores] = useState([]);
   const [modalCoverLetterScores, setModalCoverLetterScores] = useState([]);
@@ -685,6 +692,13 @@ export default function Staging() {
     }
   }, [currentTab]);
 
+  // Fetch first round interviews when first round tab is active
+  useEffect(() => {
+    if (currentTab === 2) {
+      fetchFirstRoundInterviews();
+    }
+  }, [currentTab]);
+
   // Recalculate demographics when tab changes
   useEffect(() => {
     if (currentTab === 0) {
@@ -829,6 +843,42 @@ export default function Staging() {
     return totalScore / evaluationsWithDecisions.length; // Average score of only evaluations with decisions
   };
 
+  // Function to calculate First Round ranking score based on behavioral and market sizing scores
+  const calculateFirstRoundRankingScore = (evaluations) => {
+    if (!evaluations || evaluations.length === 0) return 0;
+    
+    // Filter evaluations that have behavioral and market sizing scores
+    const evaluationsWithScores = evaluations.filter(evaluation => 
+      evaluation.behavioralTotal !== null && 
+      evaluation.behavioralTotal !== undefined &&
+      evaluation.marketSizingTotal !== null && 
+      evaluation.marketSizingTotal !== undefined
+    );
+    
+    // If no evaluations have scores, fall back to decision-based scoring
+    if (evaluationsWithScores.length === 0) {
+      return calculateRankingScore(evaluations);
+    }
+    
+    // Calculate average behavioral and market sizing scores
+    const totalBehavioral = evaluationsWithScores.reduce((sum, evaluation) => {
+      return sum + (evaluation.behavioralTotal || 0);
+    }, 0);
+    
+    const totalMarketSizing = evaluationsWithScores.reduce((sum, evaluation) => {
+      return sum + (evaluation.marketSizingTotal || 0);
+    }, 0);
+    
+    const avgBehavioral = totalBehavioral / evaluationsWithScores.length;
+    const avgMarketSizing = totalMarketSizing / evaluationsWithScores.length;
+    
+    // Combine behavioral and market sizing scores (each out of 15, so total out of 30)
+    // Convert to a 0-10 scale for consistency with other ranking systems
+    const combinedScore = ((avgBehavioral + avgMarketSizing) / 30) * 10;
+    
+    return combinedScore;
+  };
+
   // Function to fetch coffee chat interviews from server
   const fetchCoffeeChatInterviews = async () => {
     try {
@@ -843,9 +893,49 @@ export default function Staging() {
     }
   };
 
+  // Function to fetch first round interviews from server
+  const fetchFirstRoundInterviews = async () => {
+    try {
+      const interviews = await apiClient.get('/admin/interviews');
+      const firstRoundInterviews = interviews.filter(interview => 
+        interview.interviewType === 'ROUND_ONE'
+      );
+      setFirstRoundInterviews(firstRoundInterviews);
+    } catch (error) {
+      console.error('Error fetching first round interviews:', error);
+      setFirstRoundInterviews([]);
+    }
+  };
+
   // Function to get applications assigned to a specific interview
   const getApplicationsForInterview = (interviewId) => {
     const interview = coffeeChatInterviews.find(i => i.id === interviewId);
+    if (!interview) return [];
+
+    // Parse interview configuration to get application groups
+    let config = {};
+    try {
+      config = typeof interview.description === 'string' 
+        ? JSON.parse(interview.description) 
+        : interview.description || {};
+    } catch (e) {
+      console.warn('Failed to parse interview description:', e);
+      return [];
+    }
+
+    // Get all application IDs from the interview's application groups
+    const applicationIds = new Set();
+    config.applicationGroups?.forEach(group => {
+      group.applicationIds?.forEach(appId => applicationIds.add(appId));
+    });
+
+    // Filter admin applications to only include those assigned to this interview
+    return adminApplications.filter(app => applicationIds.has(app.id));
+  };
+
+  // Function to get applications assigned to a specific first round interview
+  const getApplicationsForFirstRoundInterview = (interviewId) => {
+    const interview = firstRoundInterviews.find(i => i.id === interviewId);
     if (!interview) return [];
 
     // Parse interview configuration to get application groups
@@ -2497,6 +2587,45 @@ export default function Staging() {
                 })()}
               </Button>
             </Box>
+            
+            {/* Filters */}
+            <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+              <Typography variant="body2" fontWeight="medium">
+                Filter by Interview:
+              </Typography>
+              <FormControl size="small" sx={{ minWidth: 200 }}>
+                <Select
+                  value={firstRoundInterviewFilter}
+                  onChange={(e) => setFirstRoundInterviewFilter(e.target.value)}
+                  displayEmpty
+                >
+                  <MenuItem value="all">All Interviews</MenuItem>
+                  {firstRoundInterviews.map((interview) => (
+                    <MenuItem key={interview.id} value={interview.id}>
+                      {interview.title}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              
+              <Typography variant="body2" fontWeight="medium" sx={{ ml: 2 }}>
+                Filter by Decision:
+              </Typography>
+              <FormControl size="small" sx={{ minWidth: 150 }}>
+                <Select
+                  value={firstRoundDecisionFilter}
+                  onChange={(e) => setFirstRoundDecisionFilter(e.target.value)}
+                  displayEmpty
+                >
+                  <MenuItem value="all">All Decisions</MenuItem>
+                  <MenuItem value="yes">Yes</MenuItem>
+                  <MenuItem value="maybe_yes">Maybe - Yes</MenuItem>
+                  <MenuItem value="maybe_no">Maybe - No</MenuItem>
+                  <MenuItem value="no">No</MenuItem>
+                  <MenuItem value="pending">Pending</MenuItem>
+                </Select>
+              </FormControl>
+            </Box>
             <TableContainer>
               <Table sx={{ minWidth: 1000 }}>
                 <TableHead>
@@ -2509,32 +2638,112 @@ export default function Staging() {
                 </TableHead>
                 <TableBody>
                   {(() => {
-                    const filteredApps = (adminApplications || []).filter(app => String(app.currentRound) === '3');
+                    // Filter for applications in first round (currentRound === '3')
+                    let filteredApps = (adminApplications || []).filter(app => String(app.currentRound) === '3');
+                    
+                    // Apply interview filter if not "all"
+                    if (firstRoundInterviewFilter !== 'all') {
+                      const interviewApps = getApplicationsForFirstRoundInterview(firstRoundInterviewFilter);
+                      filteredApps = filteredApps.filter(app => 
+                        interviewApps.some(interviewApp => interviewApp.id === app.id)
+                      );
+                    }
+                    
+                    // Apply decision filter if not "all"
+                    if (firstRoundDecisionFilter !== 'all') {
+                      filteredApps = filteredApps.filter(app => {
+                        const decision = inlineDecisions[app.id] || (app.approved === true ? 'yes' : app.approved === false ? 'no' : '');
+                        
+                        if (firstRoundDecisionFilter === 'pending') {
+                          return !decision || decision === '';
+                        } else {
+                          return decision === firstRoundDecisionFilter;
+                        }
+                      });
+                    }
+                    
+                    // Sort applications by ranking score (highest first)
                     const sortedApps = filteredApps.sort((a, b) => {
-                      const scoreA = calculateRankingScore(evaluationSummariesFirstRound[a.id]?.evaluations || []);
-                      const scoreB = calculateRankingScore(evaluationSummariesFirstRound[b.id]?.evaluations || []);
+                      const scoreA = calculateFirstRoundRankingScore(evaluationSummariesFirstRound[a.id]?.evaluations || []);
+                      const scoreB = calculateFirstRoundRankingScore(evaluationSummariesFirstRound[b.id]?.evaluations || []);
                       return scoreB - scoreA;
                     });
                     return sortedApps.map((application, index) => {
                       const displayDecision = inlineDecisions[application.id] || '';
                       const evaluations = evaluationSummariesFirstRound[application.id]?.evaluations || [];
                       return (
-                        <TableRow key={application.id} hover>
+                        <TableRow key={application.id} hover sx={{ cursor: 'pointer' }} onClick={async () => {
+                          try {
+                            setAppModalLoading(true);
+                            setEvaluationsLoading(true);
+                            
+                            // Load application data and interview evaluations in parallel
+                            const [appData, evaluationsData] = await Promise.all([
+                              apiClient.get(`/applications/${application.id}`),
+                              apiClient.get(`/admin/applications/${application.id}/interview-evaluations`)
+                            ]);
+                            
+                            setAppModal(appData);
+                            setInterviewEvaluations(evaluationsData);
+                            setAppModalOpen(true);
+                          } catch (e) {
+                            console.error('Failed to load application', e);
+                            setSnackbar({ open: true, message: 'Failed to load application', severity: 'error' });
+                          } finally {
+                            setAppModalLoading(false);
+                            setEvaluationsLoading(false);
+                          }
+                        }}>
                           <TableCell>
                             <Box display="flex" alignItems="center" gap={1}>
                               <Typography variant="h6" fontWeight="bold" color="primary">#{index + 1}</Typography>
                               <Typography variant="caption" color="text.secondary">
-                                Score: {calculateRankingScore(evaluations).toFixed(1)}
+                                Score: {calculateFirstRoundRankingScore(evaluations).toFixed(1)}
                               </Typography>
                             </Box>
                           </TableCell>
                           <TableCell>
-                            <Box>
-                              <Typography variant="subtitle2" fontWeight="bold">{application.name}</Typography>
-                              <Typography variant="body2" color="text.secondary">{application.email}</Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                {application.major} • {application.year} • GPA: {application.gpa}
-                              </Typography>
+                            <Box display="flex" alignItems="center" gap={2}>
+                              {/* Headshot */}
+                              <Box sx={{ 
+                                width: 48, 
+                                height: 48, 
+                                borderRadius: '50%', 
+                                overflow: 'hidden',
+                                flexShrink: 0,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                backgroundColor: '#f5f5f5'
+                              }}>
+                                {application.headshotUrl ? (
+                                  <AuthenticatedImage
+                                    src={application.headshotUrl}
+                                    alt={application.name}
+                                    style={{
+                                      width: '100%',
+                                      height: '100%',
+                                      objectFit: 'cover'
+                                    }}
+                                  />
+                                ) : (
+                                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
+                                    <PersonIcon sx={{ color: '#666', fontSize: 24 }} />
+                                    <Typography variant="caption" sx={{ fontSize: '8px', color: '#999' }}>
+                                      No photo
+                                    </Typography>
+                                  </Box>
+                                )}
+                              </Box>
+                              
+                              {/* Application Details */}
+                              <Box>
+                                <Typography variant="subtitle2" fontWeight="bold">{application.name}</Typography>
+                                <Typography variant="body2" color="text.secondary">{application.email}</Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  {application.major} • {application.year} • GPA: {application.gpa}
+                                </Typography>
+                              </Box>
                             </Box>
                           </TableCell>
                           <TableCell>
@@ -2546,15 +2755,40 @@ export default function Staging() {
                                   </Typography>
                                 );
                               }
+                              
+                              // Calculate behavioral and market sizing averages
+                              const evaluationsWithScores = evaluations.filter(e => 
+                                e.behavioralTotal !== null && e.behavioralTotal !== undefined &&
+                                e.marketSizingTotal !== null && e.marketSizingTotal !== undefined
+                              );
+                              
                               const counts = evaluations.reduce((acc, evaluation) => {
                                 acc[evaluation.decision] = (acc[evaluation.decision] || 0) + 1;
                                 return acc;
                               }, {});
+                              
                               return (
                                 <Box>
                                   <Typography variant="caption" display="block">
                                     Total: {evaluations.length} evaluation{evaluations.length !== 1 ? 's' : ''}
                                   </Typography>
+                                  
+                                  {/* Show behavioral and market sizing scores if available */}
+                                  {evaluationsWithScores.length > 0 && (
+                                    <>
+                                      <Typography variant="caption" display="block" color="primary.main" sx={{ fontWeight: 'bold', mt: 1 }}>
+                                        Avg Scores:
+                                      </Typography>
+                                      <Typography variant="caption" display="block" color="primary.main">
+                                        Behavioral: {(evaluationsWithScores.reduce((sum, e) => sum + (e.behavioralTotal || 0), 0) / evaluationsWithScores.length).toFixed(1)}/15
+                                      </Typography>
+                                      <Typography variant="caption" display="block" color="primary.main">
+                                        Market Sizing: {(evaluationsWithScores.reduce((sum, e) => sum + (e.marketSizingTotal || 0), 0) / evaluationsWithScores.length).toFixed(1)}/15
+                                      </Typography>
+                                    </>
+                                  )}
+                                  
+                                  {/* Show decision counts */}
                                   {counts.YES > 0 && (
                                     <Typography variant="caption" display="block" color="success.main">YES: {counts.YES}</Typography>
                                   )}
@@ -3137,8 +3371,100 @@ export default function Staging() {
                             )}
                           </Box>
                           
-                          {/* Notes */}
-                          {evaluation.notes && (
+                          {/* First Round Interview Scores */}
+                          {evaluation.interview.interviewType === 'ROUND_ONE' && (
+                            <Box mb={2}>
+                              <Typography variant="subtitle2" gutterBottom>Interview Scores:</Typography>
+                              <Grid container spacing={2}>
+                                <Grid item xs={6}>
+                                  <Box sx={{ backgroundColor: 'primary.50', p: 2, borderRadius: 1 }}>
+                                    <Typography variant="subtitle2" color="primary.main" gutterBottom>
+                                      Behavioral Assessment
+                                    </Typography>
+                                    <Typography variant="body2">
+                                      Leadership: {evaluation.behavioralLeadership || 'N/A'}/5
+                                    </Typography>
+                                    <Typography variant="body2">
+                                      Problem Solving: {evaluation.behavioralProblemSolving || 'N/A'}/5
+                                    </Typography>
+                                    <Typography variant="body2">
+                                      Interest: {evaluation.behavioralInterest || 'N/A'}/5
+                                    </Typography>
+                                    <Typography variant="subtitle2" sx={{ mt: 1, fontWeight: 'bold' }}>
+                                      Total: {evaluation.behavioralTotal || 0}/15
+                                    </Typography>
+                                  </Box>
+                                </Grid>
+                                <Grid item xs={6}>
+                                  <Box sx={{ backgroundColor: 'secondary.50', p: 2, borderRadius: 1 }}>
+                                    <Typography variant="subtitle2" color="secondary.main" gutterBottom>
+                                      Market Sizing Assessment
+                                    </Typography>
+                                    <Typography variant="body2">
+                                      Teamwork: {evaluation.marketSizingTeamwork || 'N/A'}/5
+                                    </Typography>
+                                    <Typography variant="body2">
+                                      Logic: {evaluation.marketSizingLogic || 'N/A'}/5
+                                    </Typography>
+                                    <Typography variant="body2">
+                                      Creativity: {evaluation.marketSizingCreativity || 'N/A'}/5
+                                    </Typography>
+                                    <Typography variant="subtitle2" sx={{ mt: 1, fontWeight: 'bold' }}>
+                                      Total: {evaluation.marketSizingTotal || 0}/15
+                                    </Typography>
+                                  </Box>
+                                </Grid>
+                              </Grid>
+                            </Box>
+                          )}
+
+                          {/* First Round Interview Notes */}
+                          {evaluation.interview.interviewType === 'ROUND_ONE' && (
+                            <>
+                              {evaluation.behavioralNotes && (
+                                <Box mb={2}>
+                                  <Typography variant="subtitle2" gutterBottom>Behavioral Notes:</Typography>
+                                  <Typography variant="body2" sx={{ 
+                                    backgroundColor: 'primary.50', 
+                                    p: 1, 
+                                    borderRadius: 1,
+                                    whiteSpace: 'pre-wrap'
+                                  }}>
+                                    {evaluation.behavioralNotes}
+                                  </Typography>
+                                </Box>
+                              )}
+                              {evaluation.marketSizingNotes && (
+                                <Box mb={2}>
+                                  <Typography variant="subtitle2" gutterBottom>Market Sizing Notes:</Typography>
+                                  <Typography variant="body2" sx={{ 
+                                    backgroundColor: 'secondary.50', 
+                                    p: 1, 
+                                    borderRadius: 1,
+                                    whiteSpace: 'pre-wrap'
+                                  }}>
+                                    {evaluation.marketSizingNotes}
+                                  </Typography>
+                                </Box>
+                              )}
+                              {evaluation.additionalNotes && (
+                                <Box mb={2}>
+                                  <Typography variant="subtitle2" gutterBottom>Additional Notes:</Typography>
+                                  <Typography variant="body2" sx={{ 
+                                    backgroundColor: 'grey.50', 
+                                    p: 1, 
+                                    borderRadius: 1,
+                                    whiteSpace: 'pre-wrap'
+                                  }}>
+                                    {evaluation.additionalNotes}
+                                  </Typography>
+                                </Box>
+                              )}
+                            </>
+                          )}
+
+                          {/* Regular Interview Notes */}
+                          {evaluation.interview.interviewType !== 'ROUND_ONE' && evaluation.notes && (
                             <Box mb={2}>
                               <Typography variant="subtitle2" gutterBottom>Notes:</Typography>
                               <Typography variant="body2" sx={{ 

@@ -3240,7 +3240,8 @@ router.get('/applications/:id/interview-evaluations', async (req, res) => {
   try {
     const { id: applicationId } = req.params;
     
-    const evaluations = await prisma.interviewEvaluation.findMany({
+    // Get regular interview evaluations
+    const regularEvaluations = await prisma.interviewEvaluation.findMany({
       where: { applicationId },
       include: {
         interview: {
@@ -3265,8 +3266,35 @@ router.get('/applications/:id/interview-evaluations', async (req, res) => {
       },
       orderBy: { createdAt: 'desc' }
     });
+
+    // Get first round interview evaluations
+    const firstRoundEvaluations = await prisma.firstRoundInterviewEvaluation.findMany({
+      where: { applicationId },
+      include: {
+        interview: {
+          select: {
+            id: true,
+            title: true,
+            interviewType: true,
+            startDate: true,
+            endDate: true
+          }
+        },
+        evaluator: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    // Combine both types of evaluations
+    const allEvaluations = [...regularEvaluations, ...firstRoundEvaluations];
     
-    res.json(evaluations);
+    res.json(allEvaluations);
   } catch (error) {
     console.error('[GET /api/admin/applications/:id/interview-evaluations]', error);
     res.status(500).json({ error: 'Failed to fetch interview evaluations', details: error.message });
@@ -3284,8 +3312,8 @@ router.post('/applications/evaluation-summaries', async (req, res) => {
     
     const summaries = {};
     
-    // Fetch evaluations for all applications
-    const evaluations = await prisma.interviewEvaluation.findMany({
+    // Fetch regular evaluations for all applications
+    const regularEvaluations = await prisma.interviewEvaluation.findMany({
       where: { 
         applicationId: { in: applicationIds }
       },
@@ -3302,9 +3330,33 @@ router.post('/applications/evaluation-summaries', async (req, res) => {
       },
       orderBy: { createdAt: 'desc' }
     });
+
+    // Fetch first round evaluations for all applications
+    const firstRoundEvaluations = await prisma.firstRoundInterviewEvaluation.findMany({
+      where: { 
+        applicationId: { in: applicationIds }
+      },
+      select: {
+        id: true,
+        applicationId: true,
+        decision: true,
+        behavioralTotal: true,
+        marketSizingTotal: true,
+        createdAt: true,
+        interview: {
+          select: {
+            interviewType: true
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+    
+    // Combine both types of evaluations
+    const allEvaluations = [...regularEvaluations, ...firstRoundEvaluations];
     
     // Group evaluations by application ID
-    evaluations.forEach(evaluation => {
+    allEvaluations.forEach(evaluation => {
       if (!summaries[evaluation.applicationId]) {
         summaries[evaluation.applicationId] = {
           evaluations: []
