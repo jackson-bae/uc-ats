@@ -32,6 +32,8 @@ class ImageCache {
 
   static async fetchImage(src, token) {
     try {
+      console.log('ImageCache: Fetching image from:', src);
+      console.log('ImageCache: Using token:', token ? 'Present' : 'Missing');
       
       const response = await fetch(src, {
         headers: {
@@ -39,11 +41,16 @@ class ImageCache {
         }
       });
 
+      console.log('ImageCache: Response status:', response.status, response.statusText);
+
       if (!response.ok) {
-        throw new Error(`Failed to load image: ${response.status} ${response.statusText}`);
+        const errorText = await response.text();
+        console.error('ImageCache: Error response:', errorText);
+        throw new Error(`Failed to load image: ${response.status} ${response.statusText} - ${errorText}`);
       }
 
       const blob = await response.blob();
+      console.log('ImageCache: Blob created:', blob.size, 'bytes');
       const blobUrl = URL.createObjectURL(blob);
       
       // Store blob URL for cleanup

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import apiClient from '../utils/api';
+import { useAuth } from '../context/AuthContext';
 
 const overlayStyle = {
   position: 'fixed',
@@ -37,6 +38,9 @@ const contentStyle = {
 export default function DocumentPreviewModal({ src, kind, title, onClose }) {
   const [blobUrl, setBlobUrl] = useState(null);
   const [error, setError] = useState(null);
+  const { token } = useAuth();
+  
+  console.log('DocumentPreviewModal props:', { src, kind, title, onClose });
 
   useEffect(() => {
     const onKey = (e) => {
@@ -50,19 +54,25 @@ export default function DocumentPreviewModal({ src, kind, title, onClose }) {
     let localUrl;
     const load = async () => {
       try {
+        console.log('Loading document from:', src);
+        console.log('Using token:', token ? 'Present' : 'Missing');
         const resp = await fetch(src, {
           headers: {
-            Authorization: `Bearer ${apiClient.token}`,
+            Authorization: `Bearer ${token}`,
           },
         });
+        console.log('Fetch response:', resp.status, resp.statusText);
         if (!resp.ok) {
           const txt = await resp.text();
+          console.error('Fetch error:', txt);
           throw new Error(`${resp.status} ${resp.statusText} - ${txt}`);
         }
         const blob = await resp.blob();
+        console.log('Blob created:', blob.size, 'bytes');
         localUrl = URL.createObjectURL(blob);
         setBlobUrl(localUrl);
       } catch (e) {
+        console.error('Document load error:', e);
         setError(e.message || 'Failed to load document');
       }
     };
@@ -70,7 +80,7 @@ export default function DocumentPreviewModal({ src, kind, title, onClose }) {
     return () => {
       if (localUrl) URL.revokeObjectURL(localUrl);
     };
-  }, [src]);
+  }, [src, token]);
 
   return (
     <div style={overlayStyle} onClick={onClose}>

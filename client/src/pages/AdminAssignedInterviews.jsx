@@ -18,7 +18,176 @@ import {
 } from '@heroicons/react/24/outline';
 import apiClient from '../utils/api';
 import AccessControl from '../components/AccessControl';
+import DocumentPreviewModal from '../components/DocumentPreviewModal';
+import AuthenticatedImage from '../components/AuthenticatedImage';
 import '../styles/AdminAssignedInterviews.css';
+
+// Application Group Card Component for Admin
+const AdminApplicationGroupCard = ({ group, interviewId }) => {
+  const [applications, setApplications] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+
+  const loadApplications = async () => {
+    if (applications.length > 0) return; // Already loaded
+    
+    setLoading(true);
+    try {
+      const apps = await apiClient.get(`/admin/interviews/${interviewId}/applications?groupIds=${group.id}`);
+      setApplications(apps);
+    } catch (error) {
+      console.error('Failed to load applications for group:', error);
+      setApplications([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleToggleExpanded = () => {
+    if (!expanded) {
+      loadApplications();
+    }
+    setExpanded(!expanded);
+  };
+
+  return (
+    <div className="application-group-card">
+      <div className="group-card-header" onClick={handleToggleExpanded}>
+        <div className="group-info">
+          <UserGroupIcon className="group-icon" />
+          <div className="group-details">
+            <h4 className="group-name">{group.name}</h4>
+            <p className="group-meta">
+              {group.applicationIds?.length || 0} candidates
+            </p>
+          </div>
+        </div>
+        <div className="group-actions">
+          <span className="expand-indicator">
+            {expanded ? '−' : '+'}
+          </span>
+        </div>
+      </div>
+      
+      {expanded && (
+        <div className="group-applications">
+          {loading ? (
+            <div className="loading-applications">
+              <div className="loading-spinner"></div>
+              <p>Loading candidates...</p>
+            </div>
+          ) : applications.length === 0 ? (
+            <div className="no-applications">
+              <p>No candidates found in this group</p>
+            </div>
+          ) : (
+            <div className="applications-grid">
+              {applications.map((application) => (
+                <AdminCandidateCard key={application.id} application={application} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Candidate Card Component for Admin
+const AdminCandidateCard = ({ application }) => {
+  const [preview, setPreview] = useState({ open: false, src: '', kind: '', title: '' });
+
+  return (
+    <>
+      <div className="candidate-card">
+        <div className="candidate-header">
+          <div className="candidate-avatar">
+            {application.headshotUrl ? (
+              <AuthenticatedImage
+                src={application.headshotUrl}
+                alt={application.name}
+                style={{
+                  width: '60px',
+                  height: '60px',
+                  borderRadius: '50%',
+                  objectFit: 'cover'
+                }}
+              />
+            ) : (
+              <div className="avatar-fallback">
+                {(application.name || '?').split(' ').map(n => n.charAt(0)).join('').slice(0,2).toUpperCase()}
+              </div>
+            )}
+          </div>
+          <div className="candidate-info">
+            <h4 className="candidate-name">{application.name}</h4>
+            <p className="candidate-meta">
+              {application.major} • Class of {application.year}
+            </p>
+          </div>
+        </div>
+        
+        <div className="candidate-documents">
+          <h5>Documents</h5>
+          <div className="document-links">
+            {application.resumeUrl && (
+              <button 
+                className="document-btn"
+                onClick={() => setPreview({ 
+                  open: true, 
+                  src: application.resumeUrl, 
+                  kind: 'pdf', 
+                  title: `${application.name} – Resume` 
+                })}
+              >
+                <DocumentDuplicateIcon className="btn-icon" />
+                Resume
+              </button>
+            )}
+            {application.coverLetterUrl && (
+              <button 
+                className="document-btn"
+                onClick={() => setPreview({ 
+                  open: true, 
+                  src: application.coverLetterUrl, 
+                  kind: 'pdf', 
+                  title: `${application.name} – Cover Letter` 
+                })}
+              >
+                <DocumentDuplicateIcon className="btn-icon" />
+                Cover Letter
+              </button>
+            )}
+            {application.videoUrl && (
+              <button 
+                className="document-btn"
+                onClick={() => setPreview({ 
+                  open: true, 
+                  src: application.videoUrl, 
+                  kind: 'video', 
+                  title: `${application.name} – Video` 
+                })}
+              >
+                <EyeIcon className="btn-icon" />
+                Video
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Document Preview Modal */}
+      {preview.open && (
+        <DocumentPreviewModal
+          onClose={() => setPreview({ open: false, src: '', kind: '', title: '' })}
+          src={preview.src}
+          kind={preview.kind}
+          title={preview.title}
+        />
+      )}
+    </>
+  );
+};
 
 export default function AdminAssignedInterviews() {
   const navigate = useNavigate();
@@ -40,6 +209,7 @@ export default function AdminAssignedInterviews() {
   const [expandedInterviewId, setExpandedInterviewId] = useState(null);
   const [interviewData, setInterviewData] = useState({});
   const [coffeeChatApplications, setCoffeeChatApplications] = useState([]);
+  const [preview, setPreview] = useState({ open: false, src: '', kind: '', title: '' });
 
   const [isEditMode, setIsEditMode] = useState(false);
   const [editedInterview, setEditedInterview] = useState(null);
@@ -923,6 +1093,43 @@ export default function AdminAssignedInterviews() {
                             </div>
                           </div>
                         </div>
+                      </div>
+
+                      {/* Assigned Application Groups Section */}
+                      <div className="expanded-section">
+                        <div className="expanded-section-header">
+                          <h3 className="expanded-section-title">Assigned Application Groups</h3>
+                        </div>
+                        {(() => {
+                          const currentInterviewData = interviewData[interview.id];
+                          const allApplicationGroups = currentInterviewData?.applicationGroups || [];
+                          
+                          // For admin, show only groups that have been assigned to member groups
+                          const assignedApplicationGroups = allApplicationGroups.filter(group => {
+                            const groupAssignments = currentInterviewData?.groupAssignments || {};
+                            // Check if this application group is assigned to any member group
+                            return Object.values(groupAssignments).some(assignedGroupIds => 
+                              assignedGroupIds.includes(group.id)
+                            );
+                          });
+                          
+                          return assignedApplicationGroups.length === 0 ? (
+                            <div className="no-groups">
+                              <UserGroupIcon className="no-groups-icon" />
+                              <p>No application groups assigned to this interview</p>
+                            </div>
+                          ) : (
+                            <div className="application-groups-list">
+                              {assignedApplicationGroups.map((group) => (
+                                <AdminApplicationGroupCard 
+                                  key={group.id} 
+                                  group={group} 
+                                  interviewId={interview.id}
+                                />
+                              ))}
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
                   )}

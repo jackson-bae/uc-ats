@@ -5,10 +5,15 @@ import {
   CheckIcon,
   UserIcon,
   DocumentTextIcon,
-  ChevronDownIcon
+  ChevronDownIcon,
+  ChevronRightIcon,
+  ChevronLeftIcon,
+  EyeIcon
 } from '@heroicons/react/24/outline';
 import apiClient from '../utils/api';
 import AccessControl from '../components/AccessControl';
+import DocumentPreviewModal from '../components/DocumentPreviewModal';
+import AuthenticatedImage from '../components/AuthenticatedImage';
 import '../styles/FirstRoundInterviewInterface.css';
 
 export default function FirstRoundInterviewInterface() {
@@ -25,6 +30,8 @@ export default function FirstRoundInterviewInterface() {
   const [saving, setSaving] = useState(false);
   const [autoSaveTimeouts, setAutoSaveTimeouts] = useState({});
   const [saveStatus, setSaveStatus] = useState({});
+  const [currentPage, setCurrentPage] = useState(0); // 0 = behavioral, 1 = market sizing
+  const [preview, setPreview] = useState({ open: false, src: '', kind: '', title: '' });
 
   const decisionOptions = [
     { value: 'YES', label: 'Yes', color: 'green' },
@@ -34,6 +41,20 @@ export default function FirstRoundInterviewInterface() {
   ];
 
   const scoreOptions = [1, 2, 3, 4, 5];
+
+  const pageTitles = [
+    { title: 'Behavioral Assessment', subtitle: 'Leadership, Problem Solving & Interest' },
+    { title: 'Market Sizing Assessment', subtitle: 'Teamwork, Logic & Creativity' },
+    { title: 'Final Decision', subtitle: 'Overall Assessment & Decision' }
+  ];
+
+  const handlePageChange = async (newPage) => {
+    if (newPage >= 0 && newPage < pageTitles.length) {
+      // Auto-save current evaluations before changing pages
+      await saveAllEvaluations();
+      setCurrentPage(newPage);
+    }
+  };
 
   useEffect(() => {
     const loadData = async () => {
@@ -87,6 +108,8 @@ export default function FirstRoundInterviewInterface() {
             ? await apiClient.get(`/admin/interviews/${interviewId}/applications?groupIds=${groupIds.join(',')}`)
             : await apiClient.get(`/member/interviews/${interviewId}/applications?groupIds=${groupIds.join(',')}`);
           console.log('Applications loaded:', applicationsRes);
+          console.log('First application structure:', applicationsRes[0]);
+          console.log('Application fields:', applicationsRes[0] ? Object.keys(applicationsRes[0]) : 'No applications');
           setApplications(applicationsRes);
         } catch (appError) {
           console.error('Failed to load applications:', appError);
@@ -308,12 +331,27 @@ export default function FirstRoundInterviewInterface() {
       });
       
       await Promise.all(promises);
-      alert('All evaluations saved successfully');
+      return true; // Return success status instead of showing alert
     } catch (error) {
       console.error('Failed to save evaluations:', error);
       alert('Failed to save evaluations');
+      return false;
     } finally {
       setSaving(false);
+    }
+  };
+
+  const finishInterview = async () => {
+    try {
+      // Save all evaluations first
+      const saved = await saveAllEvaluations();
+      if (saved) {
+        alert('Interview completed successfully! All evaluations have been saved.');
+        navigate('/assigned-interviews');
+      }
+    } catch (error) {
+      console.error('Failed to finish interview:', error);
+      alert('Failed to complete interview');
     }
   };
 
@@ -349,312 +387,432 @@ export default function FirstRoundInterviewInterface() {
   return (
     <AccessControl allowedRoles={['ADMIN', 'MEMBER']}>
       <div className="first-round-interview-container">
-      {/* Header */}
-      <div className="interview-header">
-        <button 
-          className="back-button"
-          onClick={() => navigate('/assigned-interviews')}
-        >
-          <ArrowLeftIcon className="back-icon" />
-          Back to Assigned Interviews
-        </button>
-        
-        <div className="interview-info">
-          <h1>{interview.title}</h1>
-          <p className="interview-subtitle">
-            First Round Interview • {applications.length} candidates
-          </p>
-        </div>
-        
-        <div className="header-actions">
+        {/* Back Button - Outside Header */}
+        <div className="back-button-container">
           <button 
-            className="btn-primary"
-            onClick={saveAllEvaluations}
-            disabled={saving}
+            className="back-button"
+            onClick={() => navigate('/assigned-interviews')}
           >
-            <CheckIcon className="btn-icon" />
-            {saving ? 'Saving...' : 'Save All'}
+            <ArrowLeftIcon className="back-icon" />
+            Back to Assigned Interviews
           </button>
         </div>
-      </div>
 
-      {/* Applications List */}
-      <div className="applications-container">
-        {applications.length === 0 ? (
-          <div className="no-applications">
-            <UserIcon className="empty-icon" />
-            <h3>No candidates assigned</h3>
-            <p>No candidates have been assigned to the selected groups for this interview.</p>
+        {/* Header */}
+        <div className="interview-header">
+          
+          <div className="interview-info">
+            <h1>{interview.title}</h1>
+            <p className="interview-subtitle">
+              First Round Interview • {applications.length} candidates
+            </p>
+            <div className="page-info">
+              <h2 className="current-page-title">{pageTitles[currentPage].title}</h2>
+              <p className="current-page-subtitle">{pageTitles[currentPage].subtitle}</p>
+            </div>
           </div>
-        ) : (
-          <div className="applications-grid">
-            {applications.map((application) => {
-              const evaluation = getEvaluation(application.id);
-              
-              return (
-                <div key={application.id} className="application-card">
-                  <div className="application-header">
-                    <div className="candidate-info">
-                      <h3>{application.name}</h3>
-                      <p className="candidate-details">
-                        {application.major} • Class of {application.year}
-                      </p>
+          
+          <div className="header-actions">
+            {currentPage === pageTitles.length - 1 ? (
+              <button 
+                className="btn-finish"
+                onClick={finishInterview}
+                disabled={saving}
+              >
+                <CheckIcon className="btn-icon" />
+                {saving ? 'Saving...' : 'Finish Interview'}
+              </button>
+            ) : null}
+          </div>
+        </div>
+
+        {/* Section Navigation */}
+        <div className="section-navigation">
+          <div className="pagination-controls">
+            <button 
+              className="page-nav-btn prev-btn"
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={currentPage === 0}
+            >
+              <ChevronLeftIcon className="nav-arrow" />
+              <span>Previous Section</span>
+            </button>
+            <div className="page-indicator">
+              <span className="page-label">Section</span>
+              <span className="page-number">{currentPage + 1}</span>
+              <span className="page-separator">of</span>
+              <span className="total-pages">{pageTitles.length}</span>
+            </div>
+            <button 
+              className="page-nav-btn next-btn"
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={currentPage === pageTitles.length - 1}
+            >
+              <span>Next Section</span>
+              <ChevronRightIcon className="nav-arrow" />
+            </button>
+          </div>
+        </div>
+
+        {/* Applications List */}
+        <div className="applications-container">
+          {applications.length === 0 ? (
+            <div className="no-applications">
+              <UserIcon className="empty-icon" />
+              <h3>No candidates assigned</h3>
+              <p>No candidates have been assigned to the selected groups for this interview.</p>
+            </div>
+          ) : (
+            <div className="applications-grid">
+              {applications.map((application) => {
+                const evaluation = getEvaluation(application.id);
+                console.log('Rendering application:', application.name, {
+                  headshotUrl: application.headshotUrl,
+                  resumeUrl: application.resumeUrl,
+                  coverLetterUrl: application.coverLetterUrl,
+                  videoUrl: application.videoUrl
+                });
+                
+                return (
+                  <div key={application.id} className="application-card">
+                    {/* Candidate Header */}
+                    <div className="candidate-header">
+                      <div className="candidate-info">
+                        <div className="candidate-avatar">
+                          {application.headshotUrl ? (
+                            <AuthenticatedImage
+                              src={application.headshotUrl}
+                              alt={application.name}
+                              style={{
+                                width: '100%',
+                                height: '100%',
+                                borderRadius: '50%',
+                                objectFit: 'cover'
+                              }}
+                            />
+                          ) : (
+                            console.log('No headshot URL for:', application.name)
+                          )}
+                          <UserIcon 
+                            className="avatar-icon" 
+                            style={{ display: application.headshotUrl ? 'none' : 'flex' }}
+                          />
+                        </div>
+                        <div className="candidate-details">
+                          <h3>{application.name}</h3>
+                          <p className="candidate-meta">
+                            {application.major} • Class of {application.year}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="candidate-actions">
+                        <div className="documents-section">
+                          <h4>Documents</h4>
+                          {console.log('Documents section rendering for:', application.name)}
+                          <div className="document-links">
+                            {console.log('Document URLs check:', {
+                              resume: application.resumeUrl,
+                              coverLetter: application.coverLetterUrl,
+                              video: application.videoUrl
+                            })}
+                            
+                            {/* Resume Button */}
+                            <button 
+                              className="document-btn"
+                              style={{ 
+                                color: '#2563eb',
+                                backgroundColor: 'white',
+                                border: '2px solid #2563eb'
+                              }}
+                              onClick={() => {
+                                console.log('Opening resume:', application.resumeUrl);
+                                if (application.resumeUrl) {
+                                  setPreview({ 
+                                    open: true, 
+                                    src: application.resumeUrl, 
+                                    kind: 'pdf', 
+                                    title: `${application.name} – Resume` 
+                                  });
+                                } else {
+                                  alert('No resume available');
+                                }
+                              }}
+                            >
+                              <DocumentTextIcon className="btn-icon" style={{ color: '#2563eb' }} />
+                              Resume
+                            </button>
+                            
+                            {/* Cover Letter Button */}
+                            <button 
+                              className="document-btn"
+                              style={{ 
+                                color: '#2563eb',
+                                backgroundColor: 'white',
+                                border: '2px solid #2563eb'
+                              }}
+                              onClick={() => {
+                                console.log('Opening cover letter:', application.coverLetterUrl);
+                                if (application.coverLetterUrl) {
+                                  setPreview({ 
+                                    open: true, 
+                                    src: application.coverLetterUrl, 
+                                    kind: 'pdf', 
+                                    title: `${application.name} – Cover Letter` 
+                                  });
+                                } else {
+                                  alert('No cover letter available');
+                                }
+                              }}
+                            >
+                              <DocumentTextIcon className="btn-icon" style={{ color: '#2563eb' }} />
+                              Cover Letter
+                            </button>
+                            
+                            {/* Video Button */}
+                            <button 
+                              className="document-btn"
+                              style={{ 
+                                color: '#2563eb',
+                                backgroundColor: 'white',
+                                border: '2px solid #2563eb'
+                              }}
+                              onClick={() => {
+                                console.log('Opening video:', application.videoUrl);
+                                if (application.videoUrl) {
+                                  setPreview({ 
+                                    open: true, 
+                                    src: application.videoUrl, 
+                                    kind: 'video', 
+                                    title: `${application.name} – Video` 
+                                  });
+                                } else {
+                                  alert('No video available');
+                                }
+                              }}
+                            >
+                              <EyeIcon className="btn-icon" style={{ color: '#2563eb' }} />
+                              Video
+                            </button>
+                          </div>
+                        </div>
+                        {saveStatus[application.id] && saveStatus[application.id].type === 'error' && (
+                          <div className={`save-status ${saveStatus[application.id].type}`}>
+                            {saveStatus[application.id].message}
+                          </div>
+                        )}
+                        <button 
+                          className="save-btn"
+                          onClick={() => saveEvaluation(application.id)}
+                          disabled={saving}
+                        >
+                          <CheckIcon className="btn-icon" />
+                          Save
+                        </button>
+                      </div>
                     </div>
-                    <div className="save-section">
-                      {saveStatus[application.id] && saveStatus[application.id].type === 'error' && (
-                        <div className={`save-status ${saveStatus[application.id].type}`}>
-                          {saveStatus[application.id].message}
+
+                    {/* Evaluation Content */}
+                    <div className="evaluation-content">
+                      {/* Behavioral Page */}
+                      {currentPage === 0 && (
+                        <div className="assessment-page">
+                          <div className="rubric-section">
+                            <div className="rubric-header">
+                              <h4>Behavioral Assessment</h4>
+                              <div className="rubric-total">
+                                Total: <span className="total-score">{evaluation.behavioralTotal || 0}</span>
+                              </div>
+                            </div>
+                            <div className="score-grid">
+                              <div className="score-item">
+                                <label>Leadership</label>
+                                <select 
+                                  value={evaluation.behavioralLeadership || ''}
+                                  onChange={(e) => updateBehavioralScore(application.id, 'behavioralLeadership', parseInt(e.target.value) || null)}
+                                  className="score-select"
+                                >
+                                  <option value="">-</option>
+                                  {scoreOptions.map(score => (
+                                    <option key={score} value={score}>{score}</option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div className="score-item">
+                                <label>Problem Solving</label>
+                                <select 
+                                  value={evaluation.behavioralProblemSolving || ''}
+                                  onChange={(e) => updateBehavioralScore(application.id, 'behavioralProblemSolving', parseInt(e.target.value) || null)}
+                                  className="score-select"
+                                >
+                                  <option value="">-</option>
+                                  {scoreOptions.map(score => (
+                                    <option key={score} value={score}>{score}</option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div className="score-item">
+                                <label>Interest</label>
+                                <select 
+                                  value={evaluation.behavioralInterest || ''}
+                                  onChange={(e) => updateBehavioralScore(application.id, 'behavioralInterest', parseInt(e.target.value) || null)}
+                                  className="score-select"
+                                >
+                                  <option value="">-</option>
+                                  {scoreOptions.map(score => (
+                                    <option key={score} value={score}>{score}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div className="notes-section">
+                            <div className="notes-card">
+                              <h4>Behavioral Notes</h4>
+                              <textarea
+                                className="notes-textarea"
+                                placeholder="Add behavioral notes here..."
+                                value={evaluation.behavioralNotes || ''}
+                                onChange={(e) => updateEvaluation(application.id, { behavioralNotes: e.target.value })}
+                                rows={6}
+                              />
+                            </div>
+                          </div>
                         </div>
                       )}
-                      <button 
-                        className="save-btn"
-                        onClick={() => saveEvaluation(application.id)}
-                        disabled={saving}
-                      >
-                        <CheckIcon className="btn-icon" />
-                        Save
-                      </button>
+
+                      {/* Market Sizing Page */}
+                      {currentPage === 1 && (
+                        <div className="assessment-page">
+                          <div className="rubric-section">
+                            <div className="rubric-header">
+                              <h4>Market Sizing Assessment</h4>
+                              <div className="rubric-total">
+                                Total: <span className="total-score">{evaluation.marketSizingTotal || 0}</span>
+                              </div>
+                            </div>
+                            <div className="score-grid">
+                              <div className="score-item">
+                                <label>Teamwork</label>
+                                <select 
+                                  value={evaluation.marketSizingTeamwork || ''}
+                                  onChange={(e) => updateMarketSizingScore(application.id, 'marketSizingTeamwork', parseInt(e.target.value) || null)}
+                                  className="score-select"
+                                >
+                                  <option value="">-</option>
+                                  {scoreOptions.map(score => (
+                                    <option key={score} value={score}>{score}</option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div className="score-item">
+                                <label>Logic</label>
+                                <select 
+                                  value={evaluation.marketSizingLogic || ''}
+                                  onChange={(e) => updateMarketSizingScore(application.id, 'marketSizingLogic', parseInt(e.target.value) || null)}
+                                  className="score-select"
+                                >
+                                  <option value="">-</option>
+                                  {scoreOptions.map(score => (
+                                    <option key={score} value={score}>{score}</option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div className="score-item">
+                                <label>Creativity</label>
+                                <select 
+                                  value={evaluation.marketSizingCreativity || ''}
+                                  onChange={(e) => updateMarketSizingScore(application.id, 'marketSizingCreativity', parseInt(e.target.value) || null)}
+                                  className="score-select"
+                                >
+                                  <option value="">-</option>
+                                  {scoreOptions.map(score => (
+                                    <option key={score} value={score}>{score}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div className="notes-section">
+                            <div className="notes-card">
+                              <h4>Market Sizing Notes</h4>
+                              <textarea
+                                className="notes-textarea"
+                                placeholder="Add market sizing notes here..."
+                                value={evaluation.marketSizingNotes || ''}
+                                onChange={(e) => updateEvaluation(application.id, { marketSizingNotes: e.target.value })}
+                                rows={6}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Final Decision Page */}
+                      {currentPage === 2 && (
+                        <div className="assessment-page">
+                          <div className="decision-section">
+                            <div className="decision-container">
+                              <h4>Final Decision</h4>
+                              <p className="decision-description">
+                                Based on your assessment of the candidate's behavioral and market sizing performance, make your final decision.
+                              </p>
+                              <div className="decision-buttons">
+                                {decisionOptions.map((option) => (
+                                  <button
+                                    key={option.value}
+                                    className={`decision-btn ${option.color} ${
+                                      evaluation.decision === option.value ? 'selected' : ''
+                                    }`}
+                                    onClick={() => updateEvaluation(application.id, { decision: option.value })}
+                                  >
+                                    {option.label}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                            
+                            <div className="summary-section">
+                              <h4>Assessment Summary</h4>
+                              <div className="summary-grid">
+                                <div className="summary-item">
+                                  <span className="summary-label">Behavioral Total:</span>
+                                  <span className="summary-value">{evaluation.behavioralTotal || 0}/15</span>
+                                </div>
+                                <div className="summary-item">
+                                  <span className="summary-label">Market Sizing Total:</span>
+                                  <span className="summary-value">{evaluation.marketSizingTotal || 0}/15</span>
+                                </div>
+                                <div className="summary-item">
+                                  <span className="summary-label">Combined Score:</span>
+                                  <span className="summary-value total-combined">
+                                    {(evaluation.behavioralTotal || 0) + (evaluation.marketSizingTotal || 0)}/30
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
-
-                  {/* Evaluation Form */}
-                  <div className="evaluation-form">
-                    {/* Behavioral Rubric */}
-                    <div className="rubric-section">
-                      <h4 className="rubric-title">Behavioral Rubric</h4>
-                      <div className="rubric-table">
-                        <div className="rubric-header">
-                          <div className="applicant-name-col">Applicant Name</div>
-                          <div className="behavioral-col">
-                            <div className="merged-header">Behavioral</div>
-                            <div className="sub-headers">
-                              <div>Leadership (1-5)</div>
-                              <div>Problem Solving (1-5)</div>
-                              <div>Interest (1-5)</div>
-                            </div>
-                          </div>
-                          <div className="results-col">
-                            <div className="merged-header">Results</div>
-                            <div className="sub-headers">
-                              <div>Total (1-15)</div>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="rubric-row">
-                          <div className="applicant-name-cell">
-                            <input 
-                              type="text" 
-                              value={application.name}
-                              readOnly
-                              className="applicant-name-input"
-                            />
-                          </div>
-                          <div className="behavioral-scores">
-                            <select 
-                              value={evaluation.behavioralLeadership || ''}
-                              onChange={(e) => updateBehavioralScore(application.id, 'behavioralLeadership', parseInt(e.target.value) || null)}
-                              className="score-select"
-                            >
-                              <option value="">-</option>
-                              {scoreOptions.map(score => (
-                                <option key={score} value={score}>{score}</option>
-                              ))}
-                            </select>
-                            <select 
-                              value={evaluation.behavioralProblemSolving || ''}
-                              onChange={(e) => updateBehavioralScore(application.id, 'behavioralProblemSolving', parseInt(e.target.value) || null)}
-                              className="score-select"
-                            >
-                              <option value="">-</option>
-                              {scoreOptions.map(score => (
-                                <option key={score} value={score}>{score}</option>
-                              ))}
-                            </select>
-                            <select 
-                              value={evaluation.behavioralInterest || ''}
-                              onChange={(e) => updateBehavioralScore(application.id, 'behavioralInterest', parseInt(e.target.value) || null)}
-                              className="score-select"
-                            >
-                              <option value="">-</option>
-                              {scoreOptions.map(score => (
-                                <option key={score} value={score}>{score}</option>
-                              ))}
-                            </select>
-                          </div>
-                          <div className="results-cell">
-                            <input 
-                              type="text" 
-                              value={evaluation.behavioralTotal || ''}
-                              readOnly
-                              className="total-input"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Market Sizing Rubric */}
-                    <div className="rubric-section">
-                      <h4 className="rubric-title">Market Sizing Rubric</h4>
-                      <div className="rubric-table">
-                        <div className="rubric-header">
-                          <div className="applicant-name-col">Applicant Name</div>
-                          <div className="market-sizing-col">
-                            <div className="merged-header">Market Sizing</div>
-                            <div className="sub-headers">
-                              <div>Teamwork (1-5)</div>
-                              <div>Logic (1-5)</div>
-                              <div>Creativity (1-5)</div>
-                            </div>
-                          </div>
-                          <div className="results-col">
-                            <div className="merged-header">Results</div>
-                            <div className="sub-headers">
-                              <div>Total (1-15)</div>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="rubric-row">
-                          <div className="applicant-name-cell">
-                            <input 
-                              type="text" 
-                              value={application.name}
-                              readOnly
-                              className="applicant-name-input"
-                            />
-                          </div>
-                          <div className="market-sizing-scores">
-                            <select 
-                              value={evaluation.marketSizingTeamwork || ''}
-                              onChange={(e) => updateMarketSizingScore(application.id, 'marketSizingTeamwork', parseInt(e.target.value) || null)}
-                              className="score-select"
-                            >
-                              <option value="">-</option>
-                              {scoreOptions.map(score => (
-                                <option key={score} value={score}>{score}</option>
-                              ))}
-                            </select>
-                            <select 
-                              value={evaluation.marketSizingLogic || ''}
-                              onChange={(e) => updateMarketSizingScore(application.id, 'marketSizingLogic', parseInt(e.target.value) || null)}
-                              className="score-select"
-                            >
-                              <option value="">-</option>
-                              {scoreOptions.map(score => (
-                                <option key={score} value={score}>{score}</option>
-                              ))}
-                            </select>
-                            <select 
-                              value={evaluation.marketSizingCreativity || ''}
-                              onChange={(e) => updateMarketSizingScore(application.id, 'marketSizingCreativity', parseInt(e.target.value) || null)}
-                              className="score-select"
-                            >
-                              <option value="">-</option>
-                              {scoreOptions.map(score => (
-                                <option key={score} value={score}>{score}</option>
-                              ))}
-                            </select>
-                          </div>
-                          <div className="results-cell">
-                            <input 
-                              type="text" 
-                              value={evaluation.marketSizingTotal || ''}
-                              readOnly
-                              className="total-input"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Notes Sections */}
-                    <div className="notes-sections">
-                      <div className="notes-section">
-                        <h4 className="notes-title">Behavioral Notes</h4>
-                        <div className="notes-grid">
-                          <textarea
-                            className="notes-textarea"
-                            placeholder="Add behavioral notes here..."
-                            value={evaluation.behavioralNotes || ''}
-                            onChange={(e) => updateEvaluation(application.id, { behavioralNotes: e.target.value })}
-                            rows={3}
-                          />
-                          <textarea
-                            className="notes-textarea"
-                            placeholder="Add behavioral notes here..."
-                            value={evaluation.behavioralNotes || ''}
-                            onChange={(e) => updateEvaluation(application.id, { behavioralNotes: e.target.value })}
-                            rows={3}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="notes-section">
-                        <h4 className="notes-title">Market Sizing Notes</h4>
-                        <div className="notes-grid">
-                          <textarea
-                            className="notes-textarea"
-                            placeholder="Add market sizing notes here..."
-                            value={evaluation.marketSizingNotes || ''}
-                            onChange={(e) => updateEvaluation(application.id, { marketSizingNotes: e.target.value })}
-                            rows={3}
-                          />
-                          <textarea
-                            className="notes-textarea"
-                            placeholder="Add market sizing notes here..."
-                            value={evaluation.marketSizingNotes || ''}
-                            onChange={(e) => updateEvaluation(application.id, { marketSizingNotes: e.target.value })}
-                            rows={3}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="notes-section">
-                        <h4 className="notes-title">Additional Notes / Decisions</h4>
-                        <div className="notes-grid">
-                          <textarea
-                            className="notes-textarea"
-                            placeholder="Add additional notes or decisions here..."
-                            value={evaluation.additionalNotes || ''}
-                            onChange={(e) => updateEvaluation(application.id, { additionalNotes: e.target.value })}
-                            rows={3}
-                          />
-                          <textarea
-                            className="notes-textarea"
-                            placeholder="Add additional notes or decisions here..."
-                            value={evaluation.additionalNotes || ''}
-                            onChange={(e) => updateEvaluation(application.id, { additionalNotes: e.target.value })}
-                            rows={3}
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Decision Section */}
-                    <div className="decision-section">
-                      <h4 className="section-title">Initial Decision</h4>
-                      <div className="decision-buttons">
-                        {decisionOptions.map((option) => (
-                          <button
-                            key={option.value}
-                            className={`decision-btn ${option.color} ${
-                              evaluation.decision === option.value ? 'selected' : ''
-                            }`}
-                            onClick={() => updateEvaluation(application.id, { decision: option.value })}
-                          >
-                            {option.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+
+      {/* Document Preview Modal */}
+      {preview.open && (
+        <DocumentPreviewModal
+          onClose={() => setPreview({ open: false, src: '', kind: '', title: '' })}
+          src={preview.src}
+          kind={preview.kind}
+          title={preview.title}
+        />
+      )}
     </AccessControl>
   );
 }
