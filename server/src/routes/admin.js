@@ -3384,7 +3384,7 @@ router.post('/process-coffee-decisions', async (req, res) => {
 
     console.log('Active cycle:', active.name);
 
-    // Get applications in Coffee Chat round (currentRound = '2') with clear decisions only
+    // Get applications in Coffee Chat round (currentRound = '2')
     const allApplications = await prisma.application.findMany({
       where: {
         cycleId: active.id,
@@ -3397,6 +3397,12 @@ router.post('/process-coffee-decisions', async (req, res) => {
 
     // Filter to only applications with clear Yes/No decisions (approved field is true or false)
     const applications = allApplications.filter(app => app.approved === true || app.approved === false);
+    
+    // Also mark any remaining applications in round 2 as rejected (they should have been processed)
+    const remainingApplications = allApplications.filter(app => app.approved === null || (app.approved !== true && app.approved !== false));
+    
+    console.log('Applications with clear decisions:', applications.length);
+    console.log('Remaining applications to mark as rejected:', remainingApplications.length);
 
     console.log('Total coffee chat applications:', allApplications.length);
     console.log('Coffee chat applications with clear decisions:', applications.length);
@@ -3455,24 +3461,24 @@ router.post('/process-coffee-decisions', async (req, res) => {
             note: 'Email sending disabled for coffee chat decisions'
           });
         } else if (decision === 'no') {
-          // Keep in Coffee Chat round but reset decision for reconsideration
+          // Mark as rejected and remove from active process
           await prisma.application.update({
             where: { id: application.id },
             data: {
-              status: 'UNDER_REVIEW',
-              currentRound: '2',
-              approved: null // reset for reconsideration
+              status: 'REJECTED',
+              currentRound: '2', // Keep the round they were rejected from for tracking
+              approved: false // Mark as rejected
             }
           });
 
-          // Don't send rejection email - they remain in the process for reconsideration
+          // Don't send rejection email - they are marked as rejected
           results.rejected.push({
             applicationId: application.id,
             candidateId: application.candidate.id,
             candidateName: `${application.firstName} ${application.lastName}`,
             email: application.email,
             emailSent: false,
-            note: 'Remains in Coffee Chat for reconsideration'
+            note: 'Rejected from Coffee Chat round'
           });
         }
       } catch (error) {
@@ -3497,7 +3503,7 @@ router.post('/process-coffee-decisions', async (req, res) => {
         emailsSent: 0, // No emails sent for coffee chat decisions
         emailsFailed: 0
       },
-      note: 'Accepted candidates moved to First Round Interviews (round 3). "No" candidates remain in Coffee Chats (round 2) for reconsideration.'
+      note: 'Accepted candidates moved to First Round Interviews (round 3). "No" candidates marked as rejected.'
     });
   } catch (error) {
     console.error('[POST /api/admin/process-coffee-decisions]', error);
@@ -3509,6 +3515,10 @@ router.post('/process-coffee-decisions', async (req, res) => {
 router.post('/process-first-round-decisions', async (req, res) => {
   try {
     console.log('Starting first round decision processing...');
+    
+    // Check if emails should be sent (default to true for backward compatibility)
+    const sendEmails = req.body.sendEmails !== false;
+    console.log('Send emails:', sendEmails);
 
     const active = await prisma.recruitingCycle.findFirst({ where: { isActive: true } });
     if (!active) {
@@ -3591,26 +3601,34 @@ router.post('/process-first-round-decisions', async (req, res) => {
             }
           });
 
-          let emailResult;
-          try {
-            emailResult = await sendFirstRoundAcceptanceEmail(
-              application.email,
-              `${application.firstName} ${application.lastName}`,
-              active.name
-            );
-          } catch (emailError) {
-            console.error(`Error sending first round acceptance email to ${application.email}:`, emailError);
-            emailResult = { success: false, error: emailError.message };
+          let emailResult = { success: true }; // Default to success if emails disabled
+          
+          if (sendEmails) {
+            try {
+              emailResult = await sendFirstRoundAcceptanceEmail(
+                application.email,
+                `${application.firstName} ${application.lastName}`,
+                active.name
+              );
+            } catch (emailError) {
+              console.error(`Error sending first round acceptance email to ${application.email}:`, emailError);
+              emailResult = { success: false, error: emailError.message };
+            }
+          } else {
+            console.log(`Skipping email for ${application.email} (emails disabled)`);
           }
 
           if (emailResult.success) {
-            results.emailsSent++;
+            if (sendEmails) {
+              results.emailsSent++;
+            }
             results.accepted.push({
               applicationId: application.id,
               candidateId: application.candidate.id,
               candidateName: `${application.firstName} ${application.lastName}`,
               email: application.email,
-              emailSent: true
+              emailSent: sendEmails && emailResult.success,
+              emailSkipped: !sendEmails
             });
           } else {
             results.emailsFailed++;
@@ -3625,24 +3643,24 @@ router.post('/process-first-round-decisions', async (req, res) => {
           }
 
         } else {
-          // Keep in First Round but reset decision for reconsideration
+          // Mark as rejected and remove from the process
           await prisma.application.update({
             where: { id: application.id },
             data: {
-              status: 'UNDER_REVIEW',
+              status: 'REJECTED',
               currentRound: '3',
-              approved: null // reset for reconsideration
+              approved: false // keep the No decision
             }
           });
 
-          // Don't send rejection email - they remain in the process for reconsideration
+          // Don't send rejection email - they are marked as rejected
           results.rejected.push({
             applicationId: application.id,
             candidateId: application.candidate.id,
             candidateName: `${application.firstName} ${application.lastName}`,
             email: application.email,
             emailSent: false,
-            note: 'Remains in First Round for reconsideration'
+            note: 'Marked as rejected'
           });
         }
 
@@ -3669,7 +3687,7 @@ router.post('/process-first-round-decisions', async (req, res) => {
         emailsSent: results.emailsSent,
         emailsFailed: results.emailsFailed
       },
-      note: 'Accepted candidates moved to Final Round (round 4) and remain visible in First Round with "Yes" decision. "No" candidates remain in First Round (round 3) for reconsideration.'
+      note: 'Accepted candidates moved to Final Round (round 4) and remain visible in First Round with "Yes" decision. "No" candidates marked as rejected.'
     });
   } catch (error) {
     console.error('[POST /api/admin/process-first-round-decisions]', error);

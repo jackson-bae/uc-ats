@@ -156,7 +156,7 @@ const stagingAPI = {
   },
 
   async processFirstRoundDecisions() {
-    return await apiClient.post('/admin/process-first-round-decisions', {});
+    return await apiClient.post('/admin/process-first-round-decisions', { sendEmails: false });
   },
 
   async processFinalDecisions() {
@@ -715,7 +715,7 @@ export default function Staging() {
     } else if (currentTab === 2) {
       // First Round tab - use first round applications
       if (adminApplications && adminApplications.length > 0) {
-        const firstRoundApps = adminApplications.filter(app => String(app.currentRound) === '3' && app.candidate);
+        const firstRoundApps = adminApplications.filter(app => String(app.currentRound) === '3');
         calculateDemographics(firstRoundApps, true);
       }
     } else if (currentTab === 3) {
@@ -1319,6 +1319,7 @@ export default function Staging() {
       if (summary) {
         const emailMessage = currentTab === 0 ? 'No emails sent (resume review round)' : 
                            currentTab === 1 ? 'No emails sent (coffee chat round)' :
+                           currentTab === 2 ? 'No emails sent (first round)' :
                            `${summary.emailsSent} emails sent`;
         setSnackbar({ 
           open: true, 
@@ -3517,6 +3518,7 @@ export default function Staging() {
                 <Typography variant="subtitle2" gutterBottom>
                   {currentTab === 0 ? '🔄 This will advance candidates to the next round (no emails sent)' : 
                    currentTab === 1 ? '🔄 This will advance candidates to the next round (no emails sent)' :
+                   currentTab === 2 ? '🔄 This will advance candidates to the next round (no emails sent)' :
                    '📧 This will send emails and advance candidates to the next round'}
                 </Typography>
                 <Typography variant="body2">
@@ -3616,6 +3618,30 @@ export default function Staging() {
                   (() => {
                     const coffeeApps = (adminApplications || []).filter(app => String(app.currentRound) === '2');
                     const toProcess = coffeeApps.filter(app => {
+                      const localDecision = inlineDecisions[app.id];
+                      const dbDecision = app.approved === true ? 'yes' : app.approved === false ? 'no' : '';
+                      const decision = localDecision || dbDecision;
+                      return decision === 'yes' || decision === 'no';
+                    });
+                    return (<span>Applications to process: <strong>{toProcess.length}</strong></span>);
+                  })()
+                ) : currentTab === 2 ? (
+                  // First Round: count only phase 3 applications with yes/no decisions
+                  (() => {
+                    const firstRoundApps = (adminApplications || []).filter(app => String(app.currentRound) === '3');
+                    const toProcess = firstRoundApps.filter(app => {
+                      const localDecision = inlineDecisions[app.id];
+                      const dbDecision = app.approved === true ? 'yes' : app.approved === false ? 'no' : '';
+                      const decision = localDecision || dbDecision;
+                      return decision === 'yes' || decision === 'no';
+                    });
+                    return (<span>Applications to process: <strong>{toProcess.length}</strong></span>);
+                  })()
+                ) : currentTab === 3 ? (
+                  // Final Round: count only phase 4 applications with yes/no decisions
+                  (() => {
+                    const finalRoundApps = (adminApplications || []).filter(app => String(app.currentRound) === '4');
+                    const toProcess = finalRoundApps.filter(app => {
                       const localDecision = inlineDecisions[app.id];
                       const dbDecision = app.approved === true ? 'yes' : app.approved === false ? 'no' : '';
                       const decision = localDecision || dbDecision;
