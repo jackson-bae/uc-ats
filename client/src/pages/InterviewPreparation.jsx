@@ -391,7 +391,7 @@ export default function InterviewPreparation() {
   }
 
   return (
-    <AccessControl allowedRoles={['USER']}>
+    <AccessControl allowedRoles={['USER', 'ADMIN', 'MEMBER']}>
       <div className="interview-prep-container">
       <div className="interview-prep-header">
         <div className="header-content">
