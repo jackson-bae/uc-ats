@@ -574,6 +574,71 @@ router.get('/interviews/:id', requireAuth, async (req, res) => {
   }
 });
 
+// Get interview configuration (member version)
+router.get('/interviews/:id/config', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const interview = await prisma.interview.findUnique({
+      where: { id }
+    });
+
+    if (!interview) {
+      return res.status(404).json({ error: 'Interview not found' });
+    }
+    
+    // Parse the configuration from description field
+    let config = {};
+    if (interview.description) {
+      try {
+        config = typeof interview.description === 'string' 
+          ? JSON.parse(interview.description) 
+          : interview.description;
+      } catch (e) {
+        console.warn('Failed to parse interview description:', e);
+        config = {};
+      }
+    }
+    
+    res.json(config);
+  } catch (error) {
+    console.error('[GET /api/member/interviews/:id/config]', error);
+    res.status(500).json({ error: 'Failed to fetch interview configuration' });
+  }
+});
+
+// Update interview configuration (member version)
+router.patch('/interviews/:id/config', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { type, config } = req.body;
+    
+    const interview = await prisma.interview.findUnique({
+      where: { id }
+    });
+
+    if (!interview) {
+      return res.status(404).json({ error: 'Interview not found' });
+    }
+    
+    // Update interview with configuration
+    const updatedInterview = await prisma.interview.update({
+      where: { id },
+      data: {
+        description: JSON.stringify(config) // Store config as JSON in description field
+      },
+      include: {
+        cycle: true
+      }
+    });
+    
+    res.json(updatedInterview);
+  } catch (error) {
+    console.error('[PATCH /api/member/interviews/:id/config]', error);
+    res.status(500).json({ error: 'Failed to update interview configuration' });
+  }
+});
+
 // Member: create a meeting slot
 router.post('/meeting-slots', requireAuth, async (req, res) => {
   try {

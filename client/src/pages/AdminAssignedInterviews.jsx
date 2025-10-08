@@ -202,7 +202,7 @@ export default function AdminAssignedInterviews() {
     startDate: '',
     endDate: '',
     location: '',
-    dresscode: '',
+    dresscode: ''
   });
   const [interviews, setInterviews] = useState([]);
   const [selectedInterviewId, setSelectedInterviewId] = useState(null);
@@ -217,6 +217,8 @@ export default function AdminAssignedInterviews() {
   const [selectedInterviewForStart, setSelectedInterviewForStart] = useState(null);
   const [groupSearchTerm, setGroupSearchTerm] = useState('');
   const [selectedGroups, setSelectedGroups] = useState([]);
+  const [behavioralQuestionsConfig, setBehavioralQuestionsConfig] = useState([]);
+  const [showBehavioralQuestionsConfig, setShowBehavioralQuestionsConfig] = useState(false);
 
   // Fetch initial data
   useEffect(() => {
@@ -279,11 +281,34 @@ export default function AdminAssignedInterviews() {
   }, []);
 
 
-  const handleStartInterview = (interviewId) => {
+  const handleStartInterview = async (interviewId) => {
     setSelectedInterviewForStart(interviewId);
     setGroupSelectionOpen(true);
     setGroupSearchTerm('');
     setSelectedGroups([]);
+    setShowBehavioralQuestionsConfig(false);
+    
+    // Load existing behavioral questions for this interview
+    try {
+      const configRes = await apiClient.get(`/admin/interviews/${interviewId}/config`);
+      const existingQuestions = configRes.behavioralQuestions || [];
+      setBehavioralQuestionsConfig(existingQuestions);
+    } catch (error) {
+      console.warn('Failed to load existing behavioral questions:', error);
+      setBehavioralQuestionsConfig([]);
+    }
+  };
+
+  const addBehavioralQuestion = () => {
+    setBehavioralQuestionsConfig(prev => [...prev, '']);
+  };
+
+  const updateBehavioralQuestion = (index, value) => {
+    setBehavioralQuestionsConfig(prev => prev.map((q, i) => i === index ? value : q));
+  };
+
+  const removeBehavioralQuestion = (index) => {
+    setBehavioralQuestionsConfig(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleGroupToggle = (groupId) => {
@@ -303,17 +328,34 @@ export default function AdminAssignedInterviews() {
   const handleStartWithSelectedGroups = () => {
     if (selectedGroups.length === 0) return;
     
-    const groupIdsParam = selectedGroups.join(',');
     const interview = interviews.find(i => i.id === selectedInterviewForStart);
+    
+    // Check if this is a final round interview that needs behavioral questions configuration
+    if ((interview?.interviewType === 'ROUND_TWO' || interview?.interviewType === 'FINAL_ROUND') && !showBehavioralQuestionsConfig) {
+      setShowBehavioralQuestionsConfig(true);
+      return;
+    }
+    
+    const groupIdsParam = selectedGroups.join(',');
     
     console.log('Admin - Interview found:', interview);
     console.log('Admin - Interview type:', interview?.interviewType);
     console.log('Admin - Is ROUND_ONE?', interview?.interviewType === 'ROUND_ONE');
     
+    // Save behavioral questions configuration if provided
+    if (showBehavioralQuestionsConfig && behavioralQuestionsConfig.length > 0) {
+      saveBehavioralQuestionsConfiguration();
+    }
+    
     // Route to appropriate interface based on interview type
     if (interview?.interviewType === 'ROUND_ONE') {
       console.log('Admin - Routing to first round interview interface');
       const url = `/member/first-round-interview?interviewId=${selectedInterviewForStart}&groupIds=${groupIdsParam}`;
+      console.log('Admin - Navigating to:', url);
+      navigate(url);
+    } else if (interview?.interviewType === 'ROUND_TWO' || interview?.interviewType === 'FINAL_ROUND') {
+      console.log('Admin - Routing to final round interview interface');
+      const url = `/admin/final-round-interview?interviewId=${selectedInterviewForStart}&groupIds=${groupIdsParam}`;
       console.log('Admin - Navigating to:', url);
       navigate(url);
     } else {
@@ -326,6 +368,44 @@ export default function AdminAssignedInterviews() {
     setGroupSelectionOpen(false);
     setSelectedInterviewForStart(null);
     setSelectedGroups([]);
+    setBehavioralQuestionsConfig([]);
+    setShowBehavioralQuestionsConfig(false);
+  };
+
+  const saveBehavioralQuestionsConfiguration = async () => {
+    try {
+      const interview = interviews.find(i => i.id === selectedInterviewForStart);
+      const currentData = interviewData[selectedInterviewForStart] || {};
+      
+      // Update the interview data with behavioral questions
+      const updatedData = {
+        ...currentData,
+        behavioralQuestions: behavioralQuestionsConfig.filter(q => q.trim() !== '')
+      };
+      
+      // Save to backend
+      await apiClient.patch(`/admin/interviews/${selectedInterviewForStart}/config`, {
+        type: 'full',
+        config: updatedData
+      });
+      
+      // Update local state
+      setInterviewData(prev => ({
+        ...prev,
+        [selectedInterviewForStart]: updatedData
+      }));
+      
+      // Update interview description
+      setInterviews(prev => prev.map(iv => 
+        iv.id === selectedInterviewForStart 
+          ? { ...iv, description: JSON.stringify(updatedData) } 
+          : iv
+      ));
+      
+    } catch (error) {
+      console.error('Failed to save behavioral questions configuration:', error);
+      alert('Failed to save behavioral questions configuration');
+    }
   };
 
   const handleCloseGroupSelection = () => {
@@ -333,6 +413,8 @@ export default function AdminAssignedInterviews() {
     setSelectedInterviewForStart(null);
     setGroupSearchTerm('');
     setSelectedGroups([]);
+    setBehavioralQuestionsConfig([]);
+    setShowBehavioralQuestionsConfig(false);
   };
 
   const handleViewDeliberations = () => {
@@ -366,6 +448,7 @@ export default function AdminAssignedInterviews() {
   };
 
 
+
   const handleDeleteInterview = async (interviewId) => {
     if (!window.confirm('Are you sure you want to delete this interview?')) return;
     try {
@@ -391,6 +474,7 @@ export default function AdminAssignedInterviews() {
         ...newInterview,
         cycleId: activeCycle.id
       };
+      console.log('Creating interview with payload:', payload);
       const created = await apiClient.post('/admin/interviews', payload);
       const next = [created, ...interviews];
       setInterviews(next);
@@ -398,7 +482,14 @@ export default function AdminAssignedInterviews() {
       setEditedInterview(null);
       setGroups([]);
       setCreateOpen(false);
-      setNewInterview({ title: '', interviewType: 'COFFEE_CHAT', startDate: '', endDate: '', location: '', dresscode: '' });
+      setNewInterview({ 
+        title: '', 
+        interviewType: 'COFFEE_CHAT', 
+        startDate: '', 
+        endDate: '', 
+        location: '', 
+        dresscode: ''
+      });
     } catch (e) {
       console.error('Failed to create interview', e);
       alert(e.message || 'Failed to create interview');
@@ -594,6 +685,7 @@ export default function AdminAssignedInterviews() {
                   <option value="COFFEE_CHAT">Coffee Chat</option>
                   <option value="ROUND_ONE">Round 1</option>
                   <option value="ROUND_TWO">Round 2</option>
+                  <option value="FINAL_ROUND">Final Round</option>
                 </select>
               </div>
               <div className="form-row two-col">
@@ -616,6 +708,7 @@ export default function AdminAssignedInterviews() {
                   <input type="text" value={newInterview.dresscode} onChange={e => setNewInterview({ ...newInterview, dresscode: e.target.value })} />
                 </div>
               </div>
+              
             </div>
             <div className="modal-footer">
               <button className="btn-secondary" onClick={() => setCreateOpen(false)}>Cancel</button>
@@ -630,85 +723,152 @@ export default function AdminAssignedInterviews() {
         <div className="modal-overlay">
           <div className="modal-content group-selection-modal">
             <div className="modal-header">
-              <h3>Select Application Groups to Evaluate</h3>
-              <div className="selection-info">
-                {selectedGroups.length}/3 groups selected
-              </div>
+              <h3>
+                {showBehavioralQuestionsConfig 
+                  ? 'Configure Behavioral Questions' 
+                  : 'Select Application Groups to Evaluate'
+                }
+              </h3>
+              {!showBehavioralQuestionsConfig && (
+                <div className="selection-info">
+                  {selectedGroups.length}/3 groups selected
+                </div>
+              )}
               <button className="icon-btn" onClick={handleCloseGroupSelection}>
                 <XMarkIcon className="btn-icon" />
               </button>
             </div>
             <div className="modal-body">
-              {(() => {
-                const interview = interviews.find(i => i.id === selectedInterviewForStart);
-                const data = interviewData[selectedInterviewForStart] || { applicationGroups: [] };
-                const filteredGroups = data.applicationGroups.filter(group =>
-                  group.name.toLowerCase().includes(groupSearchTerm.toLowerCase())
-                );
-                
-                return (
-                  <>
-                    <div className="search-section">
+              {showBehavioralQuestionsConfig ? (
+                <div className="behavioral-questions-config">
+                  <p className="config-instruction">
+                    Configure the behavioral questions for this interview. All interviewers will see these same questions.
+                  </p>
+                  {behavioralQuestionsConfig.map((question, index) => (
+                    <div key={index} className="question-config-row">
                       <input
                         type="text"
-                        placeholder="Search application groups..."
-                        value={groupSearchTerm}
-                        onChange={(e) => setGroupSearchTerm(e.target.value)}
-                        className="group-search-input"
+                        value={question}
+                        onChange={(e) => updateBehavioralQuestion(index, e.target.value)}
+                        placeholder={`Question ${index + 1}`}
+                        className="question-input"
                       />
+                      <button
+                        type="button"
+                        className="remove-question-btn"
+                        onClick={() => removeBehavioralQuestion(index)}
+                      >
+                        <XMarkIcon className="btn-icon" />
+                      </button>
                     </div>
-                    
-                    <div className="groups-selection-list">
-                      {filteredGroups.length === 0 ? (
-                        <div className="no-groups-message">
-                          {groupSearchTerm ? 'No groups match your search' : 'No application groups available'}
-                        </div>
-                      ) : (
-                        filteredGroups.map(group => {
-                          const isSelected = selectedGroups.includes(group.id);
-                          const isDisabled = !isSelected && selectedGroups.length >= 3;
-                          
-                          return (
-                            <div 
-                              key={group.id} 
-                              className={`group-selection-item ${isSelected ? 'selected' : ''} ${isDisabled ? 'disabled' : ''}`}
-                              onClick={() => !isDisabled && handleGroupToggle(group.id)}
-                            >
-                              <div className="group-checkbox">
-                                <input
-                                  type="checkbox"
-                                  checked={isSelected}
-                                  onChange={() => !isDisabled && handleGroupToggle(group.id)}
-                                  disabled={isDisabled}
-                                />
-                                <span className="checkmark"></span>
+                  ))}
+                  <button
+                    type="button"
+                    className="add-question-btn"
+                    onClick={addBehavioralQuestion}
+                  >
+                    <PlusIcon className="btn-icon" />
+                    Add Question
+                  </button>
+                </div>
+              ) : (
+                (() => {
+                  const interview = interviews.find(i => i.id === selectedInterviewForStart);
+                  const data = interviewData[selectedInterviewForStart] || { applicationGroups: [] };
+                  const filteredGroups = data.applicationGroups.filter(group =>
+                    group.name.toLowerCase().includes(groupSearchTerm.toLowerCase())
+                  );
+                  
+                  return (
+                    <>
+                      <div className="search-section">
+                        <input
+                          type="text"
+                          placeholder="Search application groups..."
+                          value={groupSearchTerm}
+                          onChange={(e) => setGroupSearchTerm(e.target.value)}
+                          className="group-search-input"
+                        />
+                      </div>
+                      
+                      <div className="groups-selection-list">
+                        {filteredGroups.length === 0 ? (
+                          <div className="no-groups-message">
+                            {groupSearchTerm ? 'No groups match your search' : 'No application groups available'}
+                          </div>
+                        ) : (
+                          filteredGroups.map(group => {
+                            const isSelected = selectedGroups.includes(group.id);
+                            const isDisabled = !isSelected && selectedGroups.length >= 3;
+                            
+                            return (
+                              <div 
+                                key={group.id} 
+                                className={`group-selection-item ${isSelected ? 'selected' : ''} ${isDisabled ? 'disabled' : ''}`}
+                                onClick={() => !isDisabled && handleGroupToggle(group.id)}
+                              >
+                                <div className="group-checkbox">
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={() => !isDisabled && handleGroupToggle(group.id)}
+                                    disabled={isDisabled}
+                                  />
+                                  <span className="checkmark"></span>
+                                </div>
+                                <div className="group-info">
+                                  <h4 className="group-name">{group.name}</h4>
+                                  <p className="group-count">
+                                    {group.applicationIds?.length || 0} applications
+                                  </p>
+                                </div>
                               </div>
-                              <div className="group-info">
-                                <h4 className="group-name">{group.name}</h4>
-                                <p className="group-count">
-                                  {group.applicationIds?.length || 0} applications
-                                </p>
-                              </div>
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  </>
-                );
-              })()}
+                            );
+                          })
+                        )}
+                      </div>
+                    </>
+                  );
+                })()
+              )}
             </div>
             <div className="modal-footer">
-              <button className="btn-secondary" onClick={handleCloseGroupSelection}>
-                Cancel
-              </button>
-              <button 
-                className="btn-primary" 
-                onClick={handleStartWithSelectedGroups}
-                disabled={selectedGroups.length === 0}
-              >
-                Start Interview ({selectedGroups.length} group{selectedGroups.length !== 1 ? 's' : ''})
-              </button>
+              {showBehavioralQuestionsConfig ? (
+                <>
+                  <button 
+                    className="btn-secondary" 
+                    onClick={() => setShowBehavioralQuestionsConfig(false)}
+                  >
+                    Back to Groups
+                  </button>
+                  <button 
+                    className="btn-primary" 
+                    onClick={handleStartWithSelectedGroups}
+                    disabled={behavioralQuestionsConfig.filter(q => q.trim() !== '').length === 0}
+                  >
+                    Start Interview
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button className="btn-secondary" onClick={handleCloseGroupSelection}>
+                    Cancel
+                  </button>
+                  <button 
+                    className="btn-primary" 
+                    onClick={handleStartWithSelectedGroups}
+                    disabled={selectedGroups.length === 0}
+                  >
+                    {(() => {
+                      const interview = interviews.find(i => i.id === selectedInterviewForStart);
+                      if (interview?.interviewType === 'ROUND_TWO' || interview?.interviewType === 'FINAL_ROUND') {
+                        return 'Configure Questions';
+                      }
+                      return `Start Interview (${selectedGroups.length} group${selectedGroups.length !== 1 ? 's' : ''})`;
+                    })()}
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>

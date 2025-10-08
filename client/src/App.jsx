@@ -21,6 +21,7 @@ import AdminAssignedInterviews from './pages/AdminAssignedInterviews';
 import InterviewInterface from './pages/InterviewInterface';
 import MemberInterviewInterface from './pages/MemberInterviewInterface';
 import FirstRoundInterviewInterface from './pages/FirstRoundInterviewInterface';
+import FinalRoundInterviewInterface from './pages/FinalRoundInterviewInterface';
 import Candidates from './pages/Candidates';
 import Staging from './pages/Staging';
 import RecruitmentResources from './pages/RecruitmentResources';
@@ -249,6 +250,24 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute>
             <FirstRoundInterviewInterface />
+          </ProtectedRoute>
+        }
+      />
+      
+      <Route
+        path="/admin/final-round-interview"
+        element={
+          <ProtectedRoute>
+            <FinalRoundInterviewInterface />
+          </ProtectedRoute>
+        }
+      />
+      
+      <Route
+        path="/member/final-round-interview"
+        element={
+          <ProtectedRoute>
+            <FinalRoundInterviewInterface />
           </ProtectedRoute>
         }
       />

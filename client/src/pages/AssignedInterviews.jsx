@@ -209,6 +209,8 @@ export default function AssignedInterviews() {
   const [saving, setSaving] = useState(false);
   const [preview, setPreview] = useState({ open: false, src: '', kind: '', title: '' });
   const [groupApplications, setGroupApplications] = useState({});
+  const [behavioralQuestionsConfig, setBehavioralQuestionsConfig] = useState([]);
+  const [showBehavioralQuestionsConfig, setShowBehavioralQuestionsConfig] = useState(false);
 
   const decisionOptions = [
     { value: 'YES', label: 'Yes', color: 'green' },
@@ -312,11 +314,22 @@ export default function AssignedInterviews() {
   }, []);
 
 
-  const handleStartInterview = (interviewId) => {
+  const handleStartInterview = async (interviewId) => {
     setSelectedInterviewForStart(interviewId);
     setGroupSelectionOpen(true);
     setGroupSearchTerm('');
     setSelectedGroups([]);
+    setShowBehavioralQuestionsConfig(false);
+    
+    // Load existing behavioral questions for this interview
+    try {
+      const configRes = await apiClient.get(`/member/interviews/${interviewId}/config`);
+      const existingQuestions = configRes.behavioralQuestions || [];
+      setBehavioralQuestionsConfig(existingQuestions);
+    } catch (error) {
+      console.warn('Failed to load existing behavioral questions:', error);
+      setBehavioralQuestionsConfig([]);
+    }
   };
 
   const handleGroupToggle = (groupId) => {
@@ -337,18 +350,35 @@ export default function AssignedInterviews() {
     
     if (selectedGroups.length === 0) return;
     
-    const groupIdsParam = selectedGroups.join(',');
     const interview = interviews.find(i => i.id === selectedInterviewForStart);
+    
+    // Check if this is a final round interview that needs behavioral questions configuration
+    if ((interview?.interviewType === 'ROUND_TWO' || interview?.interviewType === 'FINAL_ROUND') && !showBehavioralQuestionsConfig) {
+      setShowBehavioralQuestionsConfig(true);
+      return;
+    }
+    
+    const groupIdsParam = selectedGroups.join(',');
     
     console.log('Interview found:', interview);
     console.log('Interview type:', interview?.interviewType);
     console.log('Is ROUND_ONE?', interview?.interviewType === 'ROUND_ONE');
     console.log('All interviews for debugging:', interviews.map(i => ({ id: i.id, title: i.title, type: i.interviewType })));
     
+    // Save behavioral questions configuration if provided
+    if (showBehavioralQuestionsConfig && behavioralQuestionsConfig.length > 0) {
+      saveBehavioralQuestionsConfiguration();
+    }
+    
     // Route to appropriate interface based on interview type
     if (interview?.interviewType === 'ROUND_ONE') {
       console.log('Routing to first round interview interface');
       const url = `/member/first-round-interview?interviewId=${selectedInterviewForStart}&groupIds=${groupIdsParam}`;
+      console.log('Navigating to:', url);
+      navigate(url);
+    } else if (interview?.interviewType === 'ROUND_TWO' || interview?.interviewType === 'FINAL_ROUND') {
+      console.log('Routing to final round interview interface');
+      const url = `/member/final-round-interview?interviewId=${selectedInterviewForStart}&groupIds=${groupIdsParam}`;
       console.log('Navigating to:', url);
       navigate(url);
     } else {
@@ -361,6 +391,44 @@ export default function AssignedInterviews() {
     setGroupSelectionOpen(false);
     setSelectedInterviewForStart(null);
     setSelectedGroups([]);
+    setBehavioralQuestionsConfig([]);
+    setShowBehavioralQuestionsConfig(false);
+  };
+
+  const saveBehavioralQuestionsConfiguration = async () => {
+    try {
+      const interview = interviews.find(i => i.id === selectedInterviewForStart);
+      const currentData = interviewData[selectedInterviewForStart] || {};
+      
+      // Update the interview data with behavioral questions
+      const updatedData = {
+        ...currentData,
+        behavioralQuestions: behavioralQuestionsConfig.filter(q => q.trim() !== '')
+      };
+      
+      // Save to backend using member endpoint
+      await apiClient.patch(`/member/interviews/${selectedInterviewForStart}/config`, {
+        type: 'full',
+        config: updatedData
+      });
+      
+      // Update local state
+      setInterviewData(prev => ({
+        ...prev,
+        [selectedInterviewForStart]: updatedData
+      }));
+      
+      // Update interview description
+      setInterviews(prev => prev.map(iv => 
+        iv.id === selectedInterviewForStart 
+          ? { ...iv, description: JSON.stringify(updatedData) } 
+          : iv
+      ));
+      
+    } catch (error) {
+      console.error('Failed to save behavioral questions configuration:', error);
+      alert('Failed to save behavioral questions configuration');
+    }
   };
 
   const handleCloseGroupSelection = () => {
@@ -368,6 +436,20 @@ export default function AssignedInterviews() {
     setSelectedInterviewForStart(null);
     setGroupSearchTerm('');
     setSelectedGroups([]);
+    setBehavioralQuestionsConfig([]);
+    setShowBehavioralQuestionsConfig(false);
+  };
+
+  const addBehavioralQuestion = () => {
+    setBehavioralQuestionsConfig(prev => [...prev, '']);
+  };
+
+  const updateBehavioralQuestion = (index, value) => {
+    setBehavioralQuestionsConfig(prev => prev.map((q, i) => i === index ? value : q));
+  };
+
+  const removeBehavioralQuestion = (index) => {
+    setBehavioralQuestionsConfig(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleViewDeliberations = () => {
@@ -498,73 +580,130 @@ export default function AssignedInterviews() {
         <div className="modal-overlay">
           <div className="modal-content group-selection-modal">
             <div className="modal-header">
-              <h3>Select Application Groups to Evaluate</h3>
-              <div className="selection-info">
-                {selectedGroups.length}/3 groups selected
-              </div>
+              <h3>
+                {showBehavioralQuestionsConfig 
+                  ? 'Configure Behavioral Questions' 
+                  : 'Select Application Groups to Evaluate'
+                }
+              </h3>
+              {!showBehavioralQuestionsConfig && (
+                <div className="selection-info">
+                  {selectedGroups.length}/3 groups selected
+                </div>
+              )}
               <button className="icon-btn" onClick={handleCloseGroupSelection}>
                 <XMarkIcon className="btn-icon" />
               </button>
             </div>
             <div className="modal-body">
-              {(() => {
-                const interview = interviews.find(i => i.id === selectedInterviewForStart);
-                const data = interviewData[selectedInterviewForStart] || { applicationGroups: [] };
-                const filteredGroups = (data.applicationGroups || []).filter(group =>
-                  group.name.toLowerCase().includes(groupSearchTerm.toLowerCase())
-                );
-                
-                return (
-                  <>
-                    <div className="search-section">
-                      <input
-                        type="text"
-                        placeholder="Search application groups..."
-                        value={groupSearchTerm}
-                        onChange={(e) => setGroupSearchTerm(e.target.value)}
-                        className="group-search-input"
-                      />
-                    </div>
-                    
-                    <div className="groups-selection-list">
-                      {filteredGroups.length === 0 ? (
-                        <div className="no-groups-message">
-                          {groupSearchTerm ? 'No groups match your search' : 'No application groups available'}
+              {showBehavioralQuestionsConfig ? (
+                <div className="behavioral-questions-config">
+                  <div className="config-instruction">
+                    <p>Configure the behavioral questions for this final round interview. These questions will be used for all candidates in the selected groups.</p>
+                    {behavioralQuestionsConfig.length > 0 && (
+                      <p className="existing-questions-note">
+                        <strong>Existing questions:</strong> {behavioralQuestionsConfig.length} question(s) already configured. You can edit them below or add new ones.
+                      </p>
+                    )}
+                  </div>
+                  
+                  <div className="questions-list">
+                    {behavioralQuestionsConfig.length === 0 ? (
+                      <div className="no-questions-message">
+                        <p>No behavioral questions configured yet. Add your first question below.</p>
+                      </div>
+                    ) : (
+                      behavioralQuestionsConfig.map((question, index) => (
+                        <div key={index} className="question-config-row">
+                          <input
+                            type="text"
+                            placeholder={`Behavioral Question ${index + 1}`}
+                            value={question}
+                            onChange={(e) => updateBehavioralQuestion(index, e.target.value)}
+                            className="question-input"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeBehavioralQuestion(index)}
+                            className="remove-question-btn"
+                            disabled={behavioralQuestionsConfig.length === 1}
+                          >
+                            <XMarkIcon className="btn-icon" />
+                          </button>
                         </div>
-                      ) : (
-                        filteredGroups.map(group => {
-                          const isSelected = selectedGroups.includes(group.id);
-                          const isDisabled = !isSelected && selectedGroups.length >= 3;
-                          
-                          return (
-                            <div 
-                              key={group.id} 
-                              className={`group-selection-item ${isSelected ? 'selected' : ''} ${isDisabled ? 'disabled' : ''}`}
-                              onClick={() => !isDisabled && handleGroupToggle(group.id)}
-                            >
-                              <div className="group-checkbox">
-                                <input
-                                  type="checkbox"
-                                  checked={isSelected}
-                                  onChange={() => !isDisabled && handleGroupToggle(group.id)}
-                                  disabled={isDisabled}
-                                />
-                                <span className="checkmark"></span>
+                      ))
+                    )}
+                  </div>
+                  
+                  <button
+                    type="button"
+                    onClick={addBehavioralQuestion}
+                    className="add-question-btn"
+                  >
+                    <PlusIcon className="btn-icon" />
+                    {behavioralQuestionsConfig.length === 0 ? 'Add First Question' : 'Add Another Question'}
+                  </button>
+                </div>
+              ) : (
+                (() => {
+                  const interview = interviews.find(i => i.id === selectedInterviewForStart);
+                  const data = interviewData[selectedInterviewForStart] || { applicationGroups: [] };
+                  const filteredGroups = (data.applicationGroups || []).filter(group =>
+                    group.name.toLowerCase().includes(groupSearchTerm.toLowerCase())
+                  );
+                  
+                  return (
+                    <>
+                      <div className="search-section">
+                        <input
+                          type="text"
+                          placeholder="Search application groups..."
+                          value={groupSearchTerm}
+                          onChange={(e) => setGroupSearchTerm(e.target.value)}
+                          className="group-search-input"
+                        />
+                      </div>
+                      
+                      <div className="groups-selection-list">
+                        {filteredGroups.length === 0 ? (
+                          <div className="no-groups-message">
+                            {groupSearchTerm ? 'No groups match your search' : 'No application groups available'}
+                          </div>
+                        ) : (
+                          filteredGroups.map(group => {
+                            const isSelected = selectedGroups.includes(group.id);
+                            const isDisabled = !isSelected && selectedGroups.length >= 3;
+                            
+                            return (
+                              <div 
+                                key={group.id} 
+                                className={`group-selection-item ${isSelected ? 'selected' : ''} ${isDisabled ? 'disabled' : ''}`}
+                                onClick={() => !isDisabled && handleGroupToggle(group.id)}
+                              >
+                                <div className="group-checkbox">
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={() => !isDisabled && handleGroupToggle(group.id)}
+                                    disabled={isDisabled}
+                                  />
+                                  <span className="checkmark"></span>
+                                </div>
+                                <div className="group-info">
+                                  <h4 className="group-name">{group.name}</h4>
+                                  <p className="group-count">
+                                    {group.applicationIds?.length || 0} applications
+                                  </p>
+                                </div>
                               </div>
-                              <div className="group-info">
-                                <h4 className="group-name">{group.name}</h4>
-                                <p className="group-count">
-                                  {group.applicationIds?.length || 0} applications
-                                </p>
-                              </div>
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  </>
-                );
-              })()}
+                            );
+                          })
+                        )}
+                      </div>
+                    </>
+                  );
+                })()
+              )}
             </div>
             <div className="modal-footer">
               <button className="btn-secondary" onClick={handleCloseGroupSelection}>
@@ -573,9 +712,12 @@ export default function AssignedInterviews() {
               <button 
                 className="btn-primary" 
                 onClick={handleStartWithSelectedGroups}
-                disabled={selectedGroups.length === 0}
+                disabled={showBehavioralQuestionsConfig ? behavioralQuestionsConfig.length === 0 : selectedGroups.length === 0}
               >
-                Start Interview ({selectedGroups.length} group{selectedGroups.length !== 1 ? 's' : ''})
+                {showBehavioralQuestionsConfig 
+                  ? 'Configure Questions' 
+                  : `Start Interview (${selectedGroups.length} group${selectedGroups.length !== 1 ? 's' : ''})`
+                }
               </button>
             </div>
           </div>

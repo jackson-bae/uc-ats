@@ -1541,6 +1541,39 @@ router.get('/interviews/:id', async (req, res) => {
   }
 });
 
+// Get interview configuration
+router.get('/interviews/:id/config', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const interview = await prisma.interview.findUnique({
+      where: { id }
+    });
+
+    if (!interview) {
+      return res.status(404).json({ error: 'Interview not found' });
+    }
+    
+    // Parse the configuration from description field
+    let config = {};
+    if (interview.description) {
+      try {
+        config = typeof interview.description === 'string' 
+          ? JSON.parse(interview.description) 
+          : interview.description;
+      } catch (e) {
+        console.warn('Failed to parse interview description:', e);
+        config = {};
+      }
+    }
+    
+    res.json(config);
+  } catch (error) {
+    console.error('[GET /api/admin/interviews/:id/config]', error);
+    res.status(500).json({ error: 'Failed to fetch interview configuration' });
+  }
+});
+
 // Update interview configuration
 router.patch('/interviews/:id/config', async (req, res) => {
   try {
