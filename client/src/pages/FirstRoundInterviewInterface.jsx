@@ -44,8 +44,7 @@ export default function FirstRoundInterviewInterface() {
 
   const pageTitles = [
     { title: 'Behavioral Assessment', subtitle: 'Leadership, Problem Solving & Interest' },
-    { title: 'Market Sizing Assessment', subtitle: 'Teamwork, Logic & Creativity' },
-    { title: 'Final Decision', subtitle: 'Overall Assessment & Decision' }
+    { title: 'Market Sizing Assessment', subtitle: 'Teamwork, Logic & Creativity' }
   ];
 
   const handlePageChange = async (newPage) => {
@@ -749,52 +748,6 @@ export default function FirstRoundInterviewInterface() {
                         </div>
                       )}
 
-                      {/* Final Decision Page */}
-                      {currentPage === 2 && (
-                        <div className="assessment-page">
-                          <div className="decision-section">
-                            <div className="decision-container">
-                              <h4>Final Decision</h4>
-                              <p className="decision-description">
-                                Based on your assessment of the candidate's behavioral and market sizing performance, make your final decision.
-                              </p>
-                              <div className="decision-buttons">
-                                {decisionOptions.map((option) => (
-                                  <button
-                                    key={option.value}
-                                    className={`decision-btn ${option.color} ${
-                                      evaluation.decision === option.value ? 'selected' : ''
-                                    }`}
-                                    onClick={() => updateEvaluation(application.id, { decision: option.value })}
-                                  >
-                                    {option.label}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                            
-                            <div className="summary-section">
-                              <h4>Assessment Summary</h4>
-                              <div className="summary-grid">
-                                <div className="summary-item">
-                                  <span className="summary-label">Behavioral Total:</span>
-                                  <span className="summary-value">{evaluation.behavioralTotal || 0}/15</span>
-                                </div>
-                                <div className="summary-item">
-                                  <span className="summary-label">Market Sizing Total:</span>
-                                  <span className="summary-value">{evaluation.marketSizingTotal || 0}/15</span>
-                                </div>
-                                <div className="summary-item">
-                                  <span className="summary-label">Combined Score:</span>
-                                  <span className="summary-value total-combined">
-                                    {(evaluation.behavioralTotal || 0) + (evaluation.marketSizingTotal || 0)}/30
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
                     </div>
                   </div>
                 );

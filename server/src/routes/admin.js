@@ -2974,6 +2974,7 @@ router.get('/interviews/:id/applications', async (req, res) => {
         firstName: true,
         lastName: true,
         email: true,
+        phoneNumber: true,
         major1: true,
         graduationYear: true,
         resumeUrl: true,
@@ -3103,6 +3104,50 @@ router.get('/interviews/:id/evaluations', async (req, res) => {
   }
 });
 
+// Get final round interview evaluations for an application
+router.get('/applications/:id/final-round-interview-evaluations', async (req, res) => {
+  try {
+    const { id: applicationId } = req.params;
+    
+    // Get all final round interview evaluations for this application
+    const evaluations = await prisma.interviewEvaluation.findMany({
+      where: {
+        applicationId,
+        interview: {
+          interviewType: {
+            in: ['ROUND_TWO', 'FINAL_ROUND']
+          }
+        }
+      },
+      include: {
+        evaluator: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true
+          }
+        },
+        application: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+    
+    res.json(evaluations);
+  } catch (error) {
+    console.error('[GET /api/admin/applications/:id/final-round-interview-evaluations]', error);
+    res.status(500).json({ error: 'Failed to fetch final round interview evaluations', details: error.message });
+  }
+});
+
 // Create or update interview evaluation
 router.post('/interviews/:id/evaluations', async (req, res) => {
   try {
@@ -3123,7 +3168,10 @@ router.post('/interviews/:id/evaluations', async (req, res) => {
       marketSizingTotal,
       behavioralNotes,
       marketSizingNotes,
-      additionalNotes
+      additionalNotes,
+      // Final round interview specific fields
+      casingNotes,
+      candidateDetails
     } = req.body;
     const evaluatorId = req.user.id;
     
@@ -3207,7 +3255,10 @@ router.post('/interviews/:id/evaluations', async (req, res) => {
           where: { id: existingEvaluation.id },
           data: {
             notes,
-            decision
+            decision,
+            behavioralNotes: behavioralNotes ? JSON.stringify(behavioralNotes) : null,
+            casingNotes: casingNotes ? JSON.stringify(casingNotes) : null,
+            candidateDetails: candidateDetails ? JSON.stringify(candidateDetails) : null
           }
         });
         
@@ -3240,7 +3291,10 @@ router.post('/interviews/:id/evaluations', async (req, res) => {
             applicationId,
             evaluatorId,
             notes,
-            decision
+            decision,
+            behavioralNotes: behavioralNotes ? JSON.stringify(behavioralNotes) : null,
+            casingNotes: casingNotes ? JSON.stringify(casingNotes) : null,
+            candidateDetails: candidateDetails ? JSON.stringify(candidateDetails) : null
           }
         });
         

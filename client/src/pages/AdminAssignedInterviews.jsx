@@ -219,17 +219,19 @@ export default function AdminAssignedInterviews() {
   const [selectedGroups, setSelectedGroups] = useState([]);
   const [behavioralQuestionsConfig, setBehavioralQuestionsConfig] = useState([]);
   const [showBehavioralQuestionsConfig, setShowBehavioralQuestionsConfig] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
 
   // Fetch initial data
   useEffect(() => {
     const load = async () => {
       try {
-        const [ivsRes, mems, adminUsers, apps, cycle] = await Promise.allSettled([
+        const [ivsRes, mems, adminUsers, apps, cycle, currentUserRes] = await Promise.allSettled([
           apiClient.get('/admin/interviews'),
           apiClient.get('/admin/users?role=INTERVIEWER'),
           apiClient.get('/admin/users?role=ADMIN'),
           apiClient.get('/admin/applications'),
-          apiClient.get('/admin/cycles/active')
+          apiClient.get('/admin/cycles/active'),
+          apiClient.get('/admin/profile')
         ]);
 
         const ivs = ivsRes.status === 'fulfilled' ? ivsRes.value : [];
@@ -240,6 +242,7 @@ export default function AdminAssignedInterviews() {
         setInterviews(ivs);
         const interviewers = mems.status === 'fulfilled' ? mems.value : [];
         const adminsList = adminUsers.status === 'fulfilled' ? adminUsers.value : [];
+        setCurrentUser(currentUserRes.status === 'fulfilled' ? currentUserRes.value : null);
         
         // Combine admins and interviewers, adding a role property for identification
         const combined = [
@@ -313,14 +316,22 @@ export default function AdminAssignedInterviews() {
 
   const handleGroupToggle = (groupId) => {
     setSelectedGroups(prev => {
+      // Check if this is a final round interview
+      const interview = interviews.find(i => i.id === selectedInterviewForStart);
+      const isFinalRound = interview?.interviewType === 'FINAL_ROUND' || interview?.interviewType === 'ROUND_TWO';
+      const maxGroups = isFinalRound ? 1 : 3;
+      
       if (prev.includes(groupId)) {
         // Remove group if already selected
         return prev.filter(id => id !== groupId);
-      } else if (prev.length < 3) {
-        // Add group if less than 3 selected
+      } else if (isFinalRound) {
+        // For final round, replace the current selection
+        return [groupId];
+      } else if (prev.length < maxGroups) {
+        // Add group if less than max selected
         return [...prev, groupId];
       }
-      // Don't add if already at max (3 groups)
+      // Don't add if already at max
       return prev;
     });
   };
@@ -729,11 +740,16 @@ export default function AdminAssignedInterviews() {
                   : 'Select Application Groups to Evaluate'
                 }
               </h3>
-              {!showBehavioralQuestionsConfig && (
-                <div className="selection-info">
-                  {selectedGroups.length}/3 groups selected
-                </div>
-              )}
+              {!showBehavioralQuestionsConfig && (() => {
+                const interview = interviews.find(i => i.id === selectedInterviewForStart);
+                const isFinalRound = interview?.interviewType === 'FINAL_ROUND' || interview?.interviewType === 'ROUND_TWO';
+                const maxGroups = isFinalRound ? 1 : 3;
+                return (
+                  <div className="selection-info">
+                    {selectedGroups.length}/{maxGroups} group{maxGroups === 1 ? '' : 's'} selected
+                  </div>
+                );
+              })()}
               <button className="icon-btn" onClick={handleCloseGroupSelection}>
                 <XMarkIcon className="btn-icon" />
               </button>
@@ -774,8 +790,24 @@ export default function AdminAssignedInterviews() {
               ) : (
                 (() => {
                   const interview = interviews.find(i => i.id === selectedInterviewForStart);
-                  const data = interviewData[selectedInterviewForStart] || { applicationGroups: [] };
-                  const filteredGroups = data.applicationGroups.filter(group =>
+                  const data = interviewData[selectedInterviewForStart] || { applicationGroups: [], groupAssignments: {} };
+                  
+                  // Filter to only show groups assigned to the current admin user
+                  const adminAssignedGroups = data.applicationGroups.filter(group => {
+                    if (!currentUser) return false;
+                    
+                    // Find member groups that include the current admin user
+                    const memberGroupsWithCurrentAdmin = data.memberGroups?.filter(memberGroup => 
+                      memberGroup.memberIds?.includes(currentUser.id)
+                    ) || [];
+                    
+                    // Check if this application group is assigned to any of the current admin's member groups
+                    return memberGroupsWithCurrentAdmin.some(memberGroup => 
+                      data.groupAssignments?.[memberGroup.id]?.includes(group.id)
+                    );
+                  });
+                  
+                  const filteredGroups = adminAssignedGroups.filter(group =>
                     group.name.toLowerCase().includes(groupSearchTerm.toLowerCase())
                   );
                   
@@ -799,7 +831,10 @@ export default function AdminAssignedInterviews() {
                         ) : (
                           filteredGroups.map(group => {
                             const isSelected = selectedGroups.includes(group.id);
-                            const isDisabled = !isSelected && selectedGroups.length >= 3;
+                            const interview = interviews.find(i => i.id === selectedInterviewForStart);
+                            const isFinalRound = interview?.interviewType === 'FINAL_ROUND' || interview?.interviewType === 'ROUND_TWO';
+                            const maxGroups = isFinalRound ? 1 : 3;
+                            const isDisabled = !isSelected && selectedGroups.length >= maxGroups;
                             
                             return (
                               <div 
@@ -809,7 +844,7 @@ export default function AdminAssignedInterviews() {
                               >
                                 <div className="group-checkbox">
                                   <input
-                                    type="checkbox"
+                                    type={isFinalRound ? "radio" : "checkbox"}
                                     checked={isSelected}
                                     onChange={() => !isDisabled && handleGroupToggle(group.id)}
                                     disabled={isDisabled}
@@ -1264,12 +1299,20 @@ export default function AdminAssignedInterviews() {
                           const currentInterviewData = interviewData[interview.id];
                           const allApplicationGroups = currentInterviewData?.applicationGroups || [];
                           
-                          // For admin, show only groups that have been assigned to member groups
+                          // For admin, show only groups assigned to member groups that include the current admin
                           const assignedApplicationGroups = allApplicationGroups.filter(group => {
+                            if (!currentUser) return false;
+                            
                             const groupAssignments = currentInterviewData?.groupAssignments || {};
-                            // Check if this application group is assigned to any member group
-                            return Object.values(groupAssignments).some(assignedGroupIds => 
-                              assignedGroupIds.includes(group.id)
+                            
+                            // Find member groups that include the current admin user
+                            const memberGroupsWithCurrentAdmin = currentInterviewData?.memberGroups?.filter(memberGroup => 
+                              memberGroup.memberIds?.includes(currentUser.id)
+                            ) || [];
+                            
+                            // Check if this application group is assigned to any of the current admin's member groups
+                            return memberGroupsWithCurrentAdmin.some(memberGroup => 
+                              groupAssignments[memberGroup.id]?.includes(group.id)
                             );
                           });
                           

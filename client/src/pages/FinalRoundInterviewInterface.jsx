@@ -58,7 +58,8 @@ export default function FinalRoundInterviewInterface() {
 
   const pageTitles = [
     { title: 'Behavioral Assessment', subtitle: 'Leadership, Problem Solving & Interest' },
-    { title: 'Case Interview', subtitle: 'Analytical Thinking & Problem Solving' }
+    { title: 'Case Interview', subtitle: 'Analytical Thinking & Problem Solving' },
+    { title: 'Confirm Candidate Details', subtitle: 'Logistical Information & Requirements' }
   ];
 
   useEffect(() => {
@@ -184,6 +185,14 @@ export default function FinalRoundInterviewInterface() {
     scheduleAutoSave(applicationId);
   };
 
+  const updateCandidateDetails = (applicationId, detailKey, value) => {
+    const evaluation = getEvaluation(applicationId);
+    const candidateDetails = { ...evaluation.candidateDetails };
+    candidateDetails[detailKey] = value;
+    updateEvaluation(applicationId, { candidateDetails });
+    scheduleAutoSave(applicationId);
+  };
+
   const addBehavioralQuestion = async () => {
     try {
       const isAdmin = window.location.pathname.includes('/admin/');
@@ -251,10 +260,10 @@ export default function FinalRoundInterviewInterface() {
       clearTimeout(autoSaveTimeouts[applicationId]);
     }
 
-    // Set new timeout for auto-save (2 seconds after last change)
+    // Set new timeout for auto-save (5 seconds after last change)
     const timeoutId = setTimeout(() => {
       autoSaveEvaluation(applicationId);
-    }, 2000);
+    }, 5000);
 
     setAutoSaveTimeouts(prev => ({
       ...prev,
@@ -650,26 +659,83 @@ export default function FinalRoundInterviewInterface() {
                   </div>
                 )}
 
-                {/* Final Decision Section */}
-                <div className="final-decision-section">
-                  <h4 className="section-title">Final Decision</h4>
-                  <div className="decision-options">
-                    {decisionOptions.map(option => (
-                      <label key={option.value} className="decision-option">
-                        <input
-                          type="radio"
-                          name={`decision-${application.id}`}
-                          value={option.value}
-                          checked={evaluation.finalDecision === option.value}
-                          onChange={() => updateFinalDecision(application.id, option.value)}
-                        />
-                        <span className={`decision-label ${option.color}`}>
-                          {option.label}
-                        </span>
-                      </label>
-                    ))}
+                {/* Candidate Details Section */}
+                {currentPage === 2 && (
+                  <div className="candidate-details-section">
+                    <h4 className="section-title">
+                      <CheckIcon className="section-icon" />
+                      Confirm Candidate Details
+                    </h4>
+                    <div className="logistical-info">
+                      <div className="logistical-item">
+                        <label className="logistical-label">
+                          <input
+                            type="checkbox"
+                            checked={evaluation.candidateDetails?.phoneConfirmed || false}
+                            onChange={(e) => updateCandidateDetails(application.id, 'phoneConfirmed', e.target.checked)}
+                          />
+                          Confirm phone number: {application.phoneNumber || 'No phone number on file'}
+                        </label>
+                      </div>
+                      
+                      <div className="logistical-item">
+                        <label className="logistical-label">
+                          <input
+                            type="checkbox"
+                            checked={evaluation.candidateDetails?.decisionCallTonight || false}
+                            onChange={(e) => updateCandidateDetails(application.id, 'decisionCallTonight', e.target.checked)}
+                          />
+                          We will call with a decision tonight
+                        </label>
+                      </div>
+                      
+                      <div className="logistical-item">
+                        <label className="logistical-label">
+                          <input
+                            type="checkbox"
+                            checked={evaluation.candidateDetails?.weeklyMeetings || false}
+                            onChange={(e) => updateCandidateDetails(application.id, 'weeklyMeetings', e.target.checked)}
+                          />
+                          Weekly mandatory meetings Tuesdays 6-7pm on the hill
+                        </label>
+                      </div>
+                      
+                      <div className="logistical-item">
+                        <label className="logistical-label">
+                          <input
+                            type="checkbox"
+                            checked={evaluation.candidateDetails?.accelerator || false}
+                            onChange={(e) => updateCandidateDetails(application.id, 'accelerator', e.target.checked)}
+                          />
+                          Weekly Accelerator Thursdays 7:00 - 8:00 during the rest of Fall Quarter
+                        </label>
+                      </div>
+                      
+                      <div className="logistical-item">
+                        <label className="logistical-label">
+                          <input
+                            type="checkbox"
+                            checked={evaluation.candidateDetails?.coffeeChats || false}
+                            onChange={(e) => updateCandidateDetails(application.id, 'coffeeChats', e.target.checked)}
+                          />
+                          At least 3 coffee chats with members each week
+                        </label>
+                      </div>
+                      
+                      <div className="logistical-item">
+                        <label className="logistical-label">
+                          <input
+                            type="checkbox"
+                            checked={evaluation.candidateDetails?.dues || false}
+                            onChange={(e) => updateCandidateDetails(application.id, 'dues', e.target.checked)}
+                          />
+                          $30 dues per quarter
+                        </label>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                )}
+
               </div>
             );
           })}

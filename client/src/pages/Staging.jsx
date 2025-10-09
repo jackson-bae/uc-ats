@@ -523,6 +523,12 @@ export default function Staging() {
   const [modalVideoScores, setModalVideoScores] = useState([]);
   const [scoresLoading, setScoresLoading] = useState(false);
   const [docPreview, setDocPreview] = useState({ open: false, src: '', kind: 'pdf', title: '' });
+  
+  // Final round interview notes modal
+  const [finalRoundNotesModalOpen, setFinalRoundNotesModalOpen] = useState(false);
+  const [finalRoundNotesLoading, setFinalRoundNotesLoading] = useState(false);
+  const [finalRoundInterviewNotes, setFinalRoundInterviewNotes] = useState([]);
+  const [selectedCandidateForNotes, setSelectedCandidateForNotes] = useState(null);
 
   // Functions to fetch document scores for modal
   const fetchModalResumeScores = async (candidateId) => {
@@ -555,6 +561,23 @@ export default function Staging() {
     } catch (e) {
       console.error('Error fetching video scores:', e);
       setModalVideoScores([]);
+    }
+  };
+
+  const loadFinalRoundInterviewNotes = async (applicationId) => {
+    try {
+      setFinalRoundNotesLoading(true);
+      setSelectedCandidateForNotes(applicationId);
+      
+      // Fetch final round interview evaluations for this application
+      const notes = await apiClient.get(`/admin/applications/${applicationId}/final-round-interview-evaluations`);
+      setFinalRoundInterviewNotes(notes);
+      setFinalRoundNotesModalOpen(true);
+    } catch (error) {
+      console.error('Failed to load final round interview notes:', error);
+      setSnackbar({ open: true, message: 'Failed to load interview notes', severity: 'error' });
+    } finally {
+      setFinalRoundNotesLoading(false);
     }
   };
   const [evaluationSummaries, setEvaluationSummaries] = useState({});
@@ -2931,7 +2954,6 @@ export default function Staging() {
               <Table>
                 <TableHead>
                   <TableRow>
-                    <TableCell>Rank</TableCell>
                     <TableCell>Application</TableCell>
                     <TableCell>Evaluation Summary</TableCell>
                     <TableCell>Decisions</TableCell>
@@ -2949,18 +2971,13 @@ export default function Staging() {
                       const displayDecision = inlineDecisions[application.id] || '';
                       const evaluations = evaluationSummariesFirstRound[application.id]?.evaluations || [];
                       return (
-                        <TableRow key={application.id} hover>
-                          <TableCell>
-                            <Box display="flex" alignItems="center" gap={1}>
-                              <Typography variant="h6" fontWeight="bold" color="primary">#{index + 1}</Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                Score: {calculateRankingScore(evaluations).toFixed(1)}
-                              </Typography>
-                            </Box>
-                          </TableCell>
+                        <TableRow key={application.id} hover sx={{ cursor: 'pointer' }} onClick={() => {
+                          // Load and display final round interview evaluations
+                          loadFinalRoundInterviewNotes(application.id);
+                        }}>
                           <TableCell>
                             <Box>
-                              <Typography variant="subtitle2" fontWeight="bold">{application.name}</Typography>
+                              <Typography variant="subtitle2" fontWeight="bold" sx={{ cursor: 'pointer', color: 'primary.main', '&:hover': { textDecoration: 'underline' } }}>{application.name}</Typography>
                               <Typography variant="body2" color="text.secondary">{application.email}</Typography>
                               <Typography variant="caption" color="text.secondary">
                                 {application.major} • {application.year} • GPA: {application.gpa}
@@ -3782,6 +3799,133 @@ export default function Staging() {
             >
               Submit Final Decision
             </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Final Round Interview Notes Modal */}
+        <Dialog open={finalRoundNotesModalOpen} onClose={() => setFinalRoundNotesModalOpen(false)} maxWidth="lg" fullWidth>
+          <DialogTitle>
+            Final Round Interview Notes
+            {selectedCandidateForNotes && (
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                Application ID: {selectedCandidateForNotes}
+              </Typography>
+            )}
+          </DialogTitle>
+          <DialogContent>
+            {finalRoundNotesLoading ? (
+              <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
+                <CircularProgress />
+                <Typography variant="body2" sx={{ ml: 2 }}>Loading interview notes...</Typography>
+              </Box>
+            ) : finalRoundInterviewNotes.length === 0 ? (
+              <Box textAlign="center" py={4}>
+                <Typography variant="body1" color="text.secondary">
+                  No final round interview evaluations found for this candidate.
+                </Typography>
+              </Box>
+            ) : (
+              <Box>
+                <Typography variant="h6" gutterBottom>
+                  Interview Evaluations ({finalRoundInterviewNotes.length})
+                </Typography>
+                <Stack spacing={3}>
+                  {finalRoundInterviewNotes.map((evaluation, index) => (
+                    <Card key={evaluation.id || index} variant="outlined">
+                      <CardContent>
+                        <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={2}>
+                          <Typography variant="subtitle1" fontWeight="bold">
+                            Interviewer: {evaluation.evaluator?.fullName || 'Unknown'}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {evaluation.createdAt ? new Date(evaluation.createdAt).toLocaleDateString() : 'Date unknown'}
+                          </Typography>
+                        </Box>
+                        
+                        {/* Behavioral Notes */}
+                        {evaluation.behavioralNotes && Object.keys(evaluation.behavioralNotes).length > 0 && (
+                          <Box mb={2}>
+                            <Typography variant="subtitle2" fontWeight="bold" gutterBottom color="primary">
+                              Behavioral Assessment Notes
+                            </Typography>
+                            {Object.entries(evaluation.behavioralNotes).map(([questionIndex, notes]) => (
+                              notes && (
+                                <Box key={questionIndex} mb={1} p={2} bgcolor="grey.50" borderRadius={1}>
+                                  <Typography variant="caption" color="text.secondary" display="block">
+                                    Question {parseInt(questionIndex) + 1}
+                                  </Typography>
+                                  <Typography variant="body2">{notes}</Typography>
+                                </Box>
+                              )
+                            ))}
+                          </Box>
+                        )}
+                        
+                        {/* Casing Notes */}
+                        {evaluation.casingNotes && Object.keys(evaluation.casingNotes).length > 0 && (
+                          <Box mb={2}>
+                            <Typography variant="subtitle2" fontWeight="bold" gutterBottom color="primary">
+                              Case Interview Notes
+                            </Typography>
+                            {Object.entries(evaluation.casingNotes).map(([section, notes]) => (
+                              notes && (
+                                <Box key={section} mb={1} p={2} bgcolor="grey.50" borderRadius={1}>
+                                  <Typography variant="caption" color="text.secondary" display="block" sx={{ textTransform: 'capitalize' }}>
+                                    {section.replace(/([A-Z])/g, ' $1').trim()}
+                                  </Typography>
+                                  <Typography variant="body2">{notes}</Typography>
+                                </Box>
+                              )
+                            ))}
+                          </Box>
+                        )}
+                        
+                        {/* Candidate Details Confirmation */}
+                        {evaluation.candidateDetails && (
+                          <Box mb={2}>
+                            <Typography variant="subtitle2" fontWeight="bold" gutterBottom color="primary">
+                              Candidate Details Confirmation
+                            </Typography>
+                            <Box display="flex" flexWrap="wrap" gap={1}>
+                              {Object.entries(evaluation.candidateDetails).map(([detail, confirmed]) => (
+                                confirmed && (
+                                  <Chip 
+                                    key={detail} 
+                                    label={detail.replace(/([A-Z])/g, ' $1').trim()} 
+                                    size="small" 
+                                    color="success" 
+                                    variant="outlined"
+                                  />
+                                )
+                              ))}
+                            </Box>
+                          </Box>
+                        )}
+                        
+                        {/* Final Decision */}
+                        {evaluation.finalDecision && (
+                          <Box>
+                            <Typography variant="subtitle2" fontWeight="bold" gutterBottom color="primary">
+                              Final Decision
+                            </Typography>
+                            <Chip 
+                              label={evaluation.finalDecision} 
+                              color={evaluation.finalDecision === 'YES' ? 'success' : 
+                                     evaluation.finalDecision === 'MAYBE_YES' ? 'warning' :
+                                     evaluation.finalDecision === 'MAYBE_NO' ? 'warning' : 'error'} 
+                              variant="filled"
+                            />
+                          </Box>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </Stack>
+              </Box>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setFinalRoundNotesModalOpen(false)}>Close</Button>
           </DialogActions>
         </Dialog>
 

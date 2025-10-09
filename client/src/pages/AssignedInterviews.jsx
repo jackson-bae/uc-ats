@@ -334,9 +334,17 @@ export default function AssignedInterviews() {
 
   const handleGroupToggle = (groupId) => {
     setSelectedGroups(prev => {
+      // Check if this is a final round interview
+      const interview = interviews.find(i => i.id === selectedInterviewForStart);
+      const isFinalRound = interview?.interviewType === 'FINAL_ROUND' || interview?.interviewType === 'ROUND_TWO';
+      const maxGroups = isFinalRound ? 1 : 3;
+      
       if (prev.includes(groupId)) {
         return prev.filter(id => id !== groupId);
-      } else if (prev.length < 3) {
+      } else if (isFinalRound) {
+        // For final round, replace the current selection
+        return [groupId];
+      } else if (prev.length < maxGroups) {
         return [...prev, groupId];
       }
       return prev;
@@ -586,11 +594,16 @@ export default function AssignedInterviews() {
                   : 'Select Application Groups to Evaluate'
                 }
               </h3>
-              {!showBehavioralQuestionsConfig && (
-                <div className="selection-info">
-                  {selectedGroups.length}/3 groups selected
-                </div>
-              )}
+              {!showBehavioralQuestionsConfig && (() => {
+                const interview = interviews.find(i => i.id === selectedInterviewForStart);
+                const isFinalRound = interview?.interviewType === 'FINAL_ROUND' || interview?.interviewType === 'ROUND_TWO';
+                const maxGroups = isFinalRound ? 1 : 3;
+                return (
+                  <div className="selection-info">
+                    {selectedGroups.length}/{maxGroups} group{maxGroups === 1 ? '' : 's'} selected
+                  </div>
+                );
+              })()}
               <button className="icon-btn" onClick={handleCloseGroupSelection}>
                 <XMarkIcon className="btn-icon" />
               </button>
@@ -648,7 +661,24 @@ export default function AssignedInterviews() {
                 (() => {
                   const interview = interviews.find(i => i.id === selectedInterviewForStart);
                   const data = interviewData[selectedInterviewForStart] || { applicationGroups: [] };
-                  const filteredGroups = (data.applicationGroups || []).filter(group =>
+                  
+                  // Filter to only show groups assigned to member groups that include the current user
+                  const userAssignedGroups = currentUser ? 
+                    data.applicationGroups.filter(group => {
+                      const groupAssignments = data.groupAssignments || {};
+                      
+                      // Find all member groups that include the current user
+                      const userMemberGroups = data.memberGroups?.filter(memberGroup => 
+                        memberGroup.memberIds?.includes(currentUser.id)
+                      ) || [];
+                      
+                      // Check if this application group is assigned to any of the user's member groups
+                      return userMemberGroups.some(memberGroup => 
+                        groupAssignments[memberGroup.id]?.includes(group.id)
+                      );
+                    }) : [];
+                  
+                  const filteredGroups = userAssignedGroups.filter(group =>
                     group.name.toLowerCase().includes(groupSearchTerm.toLowerCase())
                   );
                   
@@ -672,7 +702,9 @@ export default function AssignedInterviews() {
                         ) : (
                           filteredGroups.map(group => {
                             const isSelected = selectedGroups.includes(group.id);
-                            const isDisabled = !isSelected && selectedGroups.length >= 3;
+                            const isFinalRound = interview?.interviewType === 'FINAL_ROUND' || interview?.interviewType === 'ROUND_TWO';
+                            const maxGroups = isFinalRound ? 1 : 3;
+                            const isDisabled = !isSelected && selectedGroups.length >= maxGroups;
                             
                             return (
                               <div 
@@ -682,7 +714,7 @@ export default function AssignedInterviews() {
                               >
                                 <div className="group-checkbox">
                                   <input
-                                    type="checkbox"
+                                    type={isFinalRound ? "radio" : "checkbox"}
                                     checked={isSelected}
                                     onChange={() => !isDisabled && handleGroupToggle(group.id)}
                                     disabled={isDisabled}
@@ -978,11 +1010,19 @@ export default function AssignedInterviews() {
                           const userMemberGroup = getUserMemberGroup(interview.id);
                           
                           // Filter application groups based on user's member group assignments
-                          const assignedApplicationGroups = userMemberGroup ? 
+                          const assignedApplicationGroups = currentUser ? 
                             allApplicationGroups.filter(group => {
                               const groupAssignments = currentInterviewData?.groupAssignments || {};
-                              const assignedGroupIds = groupAssignments[userMemberGroup.id] || [];
-                              return assignedGroupIds.includes(group.id);
+                              
+                              // Find all member groups that include the current user
+                              const userMemberGroups = currentInterviewData?.memberGroups?.filter(memberGroup => 
+                                memberGroup.memberIds?.includes(currentUser.id)
+                              ) || [];
+                              
+                              // Check if this application group is assigned to any of the user's member groups
+                              return userMemberGroups.some(memberGroup => 
+                                groupAssignments[memberGroup.id]?.includes(group.id)
+                              );
                             }) : [];
                           
                           return assignedApplicationGroups.length === 0 ? (

@@ -961,6 +961,7 @@ router.get('/interviews/:id/applications', requireAuth, async (req, res) => {
         firstName: true,
         lastName: true,
         email: true,
+        phoneNumber: true,
         major1: true,
         graduationYear: true,
         resumeUrl: true,
