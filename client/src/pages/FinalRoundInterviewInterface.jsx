@@ -319,17 +319,19 @@ export default function FinalRoundInterviewInterface() {
       if (isAdmin) {
         await apiClient.post(`${basePath}/interviews/${interviewId}/evaluations`, {
           applicationId,
-          notes: JSON.stringify(evaluation),
           decision: evaluation.finalDecision,
-          ...evaluation
+          behavioralNotes: evaluation.behavioralNotes,
+          casingNotes: evaluation.casingNotes,
+          candidateDetails: evaluation.candidateDetails
         });
       } else {
         await apiClient.post(`${basePath}/evaluations`, {
           interviewId,
           applicationId,
           decision: evaluation.finalDecision,
-          notes: JSON.stringify(evaluation),
-          ...evaluation
+          behavioralNotes: evaluation.behavioralNotes,
+          casingNotes: evaluation.casingNotes,
+          candidateDetails: evaluation.candidateDetails
         });
       }
       
@@ -352,17 +354,19 @@ export default function FinalRoundInterviewInterface() {
       if (isAdmin) {
         await apiClient.post(`${basePath}/interviews/${interviewId}/evaluations`, {
           applicationId,
-          notes: JSON.stringify(evaluation),
           decision: evaluation.finalDecision,
-          ...evaluation
+          behavioralNotes: evaluation.behavioralNotes,
+          casingNotes: evaluation.casingNotes,
+          candidateDetails: evaluation.candidateDetails
         });
       } else {
         await apiClient.post(`${basePath}/evaluations`, {
           interviewId,
           applicationId,
           decision: evaluation.finalDecision,
-          notes: JSON.stringify(evaluation),
-          ...evaluation
+          behavioralNotes: evaluation.behavioralNotes,
+          casingNotes: evaluation.casingNotes,
+          candidateDetails: evaluation.candidateDetails
         });
       }
       
@@ -385,17 +389,19 @@ export default function FinalRoundInterviewInterface() {
         if (isAdmin) {
           return apiClient.post(`${basePath}/interviews/${interviewId}/evaluations`, {
             applicationId: app.id,
-            notes: JSON.stringify(evaluation),
             decision: evaluation.finalDecision,
-            ...evaluation
+            behavioralNotes: evaluation.behavioralNotes,
+            casingNotes: evaluation.casingNotes,
+            candidateDetails: evaluation.candidateDetails
           });
         } else {
           return apiClient.post(`${basePath}/evaluations`, {
             interviewId,
             applicationId: app.id,
             decision: evaluation.finalDecision,
-            notes: JSON.stringify(evaluation),
-            ...evaluation
+            behavioralNotes: evaluation.behavioralNotes,
+            casingNotes: evaluation.casingNotes,
+            candidateDetails: evaluation.candidateDetails
           });
         }
       });

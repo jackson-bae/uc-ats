@@ -572,15 +572,8 @@ export default function Staging() {
       // Fetch final round interview evaluations for this application
       const notes = await apiClient.get(`/admin/applications/${applicationId}/final-round-interview-evaluations`);
       
-      // Parse JSON strings in the notes
-      const parsedNotes = notes.map(note => ({
-        ...note,
-        behavioralNotes: note.behavioralNotes ? JSON.parse(note.behavioralNotes) : null,
-        casingNotes: note.casingNotes ? JSON.parse(note.casingNotes) : null,
-        candidateDetails: note.candidateDetails ? JSON.parse(note.candidateDetails) : null
-      }));
-      
-      setFinalRoundInterviewNotes(parsedNotes);
+      // Notes are already parsed by the backend, no need to parse again
+      setFinalRoundInterviewNotes(notes);
       setFinalRoundNotesModalOpen(true);
     } catch (error) {
       console.error('Failed to load final round interview notes:', error);
@@ -3860,8 +3853,8 @@ export default function Staging() {
                             {Object.entries(evaluation.behavioralNotes).map(([questionId, notes]) => (
                               notes && (
                                 <Box key={questionId} mb={1} p={2} bgcolor="grey.50" borderRadius={1}>
-                                  <Typography variant="caption" color="text.secondary" display="block">
-                                    Question ID: {questionId}
+                                  <Typography variant="caption" color="text.secondary" display="block" sx={{ fontWeight: 'medium' }}>
+                                    Question {Object.keys(evaluation.behavioralNotes).indexOf(questionId) + 1}
                                   </Typography>
                                   <Typography variant="body2">{notes}</Typography>
                                 </Box>

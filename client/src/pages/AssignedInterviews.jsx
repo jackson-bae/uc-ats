@@ -1008,10 +1008,56 @@ export default function AssignedInterviews() {
                                         </button>
                                       </div>
                                     </div>
+                                    {/* Basic Notes */}
                                     {evaluation.notes && (
                                       <div className="evaluation-notes">
-                                        <p className="notes-label">Notes:</p>
+                                        <p className="notes-label">General Notes:</p>
                                         <p className="notes-content">{evaluation.notes}</p>
+                                      </div>
+                                    )}
+
+                                    {/* Behavioral Notes */}
+                                    {evaluation.behavioralNotes && Object.keys(evaluation.behavioralNotes).length > 0 && (
+                                      <div className="evaluation-notes">
+                                        <p className="notes-label">Behavioral Assessment Notes:</p>
+                                        {Object.entries(evaluation.behavioralNotes).map(([questionId, notes]) => (
+                                          notes && (
+                                            <div key={questionId} className="behavioral-question-notes">
+                                              <p className="question-label">Question {Object.keys(evaluation.behavioralNotes).indexOf(questionId) + 1}:</p>
+                                              <p className="notes-content">{notes}</p>
+                                            </div>
+                                          )
+                                        ))}
+                                      </div>
+                                    )}
+
+                                    {/* Casing Notes */}
+                                    {evaluation.casingNotes && Object.keys(evaluation.casingNotes).length > 0 && (
+                                      <div className="evaluation-notes">
+                                        <p className="notes-label">Case Interview Notes:</p>
+                                        {Object.entries(evaluation.casingNotes).map(([section, notes]) => (
+                                          notes && (
+                                            <div key={section} className="casing-section-notes">
+                                              <p className="section-label">{section.replace(/([A-Z])/g, ' $1').trim()}:</p>
+                                              <p className="notes-content">{notes}</p>
+                                            </div>
+                                          )
+                                        ))}
+                                      </div>
+                                    )}
+
+                                    {/* Candidate Details */}
+                                    {evaluation.candidateDetails && Object.keys(evaluation.candidateDetails).length > 0 && (
+                                      <div className="evaluation-notes">
+                                        <p className="notes-label">Candidate Details Confirmation:</p>
+                                        <div className="candidate-details-grid">
+                                          {Object.entries(evaluation.candidateDetails).map(([field, value]) => (
+                                            <div key={field} className="detail-item">
+                                              <span className="detail-label">{field.replace(/([A-Z])/g, ' $1').trim()}:</span>
+                                              <span className="detail-value">{value ? 'Yes' : 'No'}</span>
+                                            </div>
+                                          ))}
+                                        </div>
                                       </div>
                                     )}
                                     <div className="evaluation-meta">

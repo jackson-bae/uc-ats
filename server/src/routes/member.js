@@ -1139,7 +1139,44 @@ router.get('/evaluations', requireAuth, async (req, res) => {
       });
     }
     
-    res.json(evaluations);
+    // Parse JSON fields for each evaluation
+    const parsedEvaluations = evaluations.map(evaluation => {
+      const parsed = { ...evaluation };
+      
+      // Parse behavioralNotes if it's a string
+      if (parsed.behavioralNotes && typeof parsed.behavioralNotes === 'string') {
+        try {
+          parsed.behavioralNotes = JSON.parse(parsed.behavioralNotes);
+        } catch (e) {
+          console.warn('Failed to parse behavioralNotes JSON:', e);
+          parsed.behavioralNotes = {};
+        }
+      }
+      
+      // Parse casingNotes if it's a string
+      if (parsed.casingNotes && typeof parsed.casingNotes === 'string') {
+        try {
+          parsed.casingNotes = JSON.parse(parsed.casingNotes);
+        } catch (e) {
+          console.warn('Failed to parse casingNotes JSON:', e);
+          parsed.casingNotes = {};
+        }
+      }
+      
+      // Parse candidateDetails if it's a string
+      if (parsed.candidateDetails && typeof parsed.candidateDetails === 'string') {
+        try {
+          parsed.candidateDetails = JSON.parse(parsed.candidateDetails);
+        } catch (e) {
+          console.warn('Failed to parse candidateDetails JSON:', e);
+          parsed.candidateDetails = {};
+        }
+      }
+      
+      return parsed;
+    });
+    
+    res.json(parsedEvaluations);
   } catch (error) {
     console.error('[GET /api/member/evaluations]', error);
     res.status(500).json({ error: 'Failed to fetch evaluations' });
@@ -1165,7 +1202,10 @@ router.post('/evaluations', requireAuth, async (req, res) => {
       marketSizingTotal,
       behavioralNotes,
       marketSizingNotes,
-      additionalNotes
+      additionalNotes,
+      // Final round interview specific fields
+      casingNotes,
+      candidateDetails
     } = req.body;
     const evaluatorId = req.user.id;
     
@@ -1240,6 +1280,9 @@ router.post('/evaluations', requireAuth, async (req, res) => {
       const evaluationData = {
         decision,
         notes,
+        behavioralNotes: behavioralNotes ? JSON.stringify(behavioralNotes) : null,
+        casingNotes: casingNotes ? JSON.stringify(casingNotes) : null,
+        candidateDetails: candidateDetails ? JSON.stringify(candidateDetails) : null,
         updatedAt: new Date()
       };
       
