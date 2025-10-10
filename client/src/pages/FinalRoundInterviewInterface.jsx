@@ -707,7 +707,7 @@ export default function FinalRoundInterviewInterface() {
                             checked={evaluation.candidateDetails?.accelerator || false}
                             onChange={(e) => updateCandidateDetails(application.id, 'accelerator', e.target.checked)}
                           />
-                          Weekly Accelerator Thursdays 7:00 - 8:00 during the rest of Fall Quarter
+                          Weekly Accelerator Mondays 6:00 - 7:00 during the rest of Fall Quarter
                         </label>
                       </div>
                       
