@@ -321,15 +321,8 @@ export default function AssignedInterviews() {
     setSelectedGroups([]);
     setShowBehavioralQuestionsConfig(false);
     
-    // Load existing behavioral questions for this interview
-    try {
-      const configRes = await apiClient.get(`/member/interviews/${interviewId}/config`);
-      const existingQuestions = configRes.behavioralQuestions || [];
-      setBehavioralQuestionsConfig(existingQuestions);
-    } catch (error) {
-      console.warn('Failed to load existing behavioral questions:', error);
-      setBehavioralQuestionsConfig([]);
-    }
+    // Don't load questions here - we'll load them when groups are selected
+    setBehavioralQuestionsConfig([]);
   };
 
   const handleGroupToggle = (groupId) => {
@@ -339,19 +332,49 @@ export default function AssignedInterviews() {
       const isFinalRound = interview?.interviewType === 'FINAL_ROUND' || interview?.interviewType === 'ROUND_TWO';
       const maxGroups = isFinalRound ? 1 : 3;
       
+      let newGroups;
       if (prev.includes(groupId)) {
-        return prev.filter(id => id !== groupId);
+        newGroups = prev.filter(id => id !== groupId);
       } else if (isFinalRound) {
         // For final round, replace the current selection
-        return [groupId];
+        newGroups = [groupId];
       } else if (prev.length < maxGroups) {
-        return [...prev, groupId];
+        newGroups = [...prev, groupId];
+      } else {
+        return prev;
       }
-      return prev;
+      
+      // Load behavioral questions for the selected groups
+      loadBehavioralQuestionsForGroups(newGroups);
+      
+      return newGroups;
     });
   };
 
-  const handleStartWithSelectedGroups = () => {
+  const loadBehavioralQuestionsForGroups = async (groupIds) => {
+    if (groupIds.length === 0) {
+      setBehavioralQuestionsConfig([]);
+      return;
+    }
+
+    try {
+      const configRes = await apiClient.get(`/member/interviews/${selectedInterviewForStart}/config?groupIds=${groupIds.join(',')}`);
+      const questionsByGroup = configRes.behavioralQuestions || {};
+      
+      // Flatten questions from all groups
+      const allQuestions = [];
+      Object.values(questionsByGroup).forEach(groupQuestions => {
+        allQuestions.push(...groupQuestions.map(q => q.text || q));
+      });
+      
+      setBehavioralQuestionsConfig(allQuestions);
+    } catch (error) {
+      console.warn('Failed to load behavioral questions for groups:', error);
+      setBehavioralQuestionsConfig([]);
+    }
+  };
+
+  const handleStartWithSelectedGroups = async () => {
     console.log('handleStartWithSelectedGroups called!');
     console.log('selectedGroups:', selectedGroups);
     console.log('selectedInterviewForStart:', selectedInterviewForStart);
@@ -375,7 +398,14 @@ export default function AssignedInterviews() {
     
     // Save behavioral questions configuration if provided
     if (showBehavioralQuestionsConfig && behavioralQuestionsConfig.length > 0) {
-      saveBehavioralQuestionsConfiguration();
+      try {
+        await saveBehavioralQuestionsConfiguration();
+        console.log('Behavioral questions saved successfully');
+      } catch (error) {
+        console.error('Failed to save behavioral questions:', error);
+        alert('Failed to save behavioral questions. Please try again.');
+        return; // Don't navigate if save failed
+      }
     }
     
     // Route to appropriate interface based on interview type
@@ -405,37 +435,34 @@ export default function AssignedInterviews() {
 
   const saveBehavioralQuestionsConfiguration = async () => {
     try {
-      const interview = interviews.find(i => i.id === selectedInterviewForStart);
-      const currentData = interviewData[selectedInterviewForStart] || {};
+      // Save questions to each selected group individually
+      const questionsToSave = behavioralQuestionsConfig.filter(q => q.trim() !== '');
       
-      // Update the interview data with behavioral questions
-      const updatedData = {
-        ...currentData,
-        behavioralQuestions: behavioralQuestionsConfig.filter(q => q.trim() !== '')
-      };
-      
-      // Save to backend using member endpoint
-      await apiClient.patch(`/member/interviews/${selectedInterviewForStart}/config`, {
-        type: 'full',
-        config: updatedData
+      console.log('Saving behavioral questions:', {
+        selectedGroups,
+        questionsToSave,
+        interviewId: selectedInterviewForStart
       });
       
-      // Update local state
-      setInterviewData(prev => ({
-        ...prev,
-        [selectedInterviewForStart]: updatedData
-      }));
+      for (const groupId of selectedGroups) {
+        console.log(`Saving questions for group ${groupId}:`, questionsToSave);
+        const response = await apiClient.patch(`/member/interviews/${selectedInterviewForStart}/config`, {
+          type: 'behavioral_questions',
+          config: {
+            behavioralQuestions: true,
+            groupId: groupId,
+            questions: questionsToSave
+          }
+        });
+        console.log(`Save response for group ${groupId}:`, response);
+      }
       
-      // Update interview description
-      setInterviews(prev => prev.map(iv => 
-        iv.id === selectedInterviewForStart 
-          ? { ...iv, description: JSON.stringify(updatedData) } 
-          : iv
-      ));
+      console.log('Behavioral questions saved successfully for groups:', selectedGroups);
       
     } catch (error) {
       console.error('Failed to save behavioral questions configuration:', error);
       alert('Failed to save behavioral questions configuration');
+      throw error; // Re-throw so the calling function can handle it
     }
   };
 

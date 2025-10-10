@@ -94,13 +94,23 @@ export default function FinalRoundInterviewInterface() {
         console.log('Interview data loaded:', interviewRes);
         setInterview(interviewRes);
         
-        // Load interview configuration to get behavioral questions
+        // Load interview configuration to get behavioral questions for selected groups
         try {
-          const configRes = await apiClient.get(`${basePath}/interviews/${interviewId}/config`);
+          const configRes = await apiClient.get(`${basePath}/interviews/${interviewId}/config?groupIds=${groupIds.join(',')}`);
           console.log('Interview config loaded:', configRes);
-          const questions = configRes.behavioralQuestions || [];
-          console.log('Loaded behavioral questions from config:', questions);
-          setBehavioralQuestions(questions);
+          const questionsByGroup = configRes.behavioralQuestions || {};
+          
+          // Flatten questions from all groups into a single array for display
+          const allQuestions = [];
+          Object.values(questionsByGroup).forEach(groupQuestions => {
+            allQuestions.push(...groupQuestions);
+          });
+          
+          // Sort by order
+          allQuestions.sort((a, b) => a.order - b.order);
+          
+          console.log('Loaded behavioral questions from config:', allQuestions);
+          setBehavioralQuestions(allQuestions);
         } catch (configError) {
           console.warn('Failed to load interview config:', configError);
           setBehavioralQuestions([]);
@@ -163,10 +173,10 @@ export default function FinalRoundInterviewInterface() {
     }));
   };
 
-  const updateBehavioralNotes = (applicationId, questionIndex, notes) => {
+  const updateBehavioralNotes = (applicationId, questionId, notes) => {
     const evaluation = getEvaluation(applicationId);
     const behavioralNotes = { ...evaluation.behavioralNotes };
-    behavioralNotes[questionIndex] = notes;
+    behavioralNotes[questionId] = notes;
     updateEvaluation(applicationId, { behavioralNotes });
     scheduleAutoSave(applicationId);
   };
@@ -193,29 +203,38 @@ export default function FinalRoundInterviewInterface() {
     scheduleAutoSave(applicationId);
   };
 
-  const addBehavioralQuestion = async () => {
+  const addBehavioralQuestion = async (groupId) => {
     try {
       const isAdmin = window.location.pathname.includes('/admin/');
       const basePath = isAdmin ? '/admin' : '/member';
       
-      // Get current configuration
-      const configRes = await apiClient.get(`${basePath}/interviews/${interviewId}/config`);
-      const currentQuestions = configRes.behavioralQuestions || [];
+      // Get current questions for the specific group
+      const configRes = await apiClient.get(`${basePath}/interviews/${interviewId}/config?groupIds=${groupId}`);
+      const questionsByGroup = configRes.behavioralQuestions || {};
+      const currentQuestions = questionsByGroup[groupId] || [];
       
       // Add new empty question
-      const newQuestions = [...currentQuestions, ''];
+      const newQuestions = [...currentQuestions.map(q => q.text || q), ''];
       
-      // Update configuration
+      // Update configuration for this specific group
       await apiClient.patch(`${basePath}/interviews/${interviewId}/config`, {
         type: 'behavioral_questions',
         config: {
-          ...configRes,
-          behavioralQuestions: newQuestions
+          behavioralQuestions: true,
+          groupId: groupId,
+          questions: newQuestions
         }
       });
       
-      // Update local state
-      setBehavioralQuestions(newQuestions);
+      // Reload questions for all groups
+      const updatedConfigRes = await apiClient.get(`${basePath}/interviews/${interviewId}/config?groupIds=${groupIds.join(',')}`);
+      const updatedQuestionsByGroup = updatedConfigRes.behavioralQuestions || {};
+      const allQuestions = [];
+      Object.values(updatedQuestionsByGroup).forEach(groupQuestions => {
+        allQuestions.push(...groupQuestions);
+      });
+      allQuestions.sort((a, b) => a.order - b.order);
+      setBehavioralQuestions(allQuestions);
       
       alert('Question added successfully!');
     } catch (error) {
@@ -224,29 +243,49 @@ export default function FinalRoundInterviewInterface() {
     }
   };
 
-  const updateBehavioralQuestion = async (index, newQuestion) => {
+  const updateBehavioralQuestion = async (questionId, newQuestion) => {
     try {
       const isAdmin = window.location.pathname.includes('/admin/');
       const basePath = isAdmin ? '/admin' : '/member';
       
-      // Get current configuration
-      const configRes = await apiClient.get(`${basePath}/interviews/${interviewId}/config`);
-      const currentQuestions = [...configRes.behavioralQuestions];
+      // Find which group this question belongs to
+      const currentQuestion = behavioralQuestions.find(q => q.id === questionId);
+      if (!currentQuestion) {
+        alert('Question not found');
+        return;
+      }
+      
+      const groupId = currentQuestion.groupId;
+      
+      // Get current questions for the specific group
+      const configRes = await apiClient.get(`${basePath}/interviews/${interviewId}/config?groupIds=${groupId}`);
+      const questionsByGroup = configRes.behavioralQuestions || {};
+      const currentQuestions = questionsByGroup[groupId] || [];
       
       // Update the specific question
-      currentQuestions[index] = newQuestion;
+      const updatedQuestions = currentQuestions.map(q => 
+        q.id === questionId ? { ...q, text: newQuestion } : q
+      );
       
-      // Update configuration
+      // Update configuration for this specific group
       await apiClient.patch(`${basePath}/interviews/${interviewId}/config`, {
         type: 'behavioral_questions',
         config: {
-          ...configRes,
-          behavioralQuestions: currentQuestions
+          behavioralQuestions: true,
+          groupId: groupId,
+          questions: updatedQuestions.map(q => q.text)
         }
       });
       
-      // Update local state
-      setBehavioralQuestions(currentQuestions);
+      // Reload questions for all groups
+      const updatedConfigRes = await apiClient.get(`${basePath}/interviews/${interviewId}/config?groupIds=${groupIds.join(',')}`);
+      const updatedQuestionsByGroup = updatedConfigRes.behavioralQuestions || {};
+      const allQuestions = [];
+      Object.values(updatedQuestionsByGroup).forEach(groupQuestions => {
+        allQuestions.push(...groupQuestions);
+      });
+      allQuestions.sort((a, b) => a.order - b.order);
+      setBehavioralQuestions(allQuestions);
       
     } catch (error) {
       console.error('Failed to update question:', error);
@@ -581,7 +620,14 @@ export default function FinalRoundInterviewInterface() {
                       </h4>
                       <button 
                         className="add-question-btn"
-                        onClick={addBehavioralQuestion}
+                        onClick={() => {
+                          // For now, add to the first group. In a more advanced UI, we'd let user choose the group
+                          if (groupIds.length > 0) {
+                            addBehavioralQuestion(groupIds[0]);
+                          } else {
+                            alert('No groups selected');
+                          }
+                        }}
                         title="Add a new behavioral question"
                       >
                         <PlusIcon className="btn-icon" />
@@ -591,16 +637,22 @@ export default function FinalRoundInterviewInterface() {
                     
                     <div className="behavioral-questions">
                       {behavioralQuestions.map((question, questionIndex) => (
-                        <div key={questionIndex} className="question-row">
+                        <div key={question.id || questionIndex} className="question-row">
                           <div className="question-cell">
                             <div className="question-header">
-                              <h5 className="question-text">{question || `Question ${questionIndex + 1}`}</h5>
+                              <h5 className="question-text">{question.text || question || `Question ${questionIndex + 1}`}</h5>
+                              {question.createdBy && (
+                                <span className="question-creator">
+                                  Created by: {question.createdBy.fullName}
+                                </span>
+                              )}
                               <button 
                                 className="edit-question-btn"
                                 onClick={() => {
-                                  const newQuestion = prompt('Edit question:', question);
-                                  if (newQuestion !== null) {
-                                    updateBehavioralQuestion(questionIndex, newQuestion);
+                                  const currentText = question.text || question;
+                                  const newQuestion = prompt('Edit question:', currentText);
+                                  if (newQuestion !== null && newQuestion !== currentText) {
+                                    updateBehavioralQuestion(question.id, newQuestion);
                                   }
                                 }}
                                 title="Edit this question"
@@ -612,8 +664,8 @@ export default function FinalRoundInterviewInterface() {
                           <div className="interviewer-notes-cell">
                             <textarea
                               className="notes-textarea"
-                              value={evaluation.behavioralNotes?.[questionIndex] || ''}
-                              onChange={(e) => updateBehavioralNotes(application.id, questionIndex, e.target.value)}
+                              value={evaluation.behavioralNotes?.[question.id] || ''}
+                              onChange={(e) => updateBehavioralNotes(application.id, question.id, e.target.value)}
                               placeholder="Your notes..."
                               rows={4}
                             />

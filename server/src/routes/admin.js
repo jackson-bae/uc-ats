@@ -1545,6 +1545,7 @@ router.get('/interviews/:id', async (req, res) => {
 router.get('/interviews/:id/config', async (req, res) => {
   try {
     const { id } = req.params;
+    const { groupIds } = req.query;
     
     const interview = await prisma.interview.findUnique({
       where: { id }
@@ -1564,6 +1565,50 @@ router.get('/interviews/:id/config', async (req, res) => {
       } catch (e) {
         console.warn('Failed to parse interview description:', e);
         config = {};
+      }
+    }
+    
+    // Get group-scoped behavioral questions if groupIds provided
+    if (groupIds) {
+      try {
+        const groupIdArray = groupIds.split(',');
+        const behavioralQuestions = await prisma.behavioralQuestion.findMany({
+          where: {
+            interviewId: id,
+            groupId: { in: groupIdArray }
+          },
+          orderBy: { order: 'asc' },
+          include: {
+            creator: {
+              select: {
+                id: true,
+                fullName: true,
+                email: true
+              }
+            }
+          }
+        });
+        
+        // Group questions by group ID for easier frontend handling
+        const questionsByGroup = {};
+        behavioralQuestions.forEach(question => {
+          if (!questionsByGroup[question.groupId]) {
+            questionsByGroup[question.groupId] = [];
+          }
+          questionsByGroup[question.groupId].push({
+            id: question.id,
+            text: question.questionText,
+            order: question.order,
+            createdBy: question.creator,
+            groupId: question.groupId,
+            createdAt: question.createdAt
+          });
+        });
+        
+        config.behavioralQuestions = questionsByGroup;
+      } catch (error) {
+        console.warn('Behavioral questions table not found yet, returning empty questions:', error.message);
+        config.behavioralQuestions = {};
       }
     }
     
@@ -1588,7 +1633,69 @@ router.patch('/interviews/:id/config', async (req, res) => {
       return res.status(404).json({ error: 'Interview not found' });
     }
     
-    // Update interview with configuration
+    // Handle behavioral questions update
+    if (type === 'behavioral_questions' && config.behavioralQuestions) {
+      try {
+        const { groupId, questions } = config;
+        
+        if (!groupId || !questions) {
+          return res.status(400).json({ error: 'groupId and questions are required for behavioral questions update' });
+        }
+        
+        console.log('Admin - Attempting to save behavioral questions:', {
+          interviewId: id,
+          groupId,
+          questions: questions.filter(q => q.trim() !== ''),
+          userId: req.user?.id
+        });
+        
+        // Verify the interview exists
+        const interviewExists = await prisma.interview.findUnique({
+          where: { id: id },
+          select: { id: true }
+        });
+        
+        if (!interviewExists) {
+          console.error('Interview not found:', id);
+          return res.status(400).json({ error: `Interview with ID ${id} not found` });
+        }
+        
+        console.log('Interview exists:', interviewExists);
+        
+        // Delete existing questions for this group and interview
+        await prisma.behavioralQuestion.deleteMany({
+          where: {
+            interviewId: id,
+            groupId: groupId
+          }
+        });
+        
+        // Insert new questions
+        const questionsToCreate = questions
+          .filter(q => q.trim() !== '')
+          .map((questionText, index) => ({
+            interviewId: id,
+            groupId: groupId,
+            questionText: questionText,
+            order: index,
+            createdBy: req.user.id // Assuming req.user is available in admin routes
+          }));
+        
+        if (questionsToCreate.length > 0) {
+          console.log('Creating behavioral questions:', questionsToCreate);
+          await prisma.behavioralQuestion.createMany({
+            data: questionsToCreate
+          });
+        }
+        
+        return res.json({ success: true, message: 'Behavioral questions updated successfully' });
+      } catch (error) {
+        console.error('Error saving behavioral questions:', error);
+        return res.status(500).json({ error: 'Failed to save behavioral questions', details: error.message });
+      }
+    }
+    
+    // Handle other configuration updates (legacy support)
     const updatedInterview = await prisma.interview.update({
       where: { id },
       data: {

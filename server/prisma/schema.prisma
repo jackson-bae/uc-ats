@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
@@ -31,6 +32,7 @@ model User {
   firstRoundEvaluations FirstRoundInterviewEvaluation[] @relation("FirstRoundEvaluator")
   interviewResources   InterviewResource[]
   createdInterviews    Interview[]           @relation("InterviewCreator")
+  createdBehavioralQuestions BehavioralQuestion[]
   resumeScores         ResumeScore[]
   videoScores          VideoScore[]
   flaggedDocuments     FlaggedDocument[]     @relation("DocumentFlagger")
@@ -402,6 +404,7 @@ model Interview {
   assignments        InterviewAssignment[]
   evaluations        InterviewEvaluation[]
   firstRoundEvaluations FirstRoundInterviewEvaluation[]
+  behavioralQuestions BehavioralQuestion[]
   creator            User                  @relation("InterviewCreator", fields: [createdBy], references: [id])
   cycle              RecruitingCycle       @relation(fields: [cycleId], references: [id])
 
@@ -605,4 +608,23 @@ model MeetingSignup {
 
   @@unique([slotId, email])
   @@map("meeting_signups")
+}
+
+model BehavioralQuestion {
+  id           String   @id @default(uuid())
+  interviewId  String
+  groupId      String   // This can be either a real group ID or application group ID
+  questionText String
+  order        Int      @default(0)
+  createdBy    String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  interview    Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  creator      User     @relation(fields: [createdBy], references: [id])
+
+  @@index([interviewId, groupId])
+  @@index([interviewId])
+  @@index([groupId])
+  @@index([createdBy])
+  @@map("behavioral_questions")
 }

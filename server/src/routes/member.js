@@ -578,6 +578,8 @@ router.get('/interviews/:id', requireAuth, async (req, res) => {
 router.get('/interviews/:id/config', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
+    const { groupIds } = req.query;
+    const userId = req.user.id;
     
     const interview = await prisma.interview.findUnique({
       where: { id }
@@ -600,6 +602,56 @@ router.get('/interviews/:id/config', requireAuth, async (req, res) => {
       }
     }
     
+    // Get group-scoped behavioral questions if groupIds provided
+    if (groupIds) {
+      const groupIdArray = groupIds.split(',');
+      
+      // Note: groupIds are application group IDs, not review group IDs
+      // Access control is handled at the interview level, not the group level
+      console.log('Member - Loading behavioral questions for application groups:', groupIdArray);
+      
+      try {
+        const behavioralQuestions = await prisma.behavioralQuestion.findMany({
+          where: {
+            interviewId: id,
+            groupId: { in: groupIdArray }
+          },
+          orderBy: { order: 'asc' },
+          include: {
+            creator: {
+              select: {
+                id: true,
+                fullName: true,
+                email: true
+              }
+            }
+          }
+        });
+        
+        // Group questions by group ID for easier frontend handling
+        const questionsByGroup = {};
+        behavioralQuestions.forEach(question => {
+          if (!questionsByGroup[question.groupId]) {
+            questionsByGroup[question.groupId] = [];
+          }
+          questionsByGroup[question.groupId].push({
+            id: question.id,
+            text: question.questionText,
+            order: question.order,
+            createdBy: question.creator,
+            groupId: question.groupId,
+            createdAt: question.createdAt
+          });
+        });
+        
+        config.behavioralQuestions = questionsByGroup;
+        console.log('Member - Loaded behavioral questions:', questionsByGroup);
+      } catch (error) {
+        console.warn('Behavioral questions table not found yet, returning empty questions:', error.message);
+        config.behavioralQuestions = {};
+      }
+    }
+    
     res.json(config);
   } catch (error) {
     console.error('[GET /api/member/interviews/:id/config]', error);
@@ -612,6 +664,7 @@ router.patch('/interviews/:id/config', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const { type, config } = req.body;
+    const userId = req.user.id;
     
     const interview = await prisma.interview.findUnique({
       where: { id }
@@ -621,7 +674,54 @@ router.patch('/interviews/:id/config', requireAuth, async (req, res) => {
       return res.status(404).json({ error: 'Interview not found' });
     }
     
-    // Update interview with configuration
+    // Handle behavioral questions update
+    if (type === 'behavioral_questions' && config.behavioralQuestions) {
+      const { groupId, questions } = config;
+      
+      if (!groupId || !questions) {
+        return res.status(400).json({ error: 'groupId and questions are required for behavioral questions update' });
+      }
+      
+      console.log('Member - Attempting to save behavioral questions:', {
+        interviewId: id,
+        groupId,
+        questions: questions.filter(q => q.trim() !== ''),
+        userId
+      });
+      
+      // Note: For behavioral questions, we're working with application groups
+      // The access control is handled at the interview level, not the group level
+      console.log('Member - Using application group for behavioral questions:', groupId);
+      
+      // Delete existing questions for this group and interview
+      await prisma.behavioralQuestion.deleteMany({
+        where: {
+          interviewId: id,
+          groupId: groupId
+        }
+      });
+      
+      // Insert new questions
+      const questionsToCreate = questions
+        .filter(q => q.trim() !== '')
+        .map((questionText, index) => ({
+          interviewId: id,
+          groupId: groupId,
+          questionText: questionText,
+          order: index,
+          createdBy: userId
+        }));
+      
+      if (questionsToCreate.length > 0) {
+        await prisma.behavioralQuestion.createMany({
+          data: questionsToCreate
+        });
+      }
+      
+      return res.json({ success: true, message: 'Behavioral questions updated successfully' });
+    }
+    
+    // Handle other configuration updates (legacy support)
     const updatedInterview = await prisma.interview.update({
       where: { id },
       data: {

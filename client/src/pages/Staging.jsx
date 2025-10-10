@@ -571,7 +571,16 @@ export default function Staging() {
       
       // Fetch final round interview evaluations for this application
       const notes = await apiClient.get(`/admin/applications/${applicationId}/final-round-interview-evaluations`);
-      setFinalRoundInterviewNotes(notes);
+      
+      // Parse JSON strings in the notes
+      const parsedNotes = notes.map(note => ({
+        ...note,
+        behavioralNotes: note.behavioralNotes ? JSON.parse(note.behavioralNotes) : null,
+        casingNotes: note.casingNotes ? JSON.parse(note.casingNotes) : null,
+        candidateDetails: note.candidateDetails ? JSON.parse(note.candidateDetails) : null
+      }));
+      
+      setFinalRoundInterviewNotes(parsedNotes);
       setFinalRoundNotesModalOpen(true);
     } catch (error) {
       console.error('Failed to load final round interview notes:', error);
@@ -3848,11 +3857,11 @@ export default function Staging() {
                             <Typography variant="subtitle2" fontWeight="bold" gutterBottom color="primary">
                               Behavioral Assessment Notes
                             </Typography>
-                            {Object.entries(evaluation.behavioralNotes).map(([questionIndex, notes]) => (
+                            {Object.entries(evaluation.behavioralNotes).map(([questionId, notes]) => (
                               notes && (
-                                <Box key={questionIndex} mb={1} p={2} bgcolor="grey.50" borderRadius={1}>
+                                <Box key={questionId} mb={1} p={2} bgcolor="grey.50" borderRadius={1}>
                                   <Typography variant="caption" color="text.secondary" display="block">
-                                    Question {parseInt(questionIndex) + 1}
+                                    Question ID: {questionId}
                                   </Typography>
                                   <Typography variant="body2">{notes}</Typography>
                                 </Box>
