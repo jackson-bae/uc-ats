@@ -1662,29 +1662,64 @@ router.patch('/interviews/:id/config', async (req, res) => {
         
         console.log('Interview exists:', interviewExists);
         
-        // Delete existing questions for this group and interview
-        await prisma.behavioralQuestion.deleteMany({
+        // Get existing questions for this group and interview
+        const existingQuestions = await prisma.behavioralQuestion.findMany({
           where: {
             interviewId: id,
             groupId: groupId
-          }
+          },
+          orderBy: { order: 'asc' }
         });
         
-        // Insert new questions
-        const questionsToCreate = questions
-          .filter(q => q.trim() !== '')
-          .map((questionText, index) => ({
-            interviewId: id,
-            groupId: groupId,
-            questionText: questionText,
-            order: index,
-            createdBy: req.user.id // Assuming req.user is available in admin routes
-          }));
+        const filteredQuestions = questions.filter(q => q.trim() !== '');
         
-        if (questionsToCreate.length > 0) {
-          console.log('Creating behavioral questions:', questionsToCreate);
-          await prisma.behavioralQuestion.createMany({
-            data: questionsToCreate
+        // Update existing questions and create new ones
+        for (let i = 0; i < filteredQuestions.length; i++) {
+          const questionText = filteredQuestions[i];
+          
+          if (existingQuestions[i]) {
+            // Update existing question if text has changed
+            if (existingQuestions[i].questionText !== questionText) {
+              await prisma.behavioralQuestion.update({
+                where: { id: existingQuestions[i].id },
+                data: {
+                  questionText: questionText,
+                  order: i,
+                  updatedAt: new Date()
+                }
+              });
+            } else if (existingQuestions[i].order !== i) {
+              // Update order if it has changed
+              await prisma.behavioralQuestion.update({
+                where: { id: existingQuestions[i].id },
+                data: {
+                  order: i,
+                  updatedAt: new Date()
+                }
+              });
+            }
+          } else {
+            // Create new question
+            await prisma.behavioralQuestion.create({
+              data: {
+                interviewId: id,
+                groupId: groupId,
+                questionText: questionText,
+                order: i,
+                createdBy: req.user.id
+              }
+            });
+          }
+        }
+        
+        // Delete any questions that are no longer in the list
+        if (filteredQuestions.length < existingQuestions.length) {
+          await prisma.behavioralQuestion.deleteMany({
+            where: {
+              interviewId: id,
+              groupId: groupId,
+              order: { gte: filteredQuestions.length }
+            }
           });
         }
         
