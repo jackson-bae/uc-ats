@@ -42,6 +42,8 @@ import {
 export default function MemberMeetingSlots() {
   const { token } = useAuth();
   const [slots, setSlots] = useState([]);
+  const [allSlots, setAllSlots] = useState([]); // Store all slots for filtering
+  const [activeCycle, setActiveCycle] = useState(null);
   const [form, setForm] = useState({ location: '', startTime: '', endTime: '', capacity: 2 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -55,12 +57,54 @@ export default function MemberMeetingSlots() {
     api.setToken(token);
   }, [token]);
 
+  const loadActiveCycle = async () => {
+    try {
+      const cycles = await api.get('/admin/cycles');
+      const active = cycles.find(c => c.isActive);
+      setActiveCycle(active || null);
+      return active || null;
+    } catch (e) {
+      console.error('Failed to load active cycle:', e);
+      return null;
+    }
+  };
+
+  const filterSlotsByCycle = (slotsToFilter, cycle) => {
+    if (!cycle) return slotsToFilter;
+    
+    // If cycle has date range, filter slots by date
+    if (cycle.startDate || cycle.endDate) {
+      return slotsToFilter.filter(slot => {
+        const slotDate = new Date(slot.startTime);
+        const startDate = cycle.startDate ? new Date(cycle.startDate) : null;
+        const endDate = cycle.endDate ? new Date(cycle.endDate) : null;
+        
+        // If cycle has start date, slot must be on or after start date
+        if (startDate && slotDate < startDate) return false;
+        
+        // If cycle has end date, slot must be on or before end date
+        if (endDate && slotDate > endDate) return false;
+        
+        return true;
+      });
+    }
+    
+    // If no date range, return all slots (or empty if you want to hide them)
+    // For now, return empty array to hide old cycle slots
+    return [];
+  };
+
   const load = async () => {
     try {
       setLoading(true);
       setError('');
       const data = await api.get('/member/meeting-slots');
-      setSlots(data);
+      setAllSlots(data);
+      
+      // Load active cycle and filter slots
+      const cycle = await loadActiveCycle();
+      const filtered = filterSlotsByCycle(data, cycle);
+      setSlots(filtered);
     } catch (e) {
       setError(e.message || 'Failed to load meeting slots');
     } finally {
@@ -70,6 +114,32 @@ export default function MemberMeetingSlots() {
 
   useEffect(() => {
     load();
+    
+    // Listen for cycle activation events and reset when a new cycle is activated
+    const handleCycleActivated = async () => {
+      // Clear slots since they're tied to the previous cycle
+      setSlots([]);
+      setForm({ location: '', startTime: '', endTime: '', capacity: 2 });
+      setEditingSlot(null);
+      setEditForm({ location: '', startTime: '', endTime: '', capacity: 2 });
+      setError('');
+      setDateError('');
+      setEditDateError('');
+      
+      // Reload active cycle and filter existing slots
+      const cycle = await loadActiveCycle();
+      const filtered = filterSlotsByCycle(allSlots, cycle);
+      setSlots(filtered);
+      
+      // Also reload from server to get any new slots
+      await load();
+    };
+    
+    window.addEventListener('cycleActivated', handleCycleActivated);
+    
+    return () => {
+      window.removeEventListener('cycleActivated', handleCycleActivated);
+    };
   }, []);
 
   const validateDate = (dateString) => {

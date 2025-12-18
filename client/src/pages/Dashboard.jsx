@@ -101,7 +101,30 @@ export default function Dashboard() {
         return;
       }
       
-      const timelineEvents = events
+      // Filter events by active cycle
+      let filteredEvents = events;
+      if (activeCycle) {
+        filteredEvents = events.filter(event => {
+          // Check if event belongs to the active cycle
+          if (event.cycleId === activeCycle.id) {
+            return true;
+          }
+          // Also check by date range if cycle has dates
+          if (activeCycle.startDate || activeCycle.endDate) {
+            const eventDate = new Date(event.eventStartDate);
+            const startDate = activeCycle.startDate ? new Date(activeCycle.startDate) : null;
+            const endDate = activeCycle.endDate ? new Date(activeCycle.endDate) : null;
+            
+            if (startDate && eventDate < startDate) return false;
+            if (endDate && eventDate > endDate) return false;
+            
+            return true;
+          }
+          return false;
+        });
+      }
+      
+      const timelineEvents = filteredEvents
         .sort((a, b) => new Date(a.eventStartDate) - new Date(b.eventStartDate))
         .map(event => {
           const eventDate = new Date(event.eventStartDate);
@@ -225,6 +248,31 @@ export default function Dashboard() {
       fetchTimelineEvents();
       fetchDemographicData();
     }
+  }, [user]);
+
+  // Refetch timeline events when active cycle changes
+  useEffect(() => {
+    if (user && activeCycle) {
+      fetchTimelineEvents();
+    }
+  }, [activeCycle]);
+
+  // Listen for cycle activation events
+  useEffect(() => {
+    if (!user) return;
+    
+    const handleCycleActivated = () => {
+      // Reload dashboard data when a new cycle is activated
+      load();
+      fetchTimelineEvents();
+      fetchDemographicData();
+    };
+    
+    window.addEventListener('cycleActivated', handleCycleActivated);
+    
+    return () => {
+      window.removeEventListener('cycleActivated', handleCycleActivated);
+    };
   }, [user]);
 
   // Update scroll button states when timeline events change

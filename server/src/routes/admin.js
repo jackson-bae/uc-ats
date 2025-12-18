@@ -877,7 +877,7 @@ router.get('/cycles/active', async (req, res) => {
 // Create a new cycle
 router.post('/cycles', async (req, res) => {
   try {
-    const { name, formUrl, startDate, endDate, isActive } = req.body;
+    const { name, formUrl, startDate, endDate, isActive, resumeDeadline, coverLetterDeadline, videoDeadline } = req.body;
     const created = await prisma.recruitingCycle.create({
       data: {
         name,
@@ -885,6 +885,9 @@ router.post('/cycles', async (req, res) => {
         startDate: startDate ? new Date(startDate) : null,
         endDate: endDate ? new Date(endDate) : null,
         isActive: Boolean(isActive) || false,
+        resumeDeadline: resumeDeadline || null,
+        coverLetterDeadline: coverLetterDeadline || null,
+        videoDeadline: videoDeadline || null,
       }
     });
     // If created as active, deactivate others
@@ -928,25 +931,61 @@ router.post('/cycles/:id/activate', async (req, res) => {
 // Update a cycle
 router.patch('/cycles/:id', async (req, res) => {
   const { id } = req.params;
-  const { name, formUrl, startDate, endDate, isActive } = req.body;
+  const { name, formUrl, startDate, endDate, isActive, resumeDeadline, coverLetterDeadline, videoDeadline } = req.body;
   try {
+    console.log('[PATCH /api/admin/cycles/:id] Updating cycle:', id, 'with data:', req.body);
+    
+    const updateData = {
+      ...(name !== undefined ? { name } : {}),
+      ...(formUrl !== undefined ? { formUrl } : {}),
+      ...(startDate !== undefined ? { startDate: startDate ? new Date(startDate) : null } : {}),
+      ...(endDate !== undefined ? { endDate: endDate ? new Date(endDate) : null } : {}),
+      ...(isActive !== undefined ? { isActive: Boolean(isActive) } : {}),
+    };
+    
+    // Add deadline fields if they exist in the schema
+    if (resumeDeadline !== undefined) {
+      updateData.resumeDeadline = resumeDeadline || null;
+    }
+    if (coverLetterDeadline !== undefined) {
+      updateData.coverLetterDeadline = coverLetterDeadline || null;
+    }
+    if (videoDeadline !== undefined) {
+      updateData.videoDeadline = videoDeadline || null;
+    }
+    
+    console.log('[PATCH /api/admin/cycles/:id] Update data:', updateData);
+    
     const updated = await prisma.recruitingCycle.update({
       where: { id },
-      data: {
-        ...(name !== undefined ? { name } : {}),
-        ...(formUrl !== undefined ? { formUrl } : {}),
-        ...(startDate !== undefined ? { startDate: startDate ? new Date(startDate) : null } : {}),
-        ...(endDate !== undefined ? { endDate: endDate ? new Date(endDate) : null } : {}),
-        ...(isActive !== undefined ? { isActive: Boolean(isActive) } : {}),
-      }
+      data: updateData
     });
+    
     if (isActive) {
       await prisma.recruitingCycle.updateMany({ where: { id: { not: id }, isActive: true }, data: { isActive: false } });
     }
+    
+    console.log('[PATCH /api/admin/cycles/:id] Successfully updated cycle');
     res.json(updated);
   } catch (error) {
-    console.error('[PATCH /api/admin/cycles/:id]', error);
-    res.status(500).json({ error: 'Failed to update cycle' });
+    console.error('[PATCH /api/admin/cycles/:id] Error:', error);
+    console.error('[PATCH /api/admin/cycles/:id] Error details:', {
+      message: error.message,
+      code: error.code,
+      meta: error.meta,
+      stack: error.stack
+    });
+    
+    // Check if error is due to missing columns
+    if (error.message && (error.message.includes('Unknown column') || 
+        error.message.includes('column') && error.message.includes('does not exist'))) {
+      return res.status(500).json({ 
+        error: 'Database schema needs to be updated. Please run the migration to add deadline columns.',
+        details: 'The deadline columns (resumeDeadline, coverLetterDeadline, videoDeadline) do not exist in the database yet.'
+      });
+    }
+    
+    res.status(500).json({ error: 'Failed to update cycle', details: error.message });
   }
 });
 

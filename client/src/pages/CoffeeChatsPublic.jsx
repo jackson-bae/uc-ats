@@ -30,6 +30,8 @@ import {
 
 export default function CoffeeChatsPublic() {
   const [slots, setSlots] = useState([]);
+  const [allSlots, setAllSlots] = useState([]); // Store all slots for filtering
+  const [activeCycle, setActiveCycle] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedSlot, setSelectedSlot] = useState(null);
@@ -37,12 +39,53 @@ export default function CoffeeChatsPublic() {
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState('');
 
+  const loadActiveCycle = async () => {
+    try {
+      const cycles = await api.get('/admin/cycles');
+      const active = cycles.find(c => c.isActive);
+      setActiveCycle(active || null);
+      return active || null;
+    } catch (e) {
+      console.error('Failed to load active cycle:', e);
+      return null;
+    }
+  };
+
+  const filterSlotsByCycle = (slotsToFilter, cycle) => {
+    if (!cycle) return slotsToFilter;
+    
+    // If cycle has date range, filter slots by date
+    if (cycle.startDate || cycle.endDate) {
+      return slotsToFilter.filter(slot => {
+        const slotDate = new Date(slot.startTime);
+        const startDate = cycle.startDate ? new Date(cycle.startDate) : null;
+        const endDate = cycle.endDate ? new Date(cycle.endDate) : null;
+        
+        // If cycle has start date, slot must be on or after start date
+        if (startDate && slotDate < startDate) return false;
+        
+        // If cycle has end date, slot must be on or before end date
+        if (endDate && slotDate > endDate) return false;
+        
+        return true;
+      });
+    }
+    
+    // If no date range, return empty array to hide old cycle slots
+    return [];
+  };
+
   const load = async () => {
     try {
       setLoading(true);
       setError('');
       const data = await api.get('/meeting-slots');
-      setSlots(data);
+      setAllSlots(data);
+      
+      // Load active cycle and filter slots
+      const cycle = await loadActiveCycle();
+      const filtered = filterSlotsByCycle(data, cycle);
+      setSlots(filtered);
     } catch (e) {
       setError(e.message || 'Failed to load meeting slots');
     } finally {
@@ -52,6 +95,25 @@ export default function CoffeeChatsPublic() {
 
   useEffect(() => {
     load();
+    
+    // Listen for cycle activation events and reset when a new cycle is activated
+    const handleCycleActivated = async () => {
+      // Clear slots since they're tied to the previous cycle
+      setSlots([]);
+      setSelectedSlot(null);
+      setForm({ fullName: '', email: '', studentId: '' });
+      setError('');
+      setSuccess('');
+      
+      // Reload from server to get updated slots and filter by new active cycle
+      await load();
+    };
+    
+    window.addEventListener('cycleActivated', handleCycleActivated);
+    
+    return () => {
+      window.removeEventListener('cycleActivated', handleCycleActivated);
+    };
   }, []);
 
   const onSubmit = async (e) => {

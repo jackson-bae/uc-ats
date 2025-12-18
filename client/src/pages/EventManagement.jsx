@@ -276,6 +276,24 @@ export default function EventManagement() {
   useEffect(() => {
     fetchEvents();
     fetchCycles();
+    
+    // Listen for cycle activation events and refresh when a new cycle is activated
+    const handleCycleActivated = () => {
+      setError('');
+      setSuccessMessage('Cycle activated. Showing events for the new active cycle.');
+      
+      // Refetch cycles to get updated active cycle info
+      fetchCycles();
+      
+      // Refetch events to show events from the new active cycle (if any exist)
+      fetchEvents();
+    };
+    
+    window.addEventListener('cycleActivated', handleCycleActivated);
+    
+    return () => {
+      window.removeEventListener('cycleActivated', handleCycleActivated);
+    };
   }, []);
 
   const formatDateTime = (dateTimeString) => {
@@ -286,6 +304,14 @@ export default function EventManagement() {
     const cycle = cycles.find(c => c.id === cycleId);
     return cycle ? cycle.name : 'Unknown Cycle';
   };
+
+  // Get the active cycle
+  const activeCycle = cycles.find(c => c.isActive);
+  
+  // Filter events to only show those from the active cycle
+  const filteredEvents = activeCycle 
+    ? events.filter(event => event.cycleId === activeCycle.id)
+    : [];
 
   const handleAddToCalendar = (event) => {
     try {
@@ -346,7 +372,19 @@ export default function EventManagement() {
       padding: 0
     }}>
       <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2}>
-        <Typography variant="h4">Event Management</Typography>
+        <Stack>
+          <Typography variant="h4">Event Management</Typography>
+          {activeCycle && (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+              Showing events for: <strong>{activeCycle.name}</strong> cycle
+            </Typography>
+          )}
+          {!activeCycle && (
+            <Typography variant="body2" color="error" sx={{ mt: 0.5 }}>
+              No active cycle. Please activate a cycle to view events.
+            </Typography>
+          )}
+        </Stack>
         <Stack direction="row" spacing={2}>
           <Button 
             variant="outlined" 
@@ -355,7 +393,7 @@ export default function EventManagement() {
           >
             {syncLoading['all'] ? <CircularProgress size={20} /> : 'Sync All Forms'}
           </Button>
-          <Button variant="contained" onClick={() => setCreateOpen(true)}>
+          <Button variant="contained" onClick={() => setCreateOpen(true)} disabled={!activeCycle}>
             New Event
           </Button>
         </Stack>
@@ -412,11 +450,22 @@ export default function EventManagement() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {events.map((event) => {
-              const stats = eventStats[event.id] || { rsvpCount: 0, attendanceCount: 0, memberRsvpCount: 0, hasRsvpForm: false, hasAttendanceForm: false, hasMemberRsvpForm: false };
+            {filteredEvents.length === 0 && !loading ? (
+              <TableRow>
+                <TableCell colSpan={10} align="center" sx={{ py: 4 }}>
+                  <Typography variant="body1" color="text.secondary">
+                    {activeCycle 
+                      ? `No events found for ${activeCycle.name} cycle. Create a new event to get started.`
+                      : 'No active cycle found. Please activate a cycle first.'}
+                  </Typography>
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredEvents.map((event) => {
+                const stats = eventStats[event.id] || { rsvpCount: 0, attendanceCount: 0, memberRsvpCount: 0, hasRsvpForm: false, hasAttendanceForm: false, hasMemberRsvpForm: false };
               
-              return (
-                <TableRow key={event.id}>
+                return (
+                  <TableRow key={event.id}>
                   <TableCell>{event.eventName}</TableCell>
                   <TableCell>{formatDateTime(event.eventStartDate)}</TableCell>
                   <TableCell>{formatDateTime(event.eventEndDate)}</TableCell>
@@ -564,7 +613,8 @@ export default function EventManagement() {
                   </TableCell>
                 </TableRow>
               );
-            })}
+              })
+            )}
           </TableBody>
         </Table>
       </TableContainer>

@@ -41,6 +41,12 @@ import {
   CheckCircle as CheckCircleIcon,
   Schedule as ScheduleIcon
 } from '@mui/icons-material';
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions
+} from '@mui/material';
 import { Tooltip } from '@mui/material';
 import { Switch, FormControlLabel } from '@mui/material';
 
@@ -83,6 +89,10 @@ export default function AdminDocumentGrading() {
   const [flaggedLoading, setFlaggedLoading] = useState(false);
   const [resolvedDocuments, setResolvedDocuments] = useState([]);
   const [resolvedLoading, setResolvedLoading] = useState(false);
+  const [activeCycle, setActiveCycle] = useState(null);
+  const [editingDeadline, setEditingDeadline] = useState(null);
+  const [deadlineForm, setDeadlineForm] = useState({ resumeDeadline: '', coverLetterDeadline: '', videoDeadline: '' });
+  const [deadlineSubmitting, setDeadlineSubmitting] = useState(false);
 
   // Calculate progress data based on actual grading completion
   const calculateProgressData = () => {
@@ -115,7 +125,7 @@ export default function AdminDocumentGrading() {
           total: myResumeAssignments,
           gradesCompleted: resumeGradedByMe,
           gradesNeeded: myResumeAssignments,
-          deadline: 'Oct 4th, Morning',
+          deadline: activeCycle?.resumeDeadline || 'Oct 4th, Morning',
           percentage: myResumeAssignments > 0 ? Math.round((resumeGradedByMe / myResumeAssignments) * 100) : 0,
           color: 'success'
         },
@@ -126,7 +136,7 @@ export default function AdminDocumentGrading() {
           total: myCoverLetterAssignments,
           gradesCompleted: coverLetterGradedByMe,
           gradesNeeded: myCoverLetterAssignments,
-          deadline: 'Oct 4th, Morning',
+          deadline: activeCycle?.coverLetterDeadline || 'Oct 4th, Morning',
           percentage: myCoverLetterAssignments > 0 ? Math.round((coverLetterGradedByMe / myCoverLetterAssignments) * 100) : 0,
           color: 'success'
         },
@@ -137,7 +147,7 @@ export default function AdminDocumentGrading() {
           total: myVideoAssignments,
           gradesCompleted: videoGradedByMe,
           gradesNeeded: myVideoAssignments,
-          deadline: 'Oct 4th, Morning',
+          deadline: activeCycle?.videoDeadline || 'Oct 4th, Morning',
           percentage: myVideoAssignments > 0 ? Math.round((videoGradedByMe / myVideoAssignments) * 100) : 0,
           color: 'success'
         }
@@ -188,7 +198,7 @@ export default function AdminDocumentGrading() {
           total: applicationsWithResume.length,
           gradesCompleted: totalResumeGradesCompleted,
           gradesNeeded: totalResumeGradesNeeded,
-          deadline: 'Oct 4th, Morning',
+          deadline: activeCycle?.resumeDeadline || 'Oct 4th, Morning',
           percentage: totalResumeGradesNeeded > 0 ? Math.round((totalResumeGradesCompleted / totalResumeGradesNeeded) * 100) : 0,
           color: 'success'
         },
@@ -199,7 +209,7 @@ export default function AdminDocumentGrading() {
           total: applicationsWithCoverLetter.length,
           gradesCompleted: totalCoverLetterGradesCompleted,
           gradesNeeded: totalCoverLetterGradesNeeded,
-          deadline: 'Oct 4th, Morning',
+          deadline: activeCycle?.coverLetterDeadline || 'Oct 4th, Morning',
           percentage: totalCoverLetterGradesNeeded > 0 ? Math.round((totalCoverLetterGradesCompleted / totalCoverLetterGradesNeeded) * 100) : 0,
           color: 'success'
         },
@@ -210,7 +220,7 @@ export default function AdminDocumentGrading() {
           total: applicationsWithVideo.length,
           gradesCompleted: totalVideoGradesCompleted,
           gradesNeeded: totalVideoGradesNeeded,
-          deadline: 'Oct 4th, Morning',
+          deadline: activeCycle?.videoDeadline || 'Oct 4th, Morning',
           percentage: totalVideoGradesNeeded > 0 ? Math.round((totalVideoGradesCompleted / totalVideoGradesNeeded) * 100) : 0,
           color: 'success'
         }
@@ -220,14 +230,45 @@ export default function AdminDocumentGrading() {
 
   const progressData = calculateProgressData();
 
+  // Fetch active cycle and deadlines
+  const fetchActiveCycle = async () => {
+    try {
+      const cycle = await apiClient.get('/admin/cycles/active');
+      setActiveCycle(cycle);
+      if (cycle) {
+        setDeadlineForm({
+          resumeDeadline: cycle.resumeDeadline || 'Oct 4th, Morning',
+          coverLetterDeadline: cycle.coverLetterDeadline || 'Oct 4th, Morning',
+          videoDeadline: cycle.videoDeadline || 'Oct 4th, Morning'
+        });
+      }
+    } catch (err) {
+      console.error('Error fetching active cycle:', err);
+    }
+  };
+
   // Fetch applications for admin grading
   useEffect(() => {
+    fetchActiveCycle();
     if (gradeOnlyAssigned) {
       fetchMemberApplications();
     } else {
       fetchAllApplications();
     }
   }, [gradeOnlyAssigned]);
+
+  // Listen for cycle activation events
+  useEffect(() => {
+    const handleCycleActivated = () => {
+      fetchActiveCycle();
+    };
+    
+    window.addEventListener('cycleActivated', handleCycleActivated);
+    
+    return () => {
+      window.removeEventListener('cycleActivated', handleCycleActivated);
+    };
+  }, []);
 
   // Fetch flagged/resolved documents when respective tabs are selected
   useEffect(() => {
@@ -366,6 +407,66 @@ export default function AdminDocumentGrading() {
       }
     } catch (err) {
       console.error('Error resolving flag:', err);
+    }
+  };
+
+  const handleEditDeadline = (documentType) => {
+    setEditingDeadline(documentType);
+    if (activeCycle) {
+      // Map document type to field name
+      const fieldMap = {
+        'resume': 'resumeDeadline',
+        'coverLetter': 'coverLetterDeadline',
+        'video': 'videoDeadline'
+      };
+      const fieldName = fieldMap[documentType];
+      if (fieldName) {
+        setDeadlineForm({
+          ...deadlineForm,
+          [fieldName]: activeCycle[fieldName] || 'Oct 4th, Morning'
+        });
+      }
+    }
+  };
+
+  const handleCloseDeadlineDialog = () => {
+    setEditingDeadline(null);
+  };
+
+  const handleSaveDeadline = async () => {
+    if (!activeCycle || !editingDeadline) return;
+    
+    try {
+      setDeadlineSubmitting(true);
+      setError('');
+      
+      // Map document type to field name
+      const fieldMap = {
+        'resume': 'resumeDeadline',
+        'coverLetter': 'coverLetterDeadline',
+        'video': 'videoDeadline'
+      };
+      const fieldName = fieldMap[editingDeadline];
+      
+      if (!fieldName) {
+        setError('Invalid document type');
+        return;
+      }
+      
+      const updateData = {
+        [fieldName]: deadlineForm[fieldName] || null
+      };
+      
+      console.log('Updating deadline:', { cycleId: activeCycle.id, fieldName, value: updateData[fieldName] });
+      
+      await apiClient.patch(`/admin/cycles/${activeCycle.id}`, updateData);
+      await fetchActiveCycle(); // Refresh cycle data
+      setEditingDeadline(null);
+    } catch (err) {
+      console.error('Error updating deadline:', err);
+      setError(err.message || 'Failed to update deadline');
+    } finally {
+      setDeadlineSubmitting(false);
     }
   };
 
@@ -642,12 +743,28 @@ export default function AdminDocumentGrading() {
                   <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
                     {item.title}
                   </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {gradeOnlyAssigned 
-                      ? `${item.gradesCompleted} / ${item.gradesNeeded} Documents Graded | Deadline: ${item.deadline}`
-                      : `${item.gradesCompleted} / ${item.gradesNeeded} Grades | Deadline: ${item.deadline}`
-                    }
-                  </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      {gradeOnlyAssigned 
+                        ? `${item.gradesCompleted} / ${item.gradesNeeded} Documents Graded | Deadline: ${item.deadline}`
+                        : `${item.gradesCompleted} / ${item.gradesNeeded} Grades | Deadline: ${item.deadline}`
+                      }
+                    </Typography>
+                    {activeCycle && (
+                      <Tooltip title="Edit deadline">
+                        <IconButton
+                          size="small"
+                          onClick={() => {
+                            const docType = index === 0 ? 'resume' : index === 1 ? 'coverLetter' : 'video';
+                            handleEditDeadline(docType);
+                          }}
+                          sx={{ ml: 1 }}
+                        >
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                  </Box>
                 </Box>
                 <Typography variant="body2" sx={{ fontWeight: 600, color: 'success.main' }}>
                   Complete {item.percentage}%
@@ -1136,6 +1253,35 @@ export default function AdminDocumentGrading() {
         application={flaggingApplication}
         documentType={flaggingDocumentType}
       />
+
+      {/* Edit Deadline Dialog */}
+      <Dialog open={!!editingDeadline} onClose={handleCloseDeadlineDialog} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          Edit {editingDeadline === 'resume' ? 'Resume' : editingDeadline === 'coverLetter' ? 'Cover Letter' : 'Video'} Deadline
+        </DialogTitle>
+        <DialogContent>
+          <TextField
+            fullWidth
+            label="Deadline"
+            value={editingDeadline ? deadlineForm[`${editingDeadline}Deadline`] : ''}
+            onChange={(e) => {
+              const fieldName = `${editingDeadline}Deadline`;
+              setDeadlineForm({ ...deadlineForm, [fieldName]: e.target.value });
+            }}
+            placeholder="e.g., Oct 4th, Morning"
+            sx={{ mt: 2 }}
+            helperText="Enter the deadline in a readable format (e.g., 'Oct 4th, Morning', 'Jan 15th, 5:00 PM')"
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDeadlineDialog} disabled={deadlineSubmitting}>
+            Cancel
+          </Button>
+          <Button onClick={handleSaveDeadline} variant="contained" disabled={deadlineSubmitting}>
+            {deadlineSubmitting ? 'Saving...' : 'Save'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
     </AccessControl>
   );

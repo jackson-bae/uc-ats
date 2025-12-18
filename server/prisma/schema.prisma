@@ -107,18 +107,21 @@ model Application {
 }
 
 model RecruitingCycle {
-  id           String        @id @default(uuid())
-  name         String
-  isActive     Boolean       @default(false)
-  startDate    DateTime?
-  endDate      DateTime?
-  createdAt    DateTime      @default(now())
-  formUrl      String?
-  applications Application[]
-  events       Events[]
-  groups       Groups[]
-  interviews   Interview[]
-  resumeScores ResumeScore[]
+  id                String        @id @default(uuid())
+  name              String
+  isActive          Boolean       @default(false)
+  startDate         DateTime?
+  endDate           DateTime?
+  createdAt         DateTime      @default(now())
+  formUrl           String?
+  resumeDeadline    String?
+  coverLetterDeadline String?
+  videoDeadline     String?
+  applications      Application[]
+  events            Events[]
+  groups            Groups[]
+  interviews        Interview[]
+  resumeScores      ResumeScore[]
 
   @@map("recruiting_cycles")
 }
