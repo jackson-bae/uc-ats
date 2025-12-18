@@ -133,7 +133,8 @@ const UserManagement = () => {
       // Clear success message after 3 seconds
       setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
-      setError('Failed to update user role');
+      const errorMessage = err.message || 'Failed to update user role';
+      setError(errorMessage);
       console.error('Error updating role:', err);
     }
   };

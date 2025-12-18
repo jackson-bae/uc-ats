@@ -131,22 +131,37 @@ router.get('/:id', requireAuth, async (req, res) => {
 // Update user role (admin only)
 router.patch('/:id/role', requireAuth, async (req, res) => {
   try {
+    console.log('[PATCH /api/users/:id/role] Request received:', {
+      userId: req.user?.id,
+      userRole: req.user?.role,
+      targetUserId: req.params.id,
+      newRole: req.body.role
+    });
+
     // Check if user is admin
     if (req.user.role !== 'ADMIN') {
+      console.log('[PATCH /api/users/:id/role] Access denied - not admin');
       return res.status(403).json({ error: 'Access denied. Admin only.' });
     }
 
     const { id } = req.params;
     const { role } = req.body;
 
+    if (!role) {
+      console.log('[PATCH /api/users/:id/role] Missing role in request body');
+      return res.status(400).json({ error: 'Role is required' });
+    }
+
     // Validate role
     const validRoles = ['USER', 'ADMIN', 'MEMBER'];
     if (!validRoles.includes(role)) {
+      console.log('[PATCH /api/users/:id/role] Invalid role:', role);
       return res.status(400).json({ error: 'Invalid role' });
     }
 
     // Prevent admin from changing their own role
     if (req.user.id === id) {
+      console.log('[PATCH /api/users/:id/role] Cannot change own role');
       return res.status(400).json({ error: 'Cannot change your own role' });
     }
 
@@ -158,13 +173,14 @@ router.patch('/:id/role', requireAuth, async (req, res) => {
         email: true,
         fullName: true,
         role: true,
-        updatedAt: true
+        createdAt: true
       }
     });
 
+    console.log('[PATCH /api/users/:id/role] Role updated successfully:', updatedUser);
     res.json(updatedUser);
   } catch (error) {
-    console.error('Error updating user role:', error);
+    console.error('[PATCH /api/users/:id/role] Error updating user role:', error);
     res.status(500).json({ error: 'Failed to update user role' });
   }
 });
@@ -195,7 +211,7 @@ router.patch('/:id', requireAuth, async (req, res) => {
         graduationClass: true,
         profileImage: true,
         role: true,
-        updatedAt: true
+        createdAt: true
       }
     });
 
