@@ -428,6 +428,36 @@ export default function InterviewInterface() {
                     </p>
                   </div>
                 </div>
+                {/* Test For Note (Admin) */}
+                {application.testFor && (
+                  <div style={{ 
+                    width: '100%',
+                    marginBottom: '16px',
+                    padding: '12px',
+                    backgroundColor: '#eff6ff', 
+                    borderLeft: '4px solid #2563eb',
+                    borderRadius: '4px'
+                  }}>
+                    <p style={{ 
+                      color: '#1e40af', 
+                      fontWeight: '600',
+                      marginBottom: '6px',
+                      fontSize: '0.875rem',
+                      margin: '0 0 6px 0'
+                    }}>
+                      Test For (Admin Note):
+                    </p>
+                    <p style={{ 
+                      color: '#1e40af',
+                      margin: 0,
+                      fontSize: '0.875rem',
+                      lineHeight: '1.5',
+                      whiteSpace: 'pre-wrap'
+                    }}>
+                      {application.testFor}
+                    </p>
+                  </div>
+                )}
                 <div className="save-section">
                   {saveStatus[application.id] && saveStatus[application.id].type === 'error' && (
                     <div className={`save-status ${saveStatus[application.id].type}`}>

@@ -1103,7 +1103,8 @@ router.get('/interviews/:id/applications', requireAuth, async (req, res) => {
         resumeUrl: true,
         coverLetterUrl: true,
         videoUrl: true,
-        headshotUrl: true
+        headshotUrl: true,
+        testFor: true
       }
     });
     
@@ -1179,33 +1180,37 @@ router.get('/evaluations', requireAuth, async (req, res) => {
     const parsedEvaluations = evaluations.map(evaluation => {
       const parsed = { ...evaluation };
       
-      // Parse behavioralNotes if it's a string
+      // Safely parse JSON fields - only parse if it looks like JSON
       if (parsed.behavioralNotes && typeof parsed.behavioralNotes === 'string') {
-        try {
-          parsed.behavioralNotes = JSON.parse(parsed.behavioralNotes);
-        } catch (e) {
-          console.warn('Failed to parse behavioralNotes JSON:', e);
-          parsed.behavioralNotes = {};
+        const trimmed = parsed.behavioralNotes.trim();
+        if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+          try {
+            parsed.behavioralNotes = JSON.parse(parsed.behavioralNotes);
+          } catch (e) {
+            parsed.behavioralNotes = {};
+          }
         }
       }
       
-      // Parse casingNotes if it's a string
       if (parsed.casingNotes && typeof parsed.casingNotes === 'string') {
-        try {
-          parsed.casingNotes = JSON.parse(parsed.casingNotes);
-        } catch (e) {
-          console.warn('Failed to parse casingNotes JSON:', e);
-          parsed.casingNotes = {};
+        const trimmed = parsed.casingNotes.trim();
+        if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+          try {
+            parsed.casingNotes = JSON.parse(parsed.casingNotes);
+          } catch (e) {
+            parsed.casingNotes = {};
+          }
         }
       }
       
-      // Parse candidateDetails if it's a string
       if (parsed.candidateDetails && typeof parsed.candidateDetails === 'string') {
-        try {
-          parsed.candidateDetails = JSON.parse(parsed.candidateDetails);
-        } catch (e) {
-          console.warn('Failed to parse candidateDetails JSON:', e);
-          parsed.candidateDetails = {};
+        const trimmed = parsed.candidateDetails.trim();
+        if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+          try {
+            parsed.candidateDetails = JSON.parse(parsed.candidateDetails);
+          } catch (e) {
+            parsed.candidateDetails = {};
+          }
         }
       }
       

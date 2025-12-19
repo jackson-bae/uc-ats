@@ -507,6 +507,11 @@ export default function Staging() {
   const [interviewEvaluations, setInterviewEvaluations] = useState([]);
   const [evaluationsLoading, setEvaluationsLoading] = useState(false);
   
+  // Test For note (admin only)
+  const [testForNote, setTestForNote] = useState('');
+  const [isEditingTestFor, setIsEditingTestFor] = useState(false);
+  const [savingTestFor, setSavingTestFor] = useState(false);
+  
   // Coffee chat interview filter
   const [coffeeChatInterviewFilter, setCoffeeChatInterviewFilter] = useState('all');
   const [coffeeChatInterviews, setCoffeeChatInterviews] = useState([]);
@@ -649,6 +654,24 @@ export default function Staging() {
       setSnackbar({ open: true, message: 'Failed to update score', severity: 'error' });
     } finally {
       setSavingScore(false);
+    }
+  };
+
+  // Handle saving testFor note
+  const handleSaveTestFor = async () => {
+    if (!appModal?.id) return;
+    
+    try {
+      setSavingTestFor(true);
+      await apiClient.patch(`/admin/applications/${appModal.id}/test-for`, { testFor: testForNote });
+      setAppModal(prev => prev ? { ...prev, testFor: testForNote } : null);
+      setIsEditingTestFor(false);
+      setSnackbar({ open: true, message: 'Test For note saved successfully', severity: 'success' });
+    } catch (error) {
+      console.error('Error saving testFor note:', error);
+      setSnackbar({ open: true, message: 'Failed to save testFor note', severity: 'error' });
+    } finally {
+      setSavingTestFor(false);
     }
   };
 
@@ -2049,6 +2072,7 @@ export default function Staging() {
                         ]);
                         
                         setAppModal(appData);
+                        setTestForNote(appData.testFor || '');
                         setInterviewEvaluations(evaluationsData);
                         
                         // Fetch document scores if candidateId is available
@@ -2448,6 +2472,7 @@ export default function Staging() {
                             ]);
                             
                             setAppModal(appData);
+                            setTestForNote(appData.testFor || '');
                             setInterviewEvaluations(evaluationsData);
                             setAppModalOpen(true);
                           } catch (e) {
@@ -2798,6 +2823,7 @@ export default function Staging() {
                             ]);
                             
                             setAppModal(appData);
+                            setTestForNote(appData.testFor || '');
                             setInterviewEvaluations(evaluationsData);
                             setAppModalOpen(true);
                           } catch (e) {
@@ -3514,6 +3540,90 @@ export default function Staging() {
                     </Card>
                   </Grid>
                   </Grid>
+                )}
+              </Box>
+            )}
+            
+            {/* Test For Note Section (Admin Only) */}
+            {appModal && isAdmin && (
+              <Box mt={3}>
+                <Divider sx={{ mb: 2 }} />
+                <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                  <Typography variant="h6">
+                    Test For Note (Admin)
+                  </Typography>
+                  {!isEditingTestFor && (
+                    <Button
+                      startIcon={<EditIcon />}
+                      variant="outlined"
+                      size="small"
+                      onClick={() => setIsEditingTestFor(true)}
+                    >
+                      {testForNote ? 'Edit' : 'Add Note'}
+                    </Button>
+                  )}
+                </Box>
+                
+                {isEditingTestFor ? (
+                  <Box sx={{ 
+                    padding: '16px', 
+                    backgroundColor: '#f9fafb', 
+                    borderRadius: '8px',
+                    border: '1px solid #e5e7eb'
+                  }}>
+                    <TextField
+                      fullWidth
+                      multiline
+                      rows={4}
+                      value={testForNote}
+                      onChange={(e) => setTestForNote(e.target.value)}
+                      placeholder="Enter what to test for in interviews (e.g., 'Test for leadership skills and problem-solving ability')"
+                      sx={{ mb: 2 }}
+                    />
+                    <Box display="flex" gap={1} justifyContent="flex-end">
+                      <Button
+                        onClick={() => {
+                          setIsEditingTestFor(false);
+                          setTestForNote(appModal?.testFor || '');
+                        }}
+                        disabled={savingTestFor}
+                        variant="outlined"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={handleSaveTestFor}
+                        disabled={savingTestFor}
+                        variant="contained"
+                      >
+                        {savingTestFor ? 'Saving...' : 'Save'}
+                      </Button>
+                    </Box>
+                  </Box>
+                ) : (
+                  <Box sx={{ 
+                    padding: '16px', 
+                    backgroundColor: testForNote ? '#eff6ff' : '#f9fafb', 
+                    borderRadius: '8px',
+                    border: `1px solid ${testForNote ? '#bfdbfe' : '#e5e7eb'}`,
+                    minHeight: '60px'
+                  }}>
+                    {testForNote ? (
+                      <Typography variant="body2" sx={{ 
+                        color: '#1e40af',
+                        whiteSpace: 'pre-wrap'
+                      }}>
+                        {testForNote}
+                      </Typography>
+                    ) : (
+                      <Typography variant="body2" sx={{ 
+                        color: '#6b7280',
+                        fontStyle: 'italic'
+                      }}>
+                        No test for note set. Click "Add Note" to add one.
+                      </Typography>
+                    )}
+                  </Box>
                 )}
               </Box>
             )}

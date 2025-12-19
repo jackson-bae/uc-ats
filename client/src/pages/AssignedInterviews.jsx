@@ -1008,6 +1008,34 @@ export default function AssignedInterviews() {
                                         </button>
                                       </div>
                                     </div>
+                                    {/* Test For Note (Admin) */}
+                                    {application.testFor && (
+                                      <div className="evaluation-notes" style={{ 
+                                        backgroundColor: '#eff6ff', 
+                                        borderLeft: '4px solid #2563eb',
+                                        padding: '12px',
+                                        marginBottom: '12px',
+                                        borderRadius: '4px'
+                                      }}>
+                                        <p className="notes-label" style={{ 
+                                          color: '#1e40af', 
+                                          fontWeight: '600',
+                                          marginBottom: '6px',
+                                          fontSize: '0.875rem'
+                                        }}>
+                                          Test For (Admin Note):
+                                        </p>
+                                        <p className="notes-content" style={{ 
+                                          color: '#1e40af',
+                                          margin: 0,
+                                          fontSize: '0.875rem',
+                                          lineHeight: '1.5',
+                                          whiteSpace: 'pre-wrap'
+                                        }}>
+                                          {application.testFor}
+                                        </p>
+                                      </div>
+                                    )}
                                     {/* Basic Notes */}
                                     {evaluation.notes && (
                                       <div className="evaluation-notes">

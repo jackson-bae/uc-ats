@@ -610,7 +610,21 @@ router.get('/:id', async (req, res) => {
     const { id } = req.params;
     const application = await prisma.application.findUnique({
       where: { id },
-      include: { comments: { orderBy: { createdAt: 'desc' }, include: { user: { select: { id: true, email: true, fullName: true } } } } }
+      include: { 
+        comments: { 
+          orderBy: { createdAt: 'desc' }, 
+          include: { user: { select: { id: true, email: true, fullName: true } } } 
+        },
+        candidate: {
+          select: {
+            id: true,
+            studentId: true,
+            firstName: true,
+            lastName: true,
+            email: true
+          }
+        }
+      }
     });
     
     if (!application) {
@@ -620,7 +634,8 @@ router.get('/:id', async (req, res) => {
     res.json(application);
   } catch (error) {
     console.error('Error fetching application:', error);
-    res.status(500).json({ error: 'Failed to fetch application' });
+    console.error('Error details:', error.message, error.stack);
+    res.status(500).json({ error: 'Failed to fetch application', details: process.env.NODE_ENV === 'development' ? error.message : undefined });
   }
 });
 

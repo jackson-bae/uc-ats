@@ -7,6 +7,25 @@ import { sendRSVPConfirmation, sendAttendanceConfirmation, formatEventDate } fro
 
 const router = express.Router();
 
+// Helper function to safely parse JSON fields that might be plain text
+const safeParseJsonField = (field) => {
+  if (!field || typeof field !== 'string') {
+    return field;
+  }
+  const trimmed = field.trim();
+  // Only try to parse if it looks like JSON (starts with { or [)
+  if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+    try {
+      return JSON.parse(field);
+    } catch (e) {
+      // If it looks like JSON but fails to parse, return empty object
+      return {};
+    }
+  }
+  // It's plain text, return as is
+  return field;
+};
+
 // Protect all admin routes
 router.use(requireAuth, requireAdmin);
 
@@ -3173,7 +3192,8 @@ router.get('/interviews/:id/applications', async (req, res) => {
         resumeUrl: true,
         coverLetterUrl: true,
         videoUrl: true,
-        headshotUrl: true
+        headshotUrl: true,
+        testFor: true
       }
     });
     
@@ -3331,35 +3351,10 @@ router.get('/interviews/:id/evaluations', async (req, res) => {
     const parsedEvaluations = evaluations.map(evaluation => {
       const parsed = { ...evaluation };
       
-      // Parse behavioralNotes if it's a string
-      if (parsed.behavioralNotes && typeof parsed.behavioralNotes === 'string') {
-        try {
-          parsed.behavioralNotes = JSON.parse(parsed.behavioralNotes);
-        } catch (e) {
-          console.warn('Failed to parse behavioralNotes JSON:', e);
-          parsed.behavioralNotes = {};
-        }
-      }
-      
-      // Parse casingNotes if it's a string
-      if (parsed.casingNotes && typeof parsed.casingNotes === 'string') {
-        try {
-          parsed.casingNotes = JSON.parse(parsed.casingNotes);
-        } catch (e) {
-          console.warn('Failed to parse casingNotes JSON:', e);
-          parsed.casingNotes = {};
-        }
-      }
-      
-      // Parse candidateDetails if it's a string
-      if (parsed.candidateDetails && typeof parsed.candidateDetails === 'string') {
-        try {
-          parsed.candidateDetails = JSON.parse(parsed.candidateDetails);
-        } catch (e) {
-          console.warn('Failed to parse candidateDetails JSON:', e);
-          parsed.candidateDetails = {};
-        }
-      }
+      // Safely parse JSON fields
+      parsed.behavioralNotes = safeParseJsonField(parsed.behavioralNotes);
+      parsed.casingNotes = safeParseJsonField(parsed.casingNotes);
+      parsed.candidateDetails = safeParseJsonField(parsed.candidateDetails);
       
       return parsed;
     });
@@ -3412,35 +3407,10 @@ router.get('/applications/:id/final-round-interview-evaluations', async (req, re
     const parsedEvaluations = evaluations.map(evaluation => {
       const parsed = { ...evaluation };
       
-      // Parse behavioralNotes if it's a string
-      if (parsed.behavioralNotes && typeof parsed.behavioralNotes === 'string') {
-        try {
-          parsed.behavioralNotes = JSON.parse(parsed.behavioralNotes);
-        } catch (e) {
-          console.warn('Failed to parse behavioralNotes JSON:', e);
-          parsed.behavioralNotes = {};
-        }
-      }
-      
-      // Parse casingNotes if it's a string
-      if (parsed.casingNotes && typeof parsed.casingNotes === 'string') {
-        try {
-          parsed.casingNotes = JSON.parse(parsed.casingNotes);
-        } catch (e) {
-          console.warn('Failed to parse casingNotes JSON:', e);
-          parsed.casingNotes = {};
-        }
-      }
-      
-      // Parse candidateDetails if it's a string
-      if (parsed.candidateDetails && typeof parsed.candidateDetails === 'string') {
-        try {
-          parsed.candidateDetails = JSON.parse(parsed.candidateDetails);
-        } catch (e) {
-          console.warn('Failed to parse candidateDetails JSON:', e);
-          parsed.candidateDetails = {};
-        }
-      }
+      // Safely parse JSON fields
+      parsed.behavioralNotes = safeParseJsonField(parsed.behavioralNotes);
+      parsed.casingNotes = safeParseJsonField(parsed.casingNotes);
+      parsed.candidateDetails = safeParseJsonField(parsed.candidateDetails);
       
       return parsed;
     });
@@ -3689,35 +3659,10 @@ router.get('/applications/:id/interview-evaluations', async (req, res) => {
     const parsedEvaluations = allEvaluations.map(evaluation => {
       const parsed = { ...evaluation };
       
-      // Parse behavioralNotes if it's a string
-      if (parsed.behavioralNotes && typeof parsed.behavioralNotes === 'string') {
-        try {
-          parsed.behavioralNotes = JSON.parse(parsed.behavioralNotes);
-        } catch (e) {
-          console.warn('Failed to parse behavioralNotes JSON:', e);
-          parsed.behavioralNotes = {};
-        }
-      }
-      
-      // Parse casingNotes if it's a string
-      if (parsed.casingNotes && typeof parsed.casingNotes === 'string') {
-        try {
-          parsed.casingNotes = JSON.parse(parsed.casingNotes);
-        } catch (e) {
-          console.warn('Failed to parse casingNotes JSON:', e);
-          parsed.casingNotes = {};
-        }
-      }
-      
-      // Parse candidateDetails if it's a string
-      if (parsed.candidateDetails && typeof parsed.candidateDetails === 'string') {
-        try {
-          parsed.candidateDetails = JSON.parse(parsed.candidateDetails);
-        } catch (e) {
-          console.warn('Failed to parse candidateDetails JSON:', e);
-          parsed.candidateDetails = {};
-        }
-      }
+      // Safely parse JSON fields
+      parsed.behavioralNotes = safeParseJsonField(parsed.behavioralNotes);
+      parsed.casingNotes = safeParseJsonField(parsed.casingNotes);
+      parsed.candidateDetails = safeParseJsonField(parsed.candidateDetails);
       
       return parsed;
     });
@@ -4787,6 +4732,39 @@ router.patch('/video-scores/:id', async (req, res) => {
   } catch (error) {
     console.error('[PATCH /api/admin/video-scores/:id]', error);
     res.status(500).json({ error: 'Failed to update video score' });
+  }
+});
+
+// Update application testFor note (admin only)
+router.patch('/applications/:id/test-for', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { testFor } = req.body;
+
+    const application = await prisma.application.findUnique({
+      where: { id }
+    });
+
+    if (!application) {
+      return res.status(404).json({ error: 'Application not found' });
+    }
+
+    const updatedApplication = await prisma.application.update({
+      where: { id },
+      data: { testFor: testFor || null },
+      select: {
+        id: true,
+        testFor: true,
+        firstName: true,
+        lastName: true,
+        candidateId: true
+      }
+    });
+
+    res.json(updatedApplication);
+  } catch (error) {
+    console.error('[PATCH /api/admin/applications/:id/test-for]', error);
+    res.status(500).json({ error: 'Failed to update testFor note' });
   }
 });
 

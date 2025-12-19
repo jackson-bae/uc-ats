@@ -96,6 +96,7 @@ model Application {
   currentRound         String?
   cycleId              String?
   candidateId          String?
+  testFor              String?              // Admin note for what to test for in interviews
   candidate            Candidate?            @relation(fields: [candidateId], references: [id])
   cycle                RecruitingCycle?      @relation(fields: [cycleId], references: [id])
   comments             Comment[]

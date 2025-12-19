@@ -70,6 +70,11 @@ export default function ApplicationDetail() {
   // Interview evaluations
   const [interviewEvaluations, setInterviewEvaluations] = useState([]);
   const [evaluationsLoading, setEvaluationsLoading] = useState(false);
+  
+  // Test For note (admin only)
+  const [testForNote, setTestForNote] = useState('');
+  const [isEditingTestFor, setIsEditingTestFor] = useState(false);
+  const [savingTestFor, setSavingTestFor] = useState(false);
 
 
   // Function to fetch and store average grades for the current application
@@ -334,6 +339,21 @@ export default function ApplicationDetail() {
     }
   };
 
+  // Handle saving testFor note
+  const handleSaveTestFor = async () => {
+    try {
+      setSavingTestFor(true);
+      await apiClient.patch(`/admin/applications/${id}/test-for`, { testFor: testForNote });
+      setApplication(prev => prev ? { ...prev, testFor: testForNote } : null);
+      setIsEditingTestFor(false);
+    } catch (error) {
+      console.error('Error saving testFor note:', error);
+      alert('Failed to save testFor note');
+    } finally {
+      setSavingTestFor(false);
+    }
+  };
+
 
 
   useEffect(() => {
@@ -349,6 +369,7 @@ export default function ApplicationDetail() {
         
         setApplication(appData);
         setCurrentUserId(userData.userId);
+        setTestForNote(appData.testFor || '');
         
         // Log average grades
         await logAverageGrades();
@@ -1380,6 +1401,128 @@ export default function ApplicationDetail() {
         </div>
       </div>
 
+      {/* Test For Note Section (Admin Only) */}
+      {isAdmin && (
+        <div className="info-section" style={{ marginTop: '2rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <h2 className="section-title">Test For Note (Admin)</h2>
+            {!isEditingTestFor && (
+              <button
+                onClick={() => setIsEditingTestFor(true)}
+                style={{
+                  padding: '6px 12px',
+                  backgroundColor: '#2563eb',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <PencilIcon style={{ width: '16px', height: '16px' }} />
+                {testForNote ? 'Edit' : 'Add Note'}
+              </button>
+            )}
+          </div>
+          
+          {isEditingTestFor ? (
+            <div style={{ 
+              padding: '16px', 
+              backgroundColor: '#f9fafb', 
+              borderRadius: '8px',
+              border: '1px solid #e5e7eb'
+            }}>
+              <textarea
+                value={testForNote}
+                onChange={(e) => setTestForNote(e.target.value)}
+                placeholder="Enter what to test for in interviews (e.g., 'Test for leadership skills and problem-solving ability')"
+                rows={4}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '0.875rem',
+                  fontFamily: 'inherit',
+                  resize: 'vertical',
+                  marginBottom: '12px'
+                }}
+              />
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                <button
+                  onClick={() => {
+                    setIsEditingTestFor(false);
+                    setTestForNote(application?.testFor || '');
+                  }}
+                  disabled={savingTestFor}
+                  style={{
+                    padding: '8px 16px',
+                    backgroundColor: '#fff',
+                    color: '#374151',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    cursor: savingTestFor ? 'not-allowed' : 'pointer',
+                    fontSize: '0.875rem',
+                    fontWeight: '500'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveTestFor}
+                  disabled={savingTestFor}
+                  style={{
+                    padding: '8px 16px',
+                    backgroundColor: savingTestFor ? '#9ca3af' : '#2563eb',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: savingTestFor ? 'not-allowed' : 'pointer',
+                    fontSize: '0.875rem',
+                    fontWeight: '500'
+                  }}
+                >
+                  {savingTestFor ? 'Saving...' : 'Save'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div style={{ 
+              padding: '16px', 
+              backgroundColor: testForNote ? '#eff6ff' : '#f9fafb', 
+              borderRadius: '8px',
+              border: `1px solid ${testForNote ? '#bfdbfe' : '#e5e7eb'}`,
+              minHeight: '60px'
+            }}>
+              {testForNote ? (
+                <p style={{ 
+                  margin: 0, 
+                  color: '#1e40af',
+                  fontSize: '0.875rem',
+                  lineHeight: '1.5',
+                  whiteSpace: 'pre-wrap'
+                }}>
+                  {testForNote}
+                </p>
+              ) : (
+                <p style={{ 
+                  margin: 0, 
+                  color: '#6b7280',
+                  fontSize: '0.875rem',
+                  fontStyle: 'italic'
+                }}>
+                  No test for note set. Click "Add Note" to add one.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Interview Evaluations Section */}
       <div className="info-section" style={{ marginTop: '2rem' }}>
         <h2 className="section-title">Interview Evaluations</h2>
@@ -1444,6 +1587,34 @@ export default function ApplicationDetail() {
                     </div>
                   )}
                 </div>
+                
+                {/* Test For Note (Admin) */}
+                {application?.testFor && (
+                  <div style={{ 
+                    marginBottom: '12px',
+                    padding: '12px',
+                    backgroundColor: '#eff6ff', 
+                    borderLeft: '4px solid #2563eb',
+                    borderRadius: '4px'
+                  }}>
+                    <div style={{ 
+                      fontWeight: '600', 
+                      color: '#1e40af', 
+                      marginBottom: '4px', 
+                      fontSize: '0.875rem'
+                    }}>
+                      Test For (Admin Note):
+                    </div>
+                    <div style={{ 
+                      color: '#1e40af',
+                      fontSize: '0.875rem',
+                      lineHeight: '1.5',
+                      whiteSpace: 'pre-wrap'
+                    }}>
+                      {application.testFor}
+                    </div>
+                  </div>
+                )}
                 
                 {/* Notes */}
                 {evaluation.notes && (
