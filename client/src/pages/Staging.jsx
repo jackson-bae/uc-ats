@@ -78,6 +78,7 @@ import AuthenticatedFileLink from '../components/AuthenticatedFileLink';
 import AuthenticatedImage from '../components/AuthenticatedImage';
 import DocumentPreviewModal from '../components/DocumentPreviewModal';
 import AccessControl from '../components/AccessControl';
+import { useAuth } from '../context/AuthContext';
 
 // API functions for staging
 const stagingAPI = {
@@ -454,6 +455,9 @@ ${hasVideo ? (hasVideoScore ? '✓ Video Scored' : '⏳ Video Pending') : '✗ N
 };
 
 export default function Staging() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
+  
   const [candidates, setCandidates] = useState([]);
   const [events, setEvents] = useState([]); // Add events state
   const [reviewTeams, setReviewTeams] = useState([]); // Add review teams state
@@ -529,6 +533,21 @@ export default function Staging() {
   const [finalRoundNotesLoading, setFinalRoundNotesLoading] = useState(false);
   const [finalRoundInterviewNotes, setFinalRoundInterviewNotes] = useState([]);
   const [selectedCandidateForNotes, setSelectedCandidateForNotes] = useState(null);
+  
+  // Edit score modal state
+  const [editScoreModalOpen, setEditScoreModalOpen] = useState(false);
+  const [editingScore, setEditingScore] = useState(null);
+  const [editingScoreType, setEditingScoreType] = useState(null); // 'resume', 'coverLetter', 'video'
+  const [editScoreForm, setEditScoreForm] = useState({
+    overallScore: '',
+    scoreOne: '',
+    scoreTwo: '',
+    scoreThree: '',
+    notes: '',
+    adminScore: '',
+    adminNotes: ''
+  });
+  const [savingScore, setSavingScore] = useState(false);
 
   // Functions to fetch document scores for modal
   const fetchModalResumeScores = async (candidateId) => {
@@ -561,6 +580,75 @@ export default function Staging() {
     } catch (e) {
       console.error('Error fetching video scores:', e);
       setModalVideoScores([]);
+    }
+  };
+
+  // Handle opening edit score modal
+  const handleEditScore = (score, scoreType) => {
+    setEditingScore(score);
+    setEditingScoreType(scoreType);
+    setEditScoreForm({
+      overallScore: score.overallScore?.toString() || '',
+      scoreOne: score.scoreOne?.toString() || '',
+      scoreTwo: score.scoreTwo?.toString() || '',
+      scoreThree: score.scoreThree?.toString() || '',
+      notes: score.notes || score.notesOne || '',
+      adminScore: score.adminScore?.toString() || '',
+      adminNotes: score.adminNotes || ''
+    });
+    setEditScoreModalOpen(true);
+  };
+
+  // Handle saving edited score
+  const handleSaveScore = async () => {
+    try {
+      setSavingScore(true);
+      
+      const endpointMap = {
+        resume: '/admin/resume-scores',
+        coverLetter: '/admin/cover-letter-scores',
+        video: '/admin/video-scores'
+      };
+      
+      const endpoint = `${endpointMap[editingScoreType]}/${editingScore.id}`;
+      
+      const updateData = {
+        overallScore: editScoreForm.overallScore ? parseFloat(editScoreForm.overallScore) : undefined,
+        scoreOne: editScoreForm.scoreOne ? parseInt(editScoreForm.scoreOne) : undefined,
+        scoreTwo: editScoreForm.scoreTwo ? parseInt(editScoreForm.scoreTwo) : undefined,
+        scoreThree: editScoreForm.scoreThree ? parseInt(editScoreForm.scoreThree) : undefined,
+        adminScore: editScoreForm.adminScore ? parseFloat(editScoreForm.adminScore) : undefined,
+        adminNotes: editScoreForm.adminNotes || undefined
+      };
+      
+      // For resume, use 'notes', for cover letter and video use 'notesOne'
+      if (editingScoreType === 'resume') {
+        updateData.notes = editScoreForm.notes || undefined;
+      } else {
+        updateData.notesOne = editScoreForm.notes || undefined;
+      }
+      
+      await apiClient.patch(endpoint, updateData);
+      
+      // Refresh the scores
+      if (appModal?.candidateId) {
+        await Promise.all([
+          fetchModalResumeScores(appModal.candidateId),
+          fetchModalCoverLetterScores(appModal.candidateId),
+          fetchModalVideoScores(appModal.candidateId)
+        ]);
+      }
+      
+      // Refresh candidates list to update rankings
+      await fetchCandidates();
+      
+      setEditScoreModalOpen(false);
+      setSnackbar({ open: true, message: 'Score updated successfully. Rankings have been updated.', severity: 'success' });
+    } catch (error) {
+      console.error('Error updating score:', error);
+      setSnackbar({ open: true, message: 'Failed to update score', severity: 'error' });
+    } finally {
+      setSavingScore(false);
     }
   };
 
@@ -3216,8 +3304,23 @@ export default function Staging() {
                                 border: '1px solid', 
                                 borderColor: 'grey.300', 
                                 borderRadius: 1,
-                                backgroundColor: 'grey.50'
+                                backgroundColor: 'grey.50',
+                                position: 'relative'
                               }}>
+                                {isAdmin && (
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => handleEditScore(score, 'resume')}
+                                    sx={{
+                                      position: 'absolute',
+                                      top: 4,
+                                      right: 4,
+                                      padding: '4px'
+                                    }}
+                                  >
+                                    <EditIcon fontSize="small" />
+                                  </IconButton>
+                                )}
                                 <Typography variant="body2" fontWeight="bold">
                                   {score.evaluator?.fullName || 'Unknown Evaluator'}
                                 </Typography>
@@ -3225,7 +3328,9 @@ export default function Staging() {
                                   {new Date(score.createdAt).toLocaleDateString()}
                                 </Typography>
                                 <Typography variant="h6" color="success.main" fontWeight="bold">
-                                  {score.overallScore}/13
+                                  {score.adminScore !== null && score.adminScore !== undefined 
+                                    ? `${score.adminScore}/13 (Admin Override)`
+                                    : `${score.overallScore}/13`}
                                 </Typography>
                                 {score.notes && (
                                   <Typography variant="caption" sx={{ 
@@ -3234,6 +3339,17 @@ export default function Staging() {
                                     fontStyle: 'italic'
                                   }}>
                                     {score.notes}
+                                  </Typography>
+                                )}
+                                {score.adminNotes && (
+                                  <Typography variant="caption" sx={{ 
+                                    display: 'block', 
+                                    mt: 0.5,
+                                    fontStyle: 'italic',
+                                    color: 'primary.main',
+                                    fontWeight: 'bold'
+                                  }}>
+                                    Admin Notes: {score.adminNotes}
                                   </Typography>
                                 )}
                               </Box>
@@ -3263,8 +3379,23 @@ export default function Staging() {
                                 border: '1px solid', 
                                 borderColor: 'grey.300', 
                                 borderRadius: 1,
-                                backgroundColor: 'grey.50'
+                                backgroundColor: 'grey.50',
+                                position: 'relative'
                               }}>
+                                {isAdmin && (
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => handleEditScore(score, 'coverLetter')}
+                                    sx={{
+                                      position: 'absolute',
+                                      top: 4,
+                                      right: 4,
+                                      padding: '4px'
+                                    }}
+                                  >
+                                    <EditIcon fontSize="small" />
+                                  </IconButton>
+                                )}
                                 <Typography variant="body2" fontWeight="bold">
                                   {score.evaluator?.fullName || 'Unknown Evaluator'}
                                 </Typography>
@@ -3272,15 +3403,28 @@ export default function Staging() {
                                   {new Date(score.createdAt).toLocaleDateString()}
                                 </Typography>
                                 <Typography variant="h6" color="success.main" fontWeight="bold">
-                                  {score.overallScore}/3
+                                  {score.adminScore !== null && score.adminScore !== undefined 
+                                    ? `${score.adminScore}/3 (Admin Override)`
+                                    : `${score.overallScore}/3`}
                                 </Typography>
-                                {score.notes && (
+                                {(score.notes || score.notesOne) && (
                                   <Typography variant="caption" sx={{ 
                                     display: 'block', 
                                     mt: 0.5,
                                     fontStyle: 'italic'
                                   }}>
-                                    {score.notes}
+                                    {score.notes || score.notesOne}
+                                  </Typography>
+                                )}
+                                {score.adminNotes && (
+                                  <Typography variant="caption" sx={{ 
+                                    display: 'block', 
+                                    mt: 0.5,
+                                    fontStyle: 'italic',
+                                    color: 'primary.main',
+                                    fontWeight: 'bold'
+                                  }}>
+                                    Admin Notes: {score.adminNotes}
                                   </Typography>
                                 )}
                               </Box>
@@ -3310,8 +3454,23 @@ export default function Staging() {
                                 border: '1px solid', 
                                 borderColor: 'grey.300', 
                                 borderRadius: 1,
-                                backgroundColor: 'grey.50'
+                                backgroundColor: 'grey.50',
+                                position: 'relative'
                               }}>
+                                {isAdmin && (
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => handleEditScore(score, 'video')}
+                                    sx={{
+                                      position: 'absolute',
+                                      top: 4,
+                                      right: 4,
+                                      padding: '4px'
+                                    }}
+                                  >
+                                    <EditIcon fontSize="small" />
+                                  </IconButton>
+                                )}
                                 <Typography variant="body2" fontWeight="bold">
                                   {score.evaluator?.fullName || 'Unknown Evaluator'}
                                 </Typography>
@@ -3319,15 +3478,28 @@ export default function Staging() {
                                   {new Date(score.createdAt).toLocaleDateString()}
                                 </Typography>
                                 <Typography variant="h6" color="success.main" fontWeight="bold">
-                                  {score.overallScore}/2
+                                  {score.adminScore !== null && score.adminScore !== undefined 
+                                    ? `${score.adminScore}/2 (Admin Override)`
+                                    : `${score.overallScore}/2`}
                                 </Typography>
-                                {score.notes && (
+                                {(score.notes || score.notesOne) && (
                                   <Typography variant="caption" sx={{ 
                                     display: 'block', 
                                     mt: 0.5,
                                     fontStyle: 'italic'
                                   }}>
-                                    {score.notes}
+                                    {score.notes || score.notesOne}
+                                  </Typography>
+                                )}
+                                {score.adminNotes && (
+                                  <Typography variant="caption" sx={{ 
+                                    display: 'block', 
+                                    mt: 0.5,
+                                    fontStyle: 'italic',
+                                    color: 'primary.main',
+                                    fontWeight: 'bold'
+                                  }}>
+                                    Admin Notes: {score.adminNotes}
                                   </Typography>
                                 )}
                               </Box>
@@ -3928,6 +4100,191 @@ export default function Staging() {
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setFinalRoundNotesModalOpen(false)}>Close</Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Edit Score Modal */}
+        <Dialog open={editScoreModalOpen} onClose={() => setEditScoreModalOpen(false)} maxWidth="sm" fullWidth>
+          <DialogTitle>
+            Edit {editingScoreType === 'resume' ? 'Resume' : editingScoreType === 'coverLetter' ? 'Cover Letter' : 'Video'} Score
+          </DialogTitle>
+          <DialogContent>
+            <Grid container spacing={2} sx={{ mt: 1 }}>
+              <Grid item xs={12}>
+                <Typography variant="body2" color="text.secondary" gutterBottom>
+                  Evaluator: {editingScore?.evaluator?.fullName || 'Unknown'}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Date: {editingScore?.createdAt ? new Date(editingScore.createdAt).toLocaleDateString() : 'N/A'}
+                </Typography>
+              </Grid>
+              
+              {editingScoreType === 'resume' && (
+                <>
+                  <Grid item xs={6}>
+                    <TextField
+                      fullWidth
+                      label="Score One (Content/Relevance/Impact)"
+                      type="number"
+                      inputProps={{ min: 0, max: 10 }}
+                      value={editScoreForm.scoreOne}
+                      onChange={(e) => setEditScoreForm({ ...editScoreForm, scoreOne: e.target.value })}
+                    />
+                  </Grid>
+                  <Grid item xs={6}>
+                    <TextField
+                      fullWidth
+                      label="Score Two (Structure/Formatting)"
+                      type="number"
+                      inputProps={{ min: 0, max: 3 }}
+                      value={editScoreForm.scoreTwo}
+                      onChange={(e) => setEditScoreForm({ ...editScoreForm, scoreTwo: e.target.value })}
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="Overall Score (0-13)"
+                      type="number"
+                      inputProps={{ min: 0, max: 13, step: 0.1 }}
+                      value={editScoreForm.overallScore}
+                      onChange={(e) => setEditScoreForm({ ...editScoreForm, overallScore: e.target.value })}
+                      helperText="Leave empty to auto-calculate from Score One + Score Two"
+                    />
+                  </Grid>
+                </>
+              )}
+              
+              {editingScoreType === 'coverLetter' && (
+                <>
+                  <Grid item xs={4}>
+                    <TextField
+                      fullWidth
+                      label="Score One"
+                      type="number"
+                      inputProps={{ min: 0, max: 3 }}
+                      value={editScoreForm.scoreOne}
+                      onChange={(e) => setEditScoreForm({ ...editScoreForm, scoreOne: e.target.value })}
+                    />
+                  </Grid>
+                  <Grid item xs={4}>
+                    <TextField
+                      fullWidth
+                      label="Score Two"
+                      type="number"
+                      inputProps={{ min: 0, max: 3 }}
+                      value={editScoreForm.scoreTwo}
+                      onChange={(e) => setEditScoreForm({ ...editScoreForm, scoreTwo: e.target.value })}
+                    />
+                  </Grid>
+                  <Grid item xs={4}>
+                    <TextField
+                      fullWidth
+                      label="Score Three"
+                      type="number"
+                      inputProps={{ min: 0, max: 3 }}
+                      value={editScoreForm.scoreThree}
+                      onChange={(e) => setEditScoreForm({ ...editScoreForm, scoreThree: e.target.value })}
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="Overall Score (0-3)"
+                      type="number"
+                      inputProps={{ min: 0, max: 3, step: 0.1 }}
+                      value={editScoreForm.overallScore}
+                      onChange={(e) => setEditScoreForm({ ...editScoreForm, overallScore: e.target.value })}
+                      helperText="Leave empty to auto-calculate from average of scores"
+                    />
+                  </Grid>
+                </>
+              )}
+              
+              {editingScoreType === 'video' && (
+                <>
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="Score One (0-2)"
+                      type="number"
+                      inputProps={{ min: 0, max: 2 }}
+                      value={editScoreForm.scoreOne}
+                      onChange={(e) => setEditScoreForm({ ...editScoreForm, scoreOne: e.target.value })}
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="Overall Score (0-2)"
+                      type="number"
+                      inputProps={{ min: 0, max: 2, step: 0.1 }}
+                      value={editScoreForm.overallScore}
+                      onChange={(e) => setEditScoreForm({ ...editScoreForm, overallScore: e.target.value })}
+                      helperText="Leave empty to use Score One"
+                    />
+                  </Grid>
+                </>
+              )}
+              
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={3}
+                  label="Notes"
+                  value={editScoreForm.notes}
+                  onChange={(e) => setEditScoreForm({ ...editScoreForm, notes: e.target.value })}
+                />
+              </Grid>
+              
+              <Grid item xs={12}>
+                <Divider sx={{ my: 1 }} />
+                <Typography variant="subtitle2" gutterBottom>
+                  Admin Override (Optional)
+                </Typography>
+              </Grid>
+              
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Admin Score Override"
+                  type="number"
+                  inputProps={{ 
+                    min: 0, 
+                    max: editingScoreType === 'resume' ? 13 : editingScoreType === 'coverLetter' ? 3 : 2,
+                    step: 0.1 
+                  }}
+                  value={editScoreForm.adminScore}
+                  onChange={(e) => setEditScoreForm({ ...editScoreForm, adminScore: e.target.value })}
+                  helperText="Override the overall score with an admin score"
+                />
+              </Grid>
+              
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={3}
+                  label="Admin Notes"
+                  value={editScoreForm.adminNotes}
+                  onChange={(e) => setEditScoreForm({ ...editScoreForm, adminNotes: e.target.value })}
+                  placeholder="Add admin notes about this score..."
+                />
+              </Grid>
+            </Grid>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setEditScoreModalOpen(false)} disabled={savingScore}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSaveScore}
+              variant="contained"
+              disabled={savingScore}
+            >
+              {savingScore ? 'Saving...' : 'Save Changes'}
+            </Button>
           </DialogActions>
         </Dialog>
 

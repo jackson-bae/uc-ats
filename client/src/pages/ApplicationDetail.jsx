@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeftIcon, DocumentIcon, ChatBubbleLeftRightIcon, ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, DocumentIcon, ChatBubbleLeftRightIcon, ChevronDownIcon, ChevronUpIcon, PencilIcon } from '@heroicons/react/24/outline';
 import apiClient from '../utils/api';
 import AuthenticatedImage from '../components/AuthenticatedImage';
 import DocumentPreviewModal from '../components/DocumentPreviewModal';
 import AccessControl from '../components/AccessControl';
+import { useAuth } from '../context/AuthContext';
 import '../styles/ApplicationDetail.css';
 
 export default function ApplicationDetail() {
@@ -28,6 +29,24 @@ export default function ApplicationDetail() {
   const [videoScores, setVideoScores] = useState([]);
   const [selectedScore, setSelectedScore] = useState(null);
   const [scoreModalOpen, setScoreModalOpen] = useState(false);
+  
+  // Admin edit score state
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
+  const [editScoreModalOpen, setEditScoreModalOpen] = useState(false);
+  const [editingScore, setEditingScore] = useState(null);
+  const [editingScoreType, setEditingScoreType] = useState(null); // 'resume', 'coverLetter', 'video'
+  const [editScoreForm, setEditScoreForm] = useState({
+    overallScore: '',
+    scoreOne: '',
+    scoreTwo: '',
+    scoreThree: '',
+    notes: '',
+    adminScore: '',
+    adminNotes: ''
+  });
+  const [savingScore, setSavingScore] = useState(false);
+  const [saveError, setSaveError] = useState(null);
 
   // Comments
   const [comments, setComments] = useState([]);
@@ -143,9 +162,16 @@ export default function ApplicationDetail() {
   };
 
   // Calculate average scores from the actual score arrays
+  // Uses adminScore override if available, otherwise uses overallScore
   const calculateAverageScore = (scores) => {
     if (!scores || scores.length === 0) return 0;
-    const validScores = scores.map(score => parseFloat(score.overallScore)).filter(score => !isNaN(score));
+    const validScores = scores.map(score => {
+      // Use adminScore if it exists, otherwise use overallScore
+      const scoreValue = score.adminScore !== null && score.adminScore !== undefined 
+        ? parseFloat(score.adminScore) 
+        : parseFloat(score.overallScore);
+      return scoreValue;
+    }).filter(score => !isNaN(score));
     if (validScores.length === 0) return 0;
     const total = validScores.reduce((sum, score) => sum + score, 0);
     return total / validScores.length;
@@ -213,6 +239,74 @@ export default function ApplicationDetail() {
       setVideoScores(scores);
     } catch (e) {
       console.error('Error fetching video scores:', e);
+    }
+  };
+
+  // Handle opening edit score modal
+  const handleEditScore = (score, scoreType) => {
+    setEditingScore(score);
+    setEditingScoreType(scoreType);
+    setEditScoreForm({
+      overallScore: score.overallScore?.toString() || '',
+      scoreOne: score.scoreOne?.toString() || '',
+      scoreTwo: score.scoreTwo?.toString() || '',
+      scoreThree: score.scoreThree?.toString() || '',
+      notes: score.notes || score.notesOne || '',
+      adminScore: score.adminScore?.toString() || '',
+      adminNotes: score.adminNotes || ''
+    });
+    setEditScoreModalOpen(true);
+    setSaveError(null);
+  };
+
+  // Handle saving edited score
+  const handleSaveScore = async () => {
+    try {
+      setSavingScore(true);
+      setSaveError(null);
+      
+      const endpointMap = {
+        resume: '/admin/resume-scores',
+        coverLetter: '/admin/cover-letter-scores',
+        video: '/admin/video-scores'
+      };
+      
+      const endpoint = `${endpointMap[editingScoreType]}/${editingScore.id}`;
+      
+      const updateData = {
+        overallScore: editScoreForm.overallScore ? parseFloat(editScoreForm.overallScore) : undefined,
+        scoreOne: editScoreForm.scoreOne ? parseInt(editScoreForm.scoreOne) : undefined,
+        scoreTwo: editScoreForm.scoreTwo ? parseInt(editScoreForm.scoreTwo) : undefined,
+        scoreThree: editScoreForm.scoreThree ? parseInt(editScoreForm.scoreThree) : undefined,
+        adminScore: editScoreForm.adminScore ? parseFloat(editScoreForm.adminScore) : undefined,
+        adminNotes: editScoreForm.adminNotes || undefined
+      };
+      
+      // For resume, use 'notes', for cover letter and video use 'notesOne'
+      if (editingScoreType === 'resume') {
+        updateData.notes = editScoreForm.notes || undefined;
+      } else {
+        updateData.notesOne = editScoreForm.notes || undefined;
+      }
+      
+      await apiClient.patch(endpoint, updateData);
+      
+      // Refresh the scores
+      if (application?.candidateId) {
+        await Promise.all([
+          fetchResumeScores(application.candidateId),
+          fetchCoverLetterScores(application.candidateId),
+          fetchVideoScores(application.candidateId)
+        ]);
+      }
+      
+      setEditScoreModalOpen(false);
+      setSaveError(null);
+    } catch (error) {
+      console.error('Error updating score:', error);
+      setSaveError(error.message || 'Failed to update score');
+    } finally {
+      setSavingScore(false);
     }
   };
 
@@ -1008,7 +1102,8 @@ export default function ApplicationDetail() {
                     marginBottom: '8px',
                     cursor: 'pointer',
                     backgroundColor: '#f9fafb',
-                    transition: 'background-color 0.2s'
+                    transition: 'background-color 0.2s',
+                    position: 'relative'
                   }}
                   onMouseEnter={(e) => e.target.style.backgroundColor = '#f3f4f6'}
                   onMouseLeave={(e) => e.target.style.backgroundColor = '#f9fafb'}
@@ -1017,6 +1112,39 @@ export default function ApplicationDetail() {
                     setScoreModalOpen(true);
                   }}
                 >
+                  {isAdmin && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEditScore(score, 'resume');
+                      }}
+                      style={{
+                        position: 'absolute',
+                        top: '8px',
+                        right: '8px',
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: '4px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderRadius: '4px',
+                        color: '#6b7280'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.backgroundColor = '#e5e7eb';
+                        e.target.style.color = '#374151';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.backgroundColor = 'transparent';
+                        e.target.style.color = '#6b7280';
+                      }}
+                      title="Edit score (Admin)"
+                    >
+                      <PencilIcon style={{ width: '16px', height: '16px' }} />
+                    </button>
+                  )}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                       <div style={{ fontWeight: '600', color: '#374151' }}>
@@ -1025,10 +1153,22 @@ export default function ApplicationDetail() {
                       <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '2px' }}>
                         {new Date(score.createdAt).toLocaleDateString()} at {new Date(score.createdAt).toLocaleTimeString()}
                       </div>
+                      {score.notes && (
+                        <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '4px', fontStyle: 'italic' }}>
+                          {score.notes}
+                        </div>
+                      )}
+                      {score.adminNotes && (
+                        <div style={{ fontSize: '0.75rem', color: '#2563eb', marginTop: '4px', fontWeight: '600' }}>
+                          Admin Notes: {score.adminNotes}
+                        </div>
+                      )}
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <div style={{ fontSize: '1.125rem', fontWeight: '600', color: '#059669' }}>
-                        {score.overallScore}/13
+                        {score.adminScore !== null && score.adminScore !== undefined 
+                          ? `${score.adminScore}/13 (Admin Override)`
+                          : `${score.overallScore}/13`}
                       </div>
                       <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
                         Overall Score
@@ -1061,7 +1201,8 @@ export default function ApplicationDetail() {
                     marginBottom: '8px',
                     cursor: 'pointer',
                     backgroundColor: '#f9fafb',
-                    transition: 'background-color 0.2s'
+                    transition: 'background-color 0.2s',
+                    position: 'relative'
                   }}
                   onMouseEnter={(e) => e.target.style.backgroundColor = '#f3f4f6'}
                   onMouseLeave={(e) => e.target.style.backgroundColor = '#f9fafb'}
@@ -1070,6 +1211,39 @@ export default function ApplicationDetail() {
                     setScoreModalOpen(true);
                   }}
                 >
+                  {isAdmin && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEditScore(score, 'coverLetter');
+                      }}
+                      style={{
+                        position: 'absolute',
+                        top: '8px',
+                        right: '8px',
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: '4px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderRadius: '4px',
+                        color: '#6b7280'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.backgroundColor = '#e5e7eb';
+                        e.target.style.color = '#374151';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.backgroundColor = 'transparent';
+                        e.target.style.color = '#6b7280';
+                      }}
+                      title="Edit score (Admin)"
+                    >
+                      <PencilIcon style={{ width: '16px', height: '16px' }} />
+                    </button>
+                  )}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                       <div style={{ fontWeight: '600', color: '#374151' }}>
@@ -1078,10 +1252,22 @@ export default function ApplicationDetail() {
                       <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '2px' }}>
                         {new Date(score.createdAt).toLocaleDateString()} at {new Date(score.createdAt).toLocaleTimeString()}
                       </div>
+                      {(score.notes || score.notesOne) && (
+                        <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '4px', fontStyle: 'italic' }}>
+                          {score.notes || score.notesOne}
+                        </div>
+                      )}
+                      {score.adminNotes && (
+                        <div style={{ fontSize: '0.75rem', color: '#2563eb', marginTop: '4px', fontWeight: '600' }}>
+                          Admin Notes: {score.adminNotes}
+                        </div>
+                      )}
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <div style={{ fontSize: '1.125rem', fontWeight: '600', color: '#059669' }}>
-                        {score.overallScore}/3
+                        {score.adminScore !== null && score.adminScore !== undefined 
+                          ? `${score.adminScore}/3 (Admin Override)`
+                          : `${score.overallScore}/3`}
                       </div>
                       <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
                         Overall Score
@@ -1114,7 +1300,8 @@ export default function ApplicationDetail() {
                     marginBottom: '8px',
                     cursor: 'pointer',
                     backgroundColor: '#f9fafb',
-                    transition: 'background-color 0.2s'
+                    transition: 'background-color 0.2s',
+                    position: 'relative'
                   }}
                   onMouseEnter={(e) => e.target.style.backgroundColor = '#f3f4f6'}
                   onMouseLeave={(e) => e.target.style.backgroundColor = '#f9fafb'}
@@ -1123,6 +1310,39 @@ export default function ApplicationDetail() {
                     setScoreModalOpen(true);
                   }}
                 >
+                  {isAdmin && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEditScore(score, 'video');
+                      }}
+                      style={{
+                        position: 'absolute',
+                        top: '8px',
+                        right: '8px',
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: '4px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderRadius: '4px',
+                        color: '#6b7280'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.backgroundColor = '#e5e7eb';
+                        e.target.style.color = '#374151';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.backgroundColor = 'transparent';
+                        e.target.style.color = '#6b7280';
+                      }}
+                      title="Edit score (Admin)"
+                    >
+                      <PencilIcon style={{ width: '16px', height: '16px' }} />
+                    </button>
+                  )}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                       <div style={{ fontWeight: '600', color: '#374151' }}>
@@ -1131,10 +1351,22 @@ export default function ApplicationDetail() {
                       <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '2px' }}>
                         {new Date(score.createdAt).toLocaleDateString()} at {new Date(score.createdAt).toLocaleTimeString()}
                       </div>
+                      {(score.notes || score.notesOne) && (
+                        <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '4px', fontStyle: 'italic' }}>
+                          {score.notes || score.notesOne}
+                        </div>
+                      )}
+                      {score.adminNotes && (
+                        <div style={{ fontSize: '0.75rem', color: '#2563eb', marginTop: '4px', fontWeight: '600' }}>
+                          Admin Notes: {score.adminNotes}
+                        </div>
+                      )}
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <div style={{ fontSize: '1.125rem', fontWeight: '600', color: '#059669' }}>
-                        {score.overallScore}/2
+                        {score.adminScore !== null && score.adminScore !== undefined 
+                          ? `${score.adminScore}/2 (Admin Override)`
+                          : `${score.overallScore}/2`}
                       </div>
                       <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
                         Overall Score
@@ -1511,6 +1743,385 @@ export default function ApplicationDetail() {
                 }}
               >
                 {isSubmittingReferral ? 'Adding...' : 'Add Referral'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Score Modal */}
+      {editScoreModalOpen && editingScore && (
+        <div 
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}
+          onClick={() => setEditScoreModalOpen(false)}
+        >
+          <div 
+            style={{
+              backgroundColor: '#fff',
+              borderRadius: '12px',
+              padding: '24px',
+              maxWidth: '600px',
+              width: '90%',
+              maxHeight: '80vh',
+              overflow: 'auto'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '600' }}>
+                Edit {editingScoreType === 'resume' ? 'Resume' : editingScoreType === 'coverLetter' ? 'Cover Letter' : 'Video'} Score
+              </h3>
+              <button 
+                onClick={() => setEditScoreModalOpen(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '1.5rem',
+                  cursor: 'pointer',
+                  color: '#6b7280'
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            {saveError && (
+              <div style={{ 
+                padding: '12px', 
+                backgroundColor: '#fee2e2', 
+                color: '#991b1b', 
+                borderRadius: '8px', 
+                marginBottom: '16px' 
+              }}>
+                {saveError}
+              </div>
+            )}
+
+            <div style={{ marginBottom: '16px' }}>
+              <div style={{ fontWeight: '600', color: '#374151', marginBottom: '4px' }}>
+                Evaluator
+              </div>
+              <div style={{ color: '#6b7280' }}>
+                {editingScore.evaluator?.fullName || 'Unknown'}
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '16px' }}>
+              <div style={{ fontWeight: '600', color: '#374151', marginBottom: '4px' }}>
+                Date
+              </div>
+              <div style={{ color: '#6b7280' }}>
+                {editingScore.createdAt ? new Date(editingScore.createdAt).toLocaleDateString() : 'N/A'}
+              </div>
+            </div>
+
+            {editingScoreType === 'resume' && (
+              <>
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ display: 'block', fontWeight: '600', color: '#374151', marginBottom: '4px' }}>
+                    Score One (Content/Relevance/Impact) (0-10)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="10"
+                    value={editScoreForm.scoreOne}
+                    onChange={(e) => setEditScoreForm({ ...editScoreForm, scoreOne: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '8px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '1rem'
+                    }}
+                  />
+                </div>
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ display: 'block', fontWeight: '600', color: '#374151', marginBottom: '4px' }}>
+                    Score Two (Structure/Formatting) (0-3)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="3"
+                    value={editScoreForm.scoreTwo}
+                    onChange={(e) => setEditScoreForm({ ...editScoreForm, scoreTwo: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '8px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '1rem'
+                    }}
+                  />
+                </div>
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ display: 'block', fontWeight: '600', color: '#374151', marginBottom: '4px' }}>
+                    Overall Score (0-13)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="13"
+                    step="0.1"
+                    value={editScoreForm.overallScore}
+                    onChange={(e) => setEditScoreForm({ ...editScoreForm, overallScore: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '8px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '1rem'
+                    }}
+                  />
+                  <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '4px' }}>
+                    Leave empty to auto-calculate from Score One + Score Two
+                  </div>
+                </div>
+              </>
+            )}
+
+            {editingScoreType === 'coverLetter' && (
+              <>
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ display: 'block', fontWeight: '600', color: '#374151', marginBottom: '4px' }}>
+                    Score One (0-3)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="3"
+                    value={editScoreForm.scoreOne}
+                    onChange={(e) => setEditScoreForm({ ...editScoreForm, scoreOne: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '8px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '1rem'
+                    }}
+                  />
+                </div>
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ display: 'block', fontWeight: '600', color: '#374151', marginBottom: '4px' }}>
+                    Score Two (0-3)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="3"
+                    value={editScoreForm.scoreTwo}
+                    onChange={(e) => setEditScoreForm({ ...editScoreForm, scoreTwo: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '8px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '1rem'
+                    }}
+                  />
+                </div>
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ display: 'block', fontWeight: '600', color: '#374151', marginBottom: '4px' }}>
+                    Score Three (0-3)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="3"
+                    value={editScoreForm.scoreThree}
+                    onChange={(e) => setEditScoreForm({ ...editScoreForm, scoreThree: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '8px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '1rem'
+                    }}
+                  />
+                </div>
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ display: 'block', fontWeight: '600', color: '#374151', marginBottom: '4px' }}>
+                    Overall Score (0-3)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="3"
+                    step="0.1"
+                    value={editScoreForm.overallScore}
+                    onChange={(e) => setEditScoreForm({ ...editScoreForm, overallScore: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '8px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '1rem'
+                    }}
+                  />
+                  <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '4px' }}>
+                    Leave empty to auto-calculate from average of scores
+                  </div>
+                </div>
+              </>
+            )}
+
+            {editingScoreType === 'video' && (
+              <>
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ display: 'block', fontWeight: '600', color: '#374151', marginBottom: '4px' }}>
+                    Score One (0-2)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="2"
+                    value={editScoreForm.scoreOne}
+                    onChange={(e) => setEditScoreForm({ ...editScoreForm, scoreOne: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '8px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '1rem'
+                    }}
+                  />
+                </div>
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ display: 'block', fontWeight: '600', color: '#374151', marginBottom: '4px' }}>
+                    Overall Score (0-2)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="2"
+                    step="0.1"
+                    value={editScoreForm.overallScore}
+                    onChange={(e) => setEditScoreForm({ ...editScoreForm, overallScore: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '8px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '1rem'
+                    }}
+                  />
+                  <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '4px' }}>
+                    Leave empty to use Score One
+                  </div>
+                </div>
+              </>
+            )}
+
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ display: 'block', fontWeight: '600', color: '#374151', marginBottom: '4px' }}>
+                Notes
+              </label>
+              <textarea
+                value={editScoreForm.notes}
+                onChange={(e) => setEditScoreForm({ ...editScoreForm, notes: e.target.value })}
+                rows={3}
+                style={{
+                  width: '100%',
+                  padding: '8px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '1rem',
+                  fontFamily: 'inherit',
+                  resize: 'vertical'
+                }}
+              />
+            </div>
+
+            <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid #e5e7eb' }}>
+              <div style={{ fontWeight: '600', color: '#374151', marginBottom: '12px' }}>
+                Admin Override (Optional)
+              </div>
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ display: 'block', fontWeight: '600', color: '#374151', marginBottom: '4px' }}>
+                  Admin Score Override
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max={editingScoreType === 'resume' ? 13 : editingScoreType === 'coverLetter' ? 3 : 2}
+                  step="0.1"
+                  value={editScoreForm.adminScore}
+                  onChange={(e) => setEditScoreForm({ ...editScoreForm, adminScore: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '8px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    fontSize: '1rem'
+                  }}
+                />
+                <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '4px' }}>
+                  Override the overall score with an admin score
+                </div>
+              </div>
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ display: 'block', fontWeight: '600', color: '#374151', marginBottom: '4px' }}>
+                  Admin Notes
+                </label>
+                <textarea
+                  value={editScoreForm.adminNotes}
+                  onChange={(e) => setEditScoreForm({ ...editScoreForm, adminNotes: e.target.value })}
+                  rows={3}
+                  placeholder="Add admin notes about this score..."
+                  style={{
+                    width: '100%',
+                    padding: '8px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    fontSize: '1rem',
+                    fontFamily: 'inherit',
+                    resize: 'vertical'
+                  }}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '24px' }}>
+              <button
+                onClick={() => setEditScoreModalOpen(false)}
+                disabled={savingScore}
+                style={{
+                  padding: '8px 16px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  background: '#fff',
+                  cursor: savingScore ? 'not-allowed' : 'pointer',
+                  color: '#374151',
+                  fontSize: '0.875rem',
+                  fontWeight: '500'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveScore}
+                disabled={savingScore}
+                style={{
+                  padding: '8px 16px',
+                  border: 'none',
+                  borderRadius: '6px',
+                  background: savingScore ? '#9ca3af' : '#2563eb',
+                  cursor: savingScore ? 'not-allowed' : 'pointer',
+                  color: '#fff',
+                  fontSize: '0.875rem',
+                  fontWeight: '500'
+                }}
+              >
+                {savingScore ? 'Saving...' : 'Save Changes'}
               </button>
             </div>
           </div>
