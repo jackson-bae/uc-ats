@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import apiClient from '../utils/api';
 
-export default function AddApplicationModal({ isOpen, onClose, onSuccess }) {
+export default function EditApplicationModal({ isOpen, onClose, onSuccess, application }) {
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -21,10 +21,39 @@ export default function AddApplicationModal({ isOpen, onClose, onSuccess }) {
     resumeUrl: '',
     headshotUrl: '',
     coverLetterUrl: '',
-    videoUrl: ''
+    videoUrl: '',
+    blindResumeUrl: '',
+    status: 'SUBMITTED'
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (application && isOpen) {
+      setFormData({
+        firstName: application.firstName || '',
+        lastName: application.lastName || '',
+        email: application.email || '',
+        studentId: application.studentId || '',
+        phoneNumber: application.phoneNumber || '',
+        graduationYear: application.graduationYear || '',
+        isTransferStudent: application.isTransferStudent || false,
+        priorCollegeYears: application.priorCollegeYears || '',
+        cumulativeGpa: application.cumulativeGpa?.toString() || '',
+        majorGpa: application.majorGpa?.toString() || '',
+        major1: application.major1 || '',
+        major2: application.major2 || '',
+        gender: application.gender || '',
+        isFirstGeneration: application.isFirstGeneration || false,
+        resumeUrl: application.resumeUrl || '',
+        headshotUrl: application.headshotUrl || '',
+        coverLetterUrl: application.coverLetterUrl || '',
+        videoUrl: application.videoUrl || '',
+        blindResumeUrl: application.blindResumeUrl || '',
+        status: application.status || 'SUBMITTED'
+      });
+    }
+  }, [application, isOpen]);
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -60,60 +89,47 @@ export default function AddApplicationModal({ isOpen, onClose, onSuccess }) {
         return;
       }
 
-      // Convert GPA to decimal format
-      const applicationData = {
-        ...formData,
+      // Prepare update data
+      const updateData = {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        studentId: formData.studentId,
+        phoneNumber: formData.phoneNumber,
+        graduationYear: formData.graduationYear,
+        isTransferStudent: formData.isTransferStudent,
+        priorCollegeYears: formData.priorCollegeYears || null,
         cumulativeGpa: parseFloat(formData.cumulativeGpa),
-        responseID: `manual-${Date.now()}`, // Generate unique response ID
-        rawResponses: {} // Empty object for manual applications
+        majorGpa: formData.majorGpa && formData.majorGpa !== '' ? parseFloat(formData.majorGpa) : null,
+        major1: formData.major1,
+        major2: formData.major2 || null,
+        gender: formData.gender || null,
+        isFirstGeneration: formData.isFirstGeneration,
+        resumeUrl: formData.resumeUrl,
+        headshotUrl: formData.headshotUrl,
+        coverLetterUrl: formData.coverLetterUrl || null,
+        videoUrl: formData.videoUrl || null,
+        blindResumeUrl: formData.blindResumeUrl || null,
+        status: formData.status
       };
 
-      // Handle majorGpa - send 0.00 if empty, otherwise parse the value
-      if (formData.majorGpa && formData.majorGpa !== '') {
-        applicationData.majorGpa = parseFloat(formData.majorGpa);
-      } else {
-        applicationData.majorGpa = 0.00;
-      }
-
-      await apiClient.post('/applications/manual', applicationData);
+      await apiClient.put(`/admin/candidates/${application.id}`, updateData);
       onSuccess();
       onClose();
-      
-      // Reset form
-      setFormData({
-        firstName: '',
-        lastName: '',
-        email: '',
-        studentId: '',
-        phoneNumber: '',
-        graduationYear: '',
-        isTransferStudent: false,
-        priorCollegeYears: '',
-        cumulativeGpa: '',
-        majorGpa: '',
-        major1: '',
-        major2: '',
-        gender: '',
-        isFirstGeneration: false,
-        resumeUrl: '',
-        headshotUrl: '',
-        coverLetterUrl: '',
-        videoUrl: ''
-      });
     } catch (err) {
-      setError(err.message || 'Failed to create application');
+      setError(err.message || 'Failed to update application');
     } finally {
       setLoading(false);
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !application) return null;
 
   return (
     <div className="modal-overlay">
       <div className="modal-content">
         <div className="modal-header">
-          <h2>Add New Application</h2>
+          <h2>Edit Application</h2>
           <button className="close-btn" onClick={onClose}>
             <XMarkIcon className="close-icon" />
           </button>
@@ -211,6 +227,22 @@ export default function AddApplicationModal({ isOpen, onClose, onSuccess }) {
 
             <div className="form-row">
               <div className="form-group">
+                <label htmlFor="status">Status *</label>
+                <select
+                  id="status"
+                  name="status"
+                  value={formData.status}
+                  onChange={handleInputChange}
+                  required
+                >
+                  <option value="SUBMITTED">Submitted</option>
+                  <option value="UNDER_REVIEW">Under Review</option>
+                  <option value="ACCEPTED">Accepted</option>
+                  <option value="REJECTED">Rejected</option>
+                  <option value="WAITLISTED">Waitlisted</option>
+                </select>
+              </div>
+              <div className="form-group">
                 <label htmlFor="gender">Gender</label>
                 <select
                   id="gender"
@@ -224,6 +256,9 @@ export default function AddApplicationModal({ isOpen, onClose, onSuccess }) {
                   <option value="Other">Other</option>
                 </select>
               </div>
+            </div>
+
+            <div className="form-row">
               <div className="form-group checkbox-group">
                 <label className="checkbox-label">
                   <input
@@ -233,6 +268,17 @@ export default function AddApplicationModal({ isOpen, onClose, onSuccess }) {
                     onChange={handleInputChange}
                   />
                   Transfer Student
+                </label>
+              </div>
+              <div className="form-group checkbox-group">
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    name="isFirstGeneration"
+                    checked={formData.isFirstGeneration}
+                    onChange={handleInputChange}
+                  />
+                  First Generation Student
                 </label>
               </div>
             </div>
@@ -250,18 +296,6 @@ export default function AddApplicationModal({ isOpen, onClose, onSuccess }) {
                 />
               </div>
             )}
-
-            <div className="form-group checkbox-group">
-              <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  name="isFirstGeneration"
-                  checked={formData.isFirstGeneration}
-                  onChange={handleInputChange}
-                />
-                First Generation Student
-              </label>
-            </div>
           </div>
 
           <div className="form-section">
@@ -336,6 +370,17 @@ export default function AddApplicationModal({ isOpen, onClose, onSuccess }) {
             </div>
 
             <div className="form-group">
+              <label htmlFor="blindResumeUrl">Blind Resume URL</label>
+              <input
+                type="url"
+                id="blindResumeUrl"
+                name="blindResumeUrl"
+                value={formData.blindResumeUrl}
+                onChange={handleInputChange}
+              />
+            </div>
+
+            <div className="form-group">
               <label htmlFor="headshotUrl">Headshot URL *</label>
               <input
                 type="url"
@@ -375,7 +420,7 @@ export default function AddApplicationModal({ isOpen, onClose, onSuccess }) {
               Cancel
             </button>
             <button type="submit" disabled={loading} className="submit-btn">
-              {loading ? 'Creating...' : 'Create Application'}
+              {loading ? 'Updating...' : 'Update Application'}
             </button>
           </div>
         </form>
@@ -383,3 +428,4 @@ export default function AddApplicationModal({ isOpen, onClose, onSuccess }) {
     </div>
   );
 }
+

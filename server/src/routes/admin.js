@@ -4768,4 +4768,46 @@ router.patch('/applications/:id/test-for', async (req, res) => {
   }
 });
 
+// Delete application (admin only)
+router.delete('/applications/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const application = await prisma.application.findUnique({
+      where: { id }
+    });
+
+    if (!application) {
+      return res.status(404).json({ error: 'Application not found' });
+    }
+
+    // Delete related records first (comments, evaluations, etc.)
+    await prisma.comment.deleteMany({
+      where: { applicationId: id }
+    });
+
+    await prisma.interviewEvaluation.deleteMany({
+      where: { applicationId: id }
+    });
+
+    await prisma.firstRoundInterviewEvaluation.deleteMany({
+      where: { applicationId: id }
+    });
+
+    await prisma.flaggedDocument.deleteMany({
+      where: { applicationId: id }
+    });
+
+    // Delete the application
+    await prisma.application.delete({
+      where: { id }
+    });
+
+    res.json({ message: 'Application deleted successfully' });
+  } catch (error) {
+    console.error('[DELETE /api/admin/applications/:id]', error);
+    res.status(500).json({ error: 'Failed to delete application' });
+  }
+});
+
 export default router;
