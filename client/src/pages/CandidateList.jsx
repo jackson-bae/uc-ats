@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { MagnifyingGlassIcon, PlusIcon } from '@heroicons/react/24/outline';
+import { MagnifyingGlassIcon, PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 import apiClient from '../utils/api';
 import AuthenticatedImage from '../components/AuthenticatedImage';
 import ImageCache from '../utils/imageCache';
 import { useAuth } from '../context/AuthContext';
 import AccessControl from '../components/AccessControl';
+import EditCandidateModal from '../components/EditCandidateModal';
 import '../styles/CandidateList.css';
 
 export default function CandidateList() {
@@ -18,6 +19,11 @@ export default function CandidateList() {
     group: '',
     createdDate: ''
   });
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingCandidate, setEditingCandidate] = useState(null);
+  const [deletingCandidate, setDeletingCandidate] = useState(null);
+
+  const isAdmin = user?.role === 'ADMIN';
 
   useEffect(() => {
     const fetchCandidates = async () => {
@@ -118,6 +124,59 @@ export default function CandidateList() {
     });
   };
 
+  const handleEdit = async (e, candidate) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setEditingCandidate(candidate);
+    setShowEditModal(true);
+  };
+
+  const handleDelete = async (e, candidate) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const candidateName = candidate.applications?.[0] ? 
+      `${candidate.applications[0].firstName} ${candidate.applications[0].lastName}` : 
+      `${candidate.firstName} ${candidate.lastName}`;
+    
+    if (!window.confirm(`Are you sure you want to delete candidate ${candidateName}? This action cannot be undone.`)) {
+      return;
+    }
+
+    // Check if candidate has applications
+    if (candidate.applications && candidate.applications.length > 0) {
+      alert('Cannot delete candidate with associated applications. Please delete applications first.');
+      return;
+    }
+
+    setDeletingCandidate(candidate.id);
+    try {
+      await apiClient.delete(`/admin/candidates/${candidate.id}`);
+      // Refresh the candidates list
+      const data = await apiClient.get('/member/all-candidates');
+      setCandidates(data);
+    } catch (err) {
+      alert(err.message || 'Failed to delete candidate');
+    } finally {
+      setDeletingCandidate(null);
+    }
+  };
+
+  const handleCandidateUpdated = () => {
+    // Refresh the candidates list
+    const fetchCandidates = async () => {
+      try {
+        const data = await apiClient.get('/member/all-candidates');
+        setCandidates(data);
+      } catch (err) {
+        console.error('Error loading candidates:', err);
+      }
+    };
+    fetchCandidates();
+    setShowEditModal(false);
+    setEditingCandidate(null);
+  };
+
   if (loading) {
     return (
       <div className="candidate-list">
@@ -193,61 +252,92 @@ export default function CandidateList() {
       ) : (
         <div className="candidates-grid">
           {filteredCandidates.map((candidate, index) => (
-            <Link
-              key={candidate.id}
-              to={`/candidate-detail/${candidate.id}`}
-              className="candidate-card"
-            >
-              <div className="candidate-header">
-                <div className="candidate-info">
-                  {/* Profile Picture with fallback - extract from application */}
-                  {candidate.applications && candidate.applications.length > 0 && candidate.applications[0].headshotUrl ? (
-                    <AuthenticatedImage
-                      src={candidate.applications[0].headshotUrl}
-                      alt={candidate.applications[0] ? 
+            <div key={candidate.id} className="candidate-card-wrapper">
+              <Link
+                to={`/candidate-detail/${candidate.id}`}
+                className="candidate-card"
+              >
+                <div className="candidate-header">
+                  <div className="candidate-info">
+                    {/* Profile Picture with fallback - extract from application */}
+                    {candidate.applications && candidate.applications.length > 0 && candidate.applications[0].headshotUrl ? (
+                      <AuthenticatedImage
+                        src={candidate.applications[0].headshotUrl}
+                        alt={candidate.applications[0] ? 
+                          `${candidate.applications[0].firstName} ${candidate.applications[0].lastName}` : 
+                          `${candidate.firstName} ${candidate.lastName}`}
+                        className="candidate-avatar"
+                        style={{
+                          width: '60px',
+                          height: '60px',
+                          borderRadius: '50%',
+                          objectFit: 'cover'
+                        }}
+                      />
+                    ) : (
+                      <div className="candidate-avatar-fallback">
+                        {getInitials(candidate.applications?.[0] ? 
+                          `${candidate.applications[0].firstName} ${candidate.applications[0].lastName}` : 
+                          `${candidate.firstName} ${candidate.lastName}`)}
+                      </div>
+                    )}
+                    <div className="candidate-details">
+                      <h3>{candidate.applications?.[0] ? 
                         `${candidate.applications[0].firstName} ${candidate.applications[0].lastName}` : 
-                        `${candidate.firstName} ${candidate.lastName}`}
-                      className="candidate-avatar"
-                      style={{
-                        width: '60px',
-                        height: '60px',
-                        borderRadius: '50%',
-                        objectFit: 'cover'
-                      }}
-                    />
-                  ) : (
-                    <div className="candidate-avatar-fallback">
-                      {getInitials(candidate.applications?.[0] ? 
-                        `${candidate.applications[0].firstName} ${candidate.applications[0].lastName}` : 
-                        `${candidate.firstName} ${candidate.lastName}`)}
+                        `${candidate.firstName} ${candidate.lastName}`}</h3>
+                      <p className="candidate-meta">
+                        {candidate.studentId || 'N/A'} • {candidate.applications?.[0]?.email || candidate.email || 'N/A'}
+                      </p>
+                      <p className="candidate-meta">
+                        Applications: {candidate.applications?.length || 0} • 
+                        Group: {candidate.assignedGroup?.id ? `Group ${candidate.assignedGroup.id.slice(-4)}` : 'Unassigned'}
+                      </p>
+                      <p className="candidate-date">
+                        Added: {formatDate(candidate.createdAt || candidate.applications?.[0]?.submittedAt)}
+                      </p>
                     </div>
-                  )}
-                  <div className="candidate-details">
-                    <h3>{candidate.applications?.[0] ? 
-                      `${candidate.applications[0].firstName} ${candidate.applications[0].lastName}` : 
-                      `${candidate.firstName} ${candidate.lastName}`}</h3>
-                    <p className="candidate-meta">
-                      {candidate.studentId || 'N/A'} • {candidate.applications?.[0]?.email || candidate.email || 'N/A'}
-                    </p>
-                    <p className="candidate-meta">
-                      Applications: {candidate.applications?.length || 0} • 
-                      Group: {candidate.assignedGroup?.id ? `Group ${candidate.assignedGroup.id.slice(-4)}` : 'Unassigned'}
-                    </p>
-                    <p className="candidate-date">
-                      Added: {formatDate(candidate.createdAt || candidate.applications?.[0]?.submittedAt)}
-                    </p>
+                  </div>
+                  <div className="candidate-status">
+                    <span className={`status-badge ${candidate.applications && candidate.applications.length > 0 ? 'applied' : 'not_applied'}`}>
+                      {candidate.applications && candidate.applications.length > 0 ? 'APPLIED' : 'NOT APPLIED'}
+                    </span>
                   </div>
                 </div>
-                <div className="candidate-status">
-                  <span className={`status-badge ${candidate.applications && candidate.applications.length > 0 ? 'applied' : 'not_applied'}`}>
-                    {candidate.applications && candidate.applications.length > 0 ? 'APPLIED' : 'NOT APPLIED'}
-                  </span>
+              </Link>
+              {isAdmin && (
+                <div className="candidate-actions">
+                  <button
+                    className="action-btn edit-btn"
+                    onClick={(e) => handleEdit(e, candidate)}
+                    title="Edit Candidate"
+                  >
+                    <PencilIcon className="action-icon" />
+                  </button>
+                  <button
+                    className="action-btn delete-btn"
+                    onClick={(e) => handleDelete(e, candidate)}
+                    disabled={deletingCandidate === candidate.id || (candidate.applications && candidate.applications.length > 0)}
+                    title={candidate.applications && candidate.applications.length > 0 ? "Cannot delete candidate with applications" : "Delete Candidate"}
+                  >
+                    <TrashIcon className="action-icon" />
+                  </button>
                 </div>
-              </div>
-            </Link>
+              )}
+            </div>
           ))}
         </div>
       )}
+
+      {/* Edit Candidate Modal */}
+      <EditCandidateModal
+        isOpen={showEditModal}
+        onClose={() => {
+          setShowEditModal(false);
+          setEditingCandidate(null);
+        }}
+        onSuccess={handleCandidateUpdated}
+        candidate={editingCandidate}
+      />
     </div>
     </AccessControl>
   );

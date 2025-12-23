@@ -464,6 +464,179 @@ router.put('/candidates/:id', async (req, res) => {
   }
 });
 
+// Update candidate information (Candidate model, not Application)
+router.put('/candidates/:id/info', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { firstName, lastName, email, studentId } = req.body;
+
+    // Validate required fields
+    if (!firstName || !lastName || !email || !studentId) {
+      return res.status(400).json({ error: 'All fields are required' });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ error: 'Invalid email format' });
+    }
+
+    // Check if candidate exists
+    const candidate = await prisma.candidate.findUnique({
+      where: { id }
+    });
+
+    if (!candidate) {
+      return res.status(404).json({ error: 'Candidate not found' });
+    }
+
+    // Check if email or studentId is being changed and if it conflicts with another candidate
+    if (email !== candidate.email) {
+      const existingEmail = await prisma.candidate.findUnique({
+        where: { email }
+      });
+      if (existingEmail && existingEmail.id !== id) {
+        return res.status(400).json({ error: 'Email already in use by another candidate' });
+      }
+    }
+
+    if (studentId !== candidate.studentId) {
+      const existingStudentId = await prisma.candidate.findUnique({
+        where: { studentId }
+      });
+      if (existingStudentId && existingStudentId.id !== id) {
+        return res.status(400).json({ error: 'Student ID already in use by another candidate' });
+      }
+    }
+
+    // Update the candidate
+    const updatedCandidate = await prisma.candidate.update({
+      where: { id },
+      data: {
+        firstName,
+        lastName,
+        email,
+        studentId
+      }
+    });
+
+    res.json({
+      message: 'Candidate updated successfully',
+      candidate: updatedCandidate
+    });
+  } catch (error) {
+    console.error(`[PUT /api/admin/candidates/:id/info]`, error);
+    if (error.code === 'P2002') {
+      return res.status(400).json({ error: 'Email or Student ID already in use' });
+    }
+    res.status(500).json({ error: 'Failed to update candidate' });
+  }
+});
+
+// Delete candidate (admin only)
+router.delete('/candidates/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Check if candidate exists
+    const candidate = await prisma.candidate.findUnique({
+      where: { id },
+      include: {
+        applications: {
+          select: { id: true }
+        },
+        eventAttendance: {
+          select: { id: true }
+        },
+        eventRsvp: {
+          select: { id: true }
+        },
+        coffeeChat: {
+          select: { id: true }
+        },
+        referrals: {
+          select: { id: true }
+        },
+        resumeScores: {
+          select: { id: true }
+        },
+        coverLetterScores: {
+          select: { id: true }
+        },
+        videoScores: {
+          select: { id: true }
+        },
+        roundOne: {
+          select: { id: true }
+        },
+        roundTwo: {
+          select: { id: true }
+        }
+      }
+    });
+
+    if (!candidate) {
+      return res.status(404).json({ error: 'Candidate not found' });
+    }
+
+    // Check if candidate has applications
+    if (candidate.applications && candidate.applications.length > 0) {
+      return res.status(400).json({ 
+        error: 'Cannot delete candidate with associated applications. Please delete applications first.' 
+      });
+    }
+
+    // Delete related records first
+    await prisma.$transaction([
+      // Delete event attendance
+      prisma.eventAttendance.deleteMany({
+        where: { candidateId: id }
+      }),
+      // Delete event RSVPs
+      prisma.eventRsvp.deleteMany({
+        where: { candidateId: id }
+      }),
+      // Delete coffee chats (and their evaluations via cascade)
+      prisma.coffeeChat.deleteMany({
+        where: { candidateId: id }
+      }),
+      // Delete referrals
+      prisma.referral.deleteMany({
+        where: { candidateId: id }
+      }),
+      // Delete resume scores
+      prisma.resumeScore.deleteMany({
+        where: { candidateId: id }
+      }),
+      // Delete cover letter scores
+      prisma.coverLetterScore.deleteMany({
+        where: { candidateId: id }
+      }),
+      // Delete video scores
+      prisma.videoScore.deleteMany({
+        where: { candidateId: id }
+      }),
+      // Delete round one (and evaluations via cascade)
+      prisma.roundOne.deleteMany({
+        where: { candidateId: id }
+      }),
+      // Delete round two (and evaluations via cascade)
+      prisma.roundTwo.deleteMany({
+        where: { candidateId: id }
+      }),
+      // Finally delete the candidate
+      prisma.candidate.delete({
+        where: { id }
+      })
+    ]);
+
+    res.json({ message: 'Candidate deleted successfully' });
+  } catch (error) {
+    console.error('[DELETE /api/admin/candidates/:id]', error);
+    res.status(500).json({ error: 'Failed to delete candidate' });
+  }
+});
+
 router.post('/reject-candidate/:id', async (req, res) => {
   try {
     const { id } = req.params;

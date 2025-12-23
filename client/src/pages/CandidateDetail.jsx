@@ -1,16 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { ArrowLeftIcon } from '@heroicons/react/24/outline';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { ArrowLeftIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 import apiClient from '../utils/api';
 import AuthenticatedImage from '../components/AuthenticatedImage';
 import AccessControl from '../components/AccessControl';
+import EditCandidateModal from '../components/EditCandidateModal';
+import { useAuth } from '../context/AuthContext';
 import '../styles/CandidateDetail.css';
 
 export default function CandidateDetail() {
   const { id } = useParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const [candidate, setCandidate] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [deletingCandidate, setDeletingCandidate] = useState(false);
+
+  const isAdmin = user?.role === 'ADMIN';
 
   useEffect(() => {
     const fetchCandidate = async () => {
@@ -64,6 +72,51 @@ export default function CandidateDetail() {
     });
   };
 
+  const handleEdit = () => {
+    setShowEditModal(true);
+  };
+
+  const handleDelete = async () => {
+    if (!candidate) return;
+    
+    const latestApp = candidate.applications?.[0];
+    const candidateName = latestApp ? 
+      `${latestApp.firstName} ${latestApp.lastName}` : 
+      `${candidate.firstName} ${candidate.lastName}`;
+    
+    if (!window.confirm(`Are you sure you want to delete candidate ${candidateName}? This action cannot be undone.`)) {
+      return;
+    }
+
+    // Check if candidate has applications
+    if (candidate.applications && candidate.applications.length > 0) {
+      alert('Cannot delete candidate with associated applications. Please delete applications first.');
+      return;
+    }
+
+    setDeletingCandidate(true);
+    try {
+      await apiClient.delete(`/admin/candidates/${candidate.id}`);
+      // Navigate back to candidate list
+      navigate('/candidate-list');
+    } catch (err) {
+      alert(err.message || 'Failed to delete candidate');
+      setDeletingCandidate(false);
+    }
+  };
+
+  const handleCandidateUpdated = async () => {
+    // Refresh the candidate data
+    try {
+      const updatedCandidate = await apiClient.get(`/member/candidate/${id}`);
+      setCandidate(updatedCandidate);
+    } catch (err) {
+      console.error('Error loading candidate detail:', err);
+      setError(err.message);
+    }
+    setShowEditModal(false);
+  };
+
   if (loading) {
     return (
       <div className="candidate-detail">
@@ -107,7 +160,49 @@ export default function CandidateDetail() {
           <ArrowLeftIcon className="back-icon" />
           Back to Candidates
         </Link>
-        <h1 className="page-title">Candidate Details</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <h1 className="page-title">Candidate Details</h1>
+          {isAdmin && (
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button
+                className="action-btn edit-btn"
+                onClick={handleEdit}
+                title="Edit Candidate"
+                style={{
+                  padding: '0.5rem',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  backgroundColor: '#f3f4f6',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <PencilIcon style={{ width: '20px', height: '20px' }} />
+              </button>
+              <button
+                className="action-btn delete-btn"
+                onClick={handleDelete}
+                disabled={deletingCandidate || (candidate.applications && candidate.applications.length > 0)}
+                title={candidate.applications && candidate.applications.length > 0 ? "Cannot delete candidate with applications" : "Delete Candidate"}
+                style={{
+                  padding: '0.5rem',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: deletingCandidate || (candidate.applications && candidate.applications.length > 0) ? 'not-allowed' : 'pointer',
+                  backgroundColor: deletingCandidate || (candidate.applications && candidate.applications.length > 0) ? '#e5e7eb' : '#fee2e2',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: deletingCandidate || (candidate.applications && candidate.applications.length > 0) ? 0.5 : 1
+                }}
+              >
+                <TrashIcon style={{ width: '20px', height: '20px' }} />
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Candidate Info Card */}
@@ -228,6 +323,16 @@ export default function CandidateDetail() {
           </div>
         </div>
       </div>
+
+      {/* Edit Candidate Modal */}
+      <EditCandidateModal
+        isOpen={showEditModal}
+        onClose={() => {
+          setShowEditModal(false);
+        }}
+        onSuccess={handleCandidateUpdated}
+        candidate={candidate}
+      />
     </div>
     </AccessControl>
   );
