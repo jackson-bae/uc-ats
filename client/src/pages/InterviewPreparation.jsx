@@ -396,9 +396,9 @@ export default function InterviewPreparation() {
       <div className="interview-prep-header">
         <div className="header-content">
           <div>
-            <h1 className="interview-prep-title">Interview Preparation</h1>
+            <h1 className="interview-prep-title">Recruitment Resources</h1>
             <p className="interview-prep-subtitle">
-              Here are some preparation tools to help you understand what to expect and how to get ready for your interview.
+              Here are some preparation tools to help you understand what to expect and how to get ready for recruitment.
             </p>
           </div>
           {isAdmin && (

@@ -28,7 +28,7 @@ const CandidateLayout = ({ children }) => {
     { name: 'Dashboard', href: '/', icon: HomeIcon },
     { name: 'Applications', href: '/applications', icon: DocumentTextIcon },
     { name: 'Events', href: '/events', icon: CalendarDaysIcon },
-    { name: 'Interview Preparation', href: '/interview-prep', icon: AcademicCapIcon },
+    { name: 'Recruitment Resources', href: '/interview-prep', icon: AcademicCapIcon },
   ];
 
   const isCurrentPath = (path) => location.pathname === path;
