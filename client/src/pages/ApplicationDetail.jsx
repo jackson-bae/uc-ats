@@ -367,6 +367,13 @@ export default function ApplicationDetail() {
           apiClient.get('/applications/current-user/id')
         ]);
         
+        console.log('Application data received:', appData);
+        console.log('Document URLs:', {
+          resumeUrl: appData.resumeUrl,
+          blindResumeUrl: appData.blindResumeUrl,
+          coverLetterUrl: appData.coverLetterUrl,
+          videoUrl: appData.videoUrl
+        });
         setApplication(appData);
         setCurrentUserId(userData.userId);
         setTestForNote(appData.testFor || '');
@@ -645,66 +652,137 @@ export default function ApplicationDetail() {
           {/* Documents */}
           <div className="info-section">
             <h2 className="section-title">Documents</h2>
-            <div className="info-grid">
+            <div className="documents-gallery">
               {application.resumeUrl && (
-                <div className="info-item">
-                  <a
-                    href="#"
-                    className="document-link"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setPreview({ open: true, src: application.resumeUrl, kind: 'pdf', title: `${application.firstName} ${application.lastName} – Resume` });
-                    }}
-                  >
-                    <DocumentIcon className="document-icon" />
-                    Resume (PDF)
-                  </a>
+                <div 
+                  className="document-card"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setPreview({ open: true, src: application.resumeUrl, kind: 'pdf', title: `${application.firstName} ${application.lastName} – Resume` });
+                  }}
+                >
+                  <div className="document-preview pdf-preview">
+                    <div className="document-preview-content">
+                      <DocumentIcon className="document-preview-icon" />
+                      <div className="document-preview-lines">
+                        <div className="preview-line"></div>
+                        <div className="preview-line"></div>
+                        <div className="preview-line short"></div>
+                        <div className="preview-line"></div>
+                        <div className="preview-line short"></div>
+                      </div>
+                    </div>
+                    <div className="document-overlay">
+                      <DocumentIcon className="document-overlay-icon" />
+                      <span>View Resume</span>
+                    </div>
+                  </div>
+                  <div className="document-info">
+                    <h3 className="document-title">Resume</h3>
+                    <p className="document-type">PDF Document</p>
+                  </div>
                 </div>
               )}
               {application.blindResumeUrl && (
-                <div className="info-item">
-                  <a
-                    href="#"
-                    className="document-link"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setPreview({ open: true, src: application.blindResumeUrl, kind: 'pdf', title: `${application.firstName} ${application.lastName} – Blind Resume` });
-                    }}
-                  >
-                    <DocumentIcon className="document-icon" />
-                    Blind Resume (PDF)
-                  </a>
+                <div 
+                  className="document-card"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setPreview({ open: true, src: application.blindResumeUrl, kind: 'pdf', title: `${application.firstName} ${application.lastName} – Blind Resume` });
+                  }}
+                >
+                  <div className="document-preview pdf-preview">
+                    <div className="document-preview-content">
+                      <DocumentIcon className="document-preview-icon" />
+                      <div className="document-preview-lines">
+                        <div className="preview-line"></div>
+                        <div className="preview-line"></div>
+                        <div className="preview-line short"></div>
+                        <div className="preview-line"></div>
+                        <div className="preview-line short"></div>
+                      </div>
+                    </div>
+                    <div className="document-overlay">
+                      <DocumentIcon className="document-overlay-icon" />
+                      <span>View Blind Resume</span>
+                    </div>
+                  </div>
+                  <div className="document-info">
+                    <h3 className="document-title">Blind Resume</h3>
+                    <p className="document-type">PDF Document</p>
+                  </div>
                 </div>
               )}
               {application.coverLetterUrl && (
-                <div className="info-item">
-                  <a
-                    href="#"
-                    className="document-link"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setPreview({ open: true, src: application.coverLetterUrl, kind: 'pdf', title: `${application.firstName} ${application.lastName} – Cover Letter` });
-                    }}
-                  >
-                    <DocumentIcon className="document-icon" />
-                    Cover Letter (PDF)
-                  </a>
+                <div 
+                  className="document-card"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setPreview({ open: true, src: application.coverLetterUrl, kind: 'pdf', title: `${application.firstName} ${application.lastName} – Cover Letter` });
+                  }}
+                >
+                  <div className="document-preview pdf-preview">
+                    <div className="document-preview-content">
+                      <DocumentIcon className="document-preview-icon" />
+                      <div className="document-preview-lines">
+                        <div className="preview-line"></div>
+                        <div className="preview-line"></div>
+                        <div className="preview-line short"></div>
+                        <div className="preview-line"></div>
+                        <div className="preview-line short"></div>
+                      </div>
+                    </div>
+                    <div className="document-overlay">
+                      <DocumentIcon className="document-overlay-icon" />
+                      <span>View Cover Letter</span>
+                    </div>
+                  </div>
+                  <div className="document-info">
+                    <h3 className="document-title">Cover Letter</h3>
+                    <p className="document-type">PDF Document</p>
+                  </div>
                 </div>
               )}
               {application.videoUrl && (
-                <div className="info-item">
-                  <a
-                    href="#"
-                    className="document-link"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setPreview({ open: true, src: application.videoUrl, kind: 'video', title: `${application.firstName} ${application.lastName} – Video` });
-                    }}
-                  >
-                    <DocumentIcon className="document-icon" />
-                    Video
-                  </a>
+                <div 
+                  className="document-card"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setPreview({ open: true, src: application.videoUrl, kind: 'video', title: `${application.firstName} ${application.lastName} – Video` });
+                  }}
+                >
+                  <div className="document-preview video-preview">
+                    <div className="document-preview-content">
+                      <div className="play-button-large">
+                        <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <circle cx="32" cy="32" r="32" fill="rgba(59, 130, 246, 0.9)"/>
+                          <path d="M26 20L44 32L26 44V20Z" fill="white"/>
+                        </svg>
+                      </div>
+                      <div className="video-preview-lines">
+                        <div className="preview-line"></div>
+                        <div className="preview-line short"></div>
+                        <div className="preview-line"></div>
+                      </div>
+                    </div>
+                    <div className="document-overlay">
+                      <div className="play-button">
+                        <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <circle cx="24" cy="24" r="24" fill="rgba(0,0,0,0.6)"/>
+                          <path d="M18 14L34 24L18 34V14Z" fill="white"/>
+                        </svg>
+                      </div>
+                      <span>View Video</span>
+                    </div>
+                  </div>
+                  <div className="document-info">
+                    <h3 className="document-title">Video</h3>
+                    <p className="document-type">Video Recording</p>
+                  </div>
                 </div>
+              )}
+              {!application.resumeUrl && !application.blindResumeUrl && !application.coverLetterUrl && !application.videoUrl && (
+                <div className="empty-state">No documents available for this application.</div>
               )}
             </div>
           </div>

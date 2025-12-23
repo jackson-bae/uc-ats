@@ -74,7 +74,6 @@ import {
 import globalTheme from '../styles/globalTheme';
 import '../styles/Staging.css';
 import apiClient from '../utils/api';
-import AuthenticatedFileLink from '../components/AuthenticatedFileLink';
 import AuthenticatedImage from '../components/AuthenticatedImage';
 import DocumentPreviewModal from '../components/DocumentPreviewModal';
 import AccessControl from '../components/AccessControl';
@@ -3283,7 +3282,7 @@ export default function Staging() {
                       <Button size="small" variant="outlined" onClick={(e) => { e.stopPropagation(); setDocPreview({ open: true, src: appModal.coverLetterUrl, kind: 'pdf', title: `${appModal.firstName} ${appModal.lastName} – Cover Letter` }); }}>View Cover Letter</Button>
                     )}
                     {appModal.videoUrl && (
-                      <AuthenticatedFileLink href={appModal.videoUrl} filename={`${appModal.firstName}_${appModal.lastName}_Video`}>Download Video</AuthenticatedFileLink>
+                      <Button size="small" variant="outlined" onClick={(e) => { e.stopPropagation(); setDocPreview({ open: true, src: appModal.videoUrl, kind: 'video', title: `${appModal.firstName} ${appModal.lastName} – Video` }); }}>View Video</Button>
                     )}
                   </Stack>
                 </Grid>

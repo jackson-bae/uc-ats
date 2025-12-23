@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import apiClient from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 
@@ -9,7 +9,7 @@ const overlayStyle = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  zIndex: 1000,
+  zIndex: 1500,
 };
 
 const modalStyle = {
@@ -38,6 +38,8 @@ const contentStyle = {
 export default function DocumentPreviewModal({ src, kind, title, onClose }) {
   const [blobUrl, setBlobUrl] = useState(null);
   const [error, setError] = useState(null);
+  const [videoMimeType, setVideoMimeType] = useState(null);
+  const videoRef = useRef(null);
   const { token } = useAuth();
   
   console.log('DocumentPreviewModal props:', { src, kind, title, onClose });
@@ -68,8 +70,29 @@ export default function DocumentPreviewModal({ src, kind, title, onClose }) {
           throw new Error(`${resp.status} ${resp.statusText} - ${txt}`);
         }
         const blob = await resp.blob();
-        console.log('Blob created:', blob.size, 'bytes');
-        localUrl = URL.createObjectURL(blob);
+        console.log('Blob created:', blob.size, 'bytes', 'type:', blob.type);
+        
+        // For videos, ensure we have a proper video MIME type
+        if (kind === 'video') {
+          let mimeType = blob.type;
+          // If the blob doesn't have a video MIME type, try to infer it from the URL
+          if (!mimeType || !mimeType.startsWith('video/')) {
+            const urlLower = src.toLowerCase();
+            mimeType = 'video/mp4'; // default
+            if (urlLower.includes('.webm')) mimeType = 'video/webm';
+            else if (urlLower.includes('.mov')) mimeType = 'video/quicktime';
+            else if (urlLower.includes('.avi')) mimeType = 'video/x-msvideo';
+            
+            const typedBlob = new Blob([blob], { type: mimeType });
+            localUrl = URL.createObjectURL(typedBlob);
+            setVideoMimeType(mimeType);
+          } else {
+            localUrl = URL.createObjectURL(blob);
+            setVideoMimeType(mimeType);
+          }
+        } else {
+          localUrl = URL.createObjectURL(blob);
+        }
         setBlobUrl(localUrl);
       } catch (e) {
         console.error('Document load error:', e);
@@ -80,7 +103,7 @@ export default function DocumentPreviewModal({ src, kind, title, onClose }) {
     return () => {
       if (localUrl) URL.revokeObjectURL(localUrl);
     };
-  }, [src, token]);
+  }, [src, token, kind]);
 
   return (
     <div style={overlayStyle} onClick={onClose}>
@@ -106,12 +129,50 @@ export default function DocumentPreviewModal({ src, kind, title, onClose }) {
             ) : kind === 'video' ? (
               <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#000' }}>
                 <video 
-                  src={blobUrl} 
-                  controls 
-                  controlsList="nodownload noremoteplayback nofullscreen"
-                  disablePictureInPicture
-                  style={{ maxWidth: '100%', maxHeight: '100%' }} 
-                />
+                  ref={videoRef}
+                  controls
+                  preload="auto"
+                  style={{ maxWidth: '100%', maxHeight: '100%', width: 'auto', height: 'auto' }}
+                  onLoadedData={() => {
+                    console.log('Video loaded successfully');
+                    // Try to play the video
+                    if (videoRef.current) {
+                      videoRef.current.play().catch(err => {
+                        console.log('Autoplay prevented, user can click play:', err);
+                      });
+                    }
+                  }}
+                  onError={(e) => {
+                    console.error('Video playback error:', e, videoRef.current?.error);
+                    const error = videoRef.current?.error;
+                    let errorMsg = 'Failed to play video.';
+                    if (error) {
+                      switch (error.code) {
+                        case error.MEDIA_ERR_ABORTED:
+                          errorMsg = 'Video playback was aborted.';
+                          break;
+                        case error.MEDIA_ERR_NETWORK:
+                          errorMsg = 'Network error while loading video.';
+                          break;
+                        case error.MEDIA_ERR_DECODE:
+                          errorMsg = 'Video format not supported or corrupted.';
+                          break;
+                        case error.MEDIA_ERR_SRC_NOT_SUPPORTED:
+                          errorMsg = 'Video format not supported.';
+                          break;
+                      }
+                    }
+                    setError(errorMsg);
+                  }}
+                >
+                  {blobUrl && videoMimeType && (
+                    <source src={blobUrl} type={videoMimeType} />
+                  )}
+                  {blobUrl && !videoMimeType && (
+                    <source src={blobUrl} />
+                  )}
+                  Your browser does not support the video tag.
+                </video>
               </div>
             ) : (
               <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fff' }}>
