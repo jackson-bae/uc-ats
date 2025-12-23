@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import apiClient from '../utils/api';
 import DocumentGradingModal from '../components/DocumentGradingModal';
@@ -93,6 +93,7 @@ export default function AdminDocumentGrading() {
   const [editingDeadline, setEditingDeadline] = useState(null);
   const [deadlineForm, setDeadlineForm] = useState({ resumeDeadline: '', coverLetterDeadline: '', videoDeadline: '' });
   const [deadlineSubmitting, setDeadlineSubmitting] = useState(false);
+  const scrollPositionRef = useRef(0);
 
   // Calculate progress data based on actual grading completion
   const calculateProgressData = () => {
@@ -257,6 +258,18 @@ export default function AdminDocumentGrading() {
     }
   }, [gradeOnlyAssigned]);
 
+  // Restore scroll position after loading completes
+  useEffect(() => {
+    if (!loading && scrollPositionRef.current > 0) {
+      // Use setTimeout to ensure DOM has updated
+      const timer = setTimeout(() => {
+        window.scrollTo(0, scrollPositionRef.current);
+        scrollPositionRef.current = 0; // Reset after restoring
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [loading]);
+
   // Listen for cycle activation events
   useEffect(() => {
     const handleCycleActivated = () => {
@@ -374,6 +387,8 @@ export default function AdminDocumentGrading() {
   };
 
   const handleCloseGradingModal = () => {
+    // Store current scroll position before closing modal
+    scrollPositionRef.current = window.scrollY || window.pageYOffset || document.documentElement.scrollTop;
     setGradingModalOpen(false);
     setSelectedApplication(null);
     // Refresh applications to update grading status
