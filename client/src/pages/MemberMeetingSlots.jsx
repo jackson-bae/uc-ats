@@ -59,8 +59,8 @@ export default function MemberMeetingSlots() {
 
   const loadActiveCycle = async () => {
     try {
-      const cycles = await api.get('/admin/cycles');
-      const active = cycles.find(c => c.isActive);
+      // Use public endpoint so it works for all users (members and admins)
+      const active = await api.get('/active-cycle');
       setActiveCycle(active || null);
       return active || null;
     } catch (e) {
@@ -70,7 +70,8 @@ export default function MemberMeetingSlots() {
   };
 
   const filterSlotsByCycle = (slotsToFilter, cycle) => {
-    if (!cycle) return slotsToFilter;
+    // If no active cycle, return empty array to only show spots from current cycle
+    if (!cycle) return [];
     
     // If cycle has date range, filter slots by date
     if (cycle.startDate || cycle.endDate) {
@@ -89,8 +90,7 @@ export default function MemberMeetingSlots() {
       });
     }
     
-    // If no date range, return all slots (or empty if you want to hide them)
-    // For now, return empty array to hide old cycle slots
+    // If no date range, return empty array to hide old cycle slots
     return [];
   };
 

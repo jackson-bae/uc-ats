@@ -41,8 +41,8 @@ export default function CoffeeChatsPublic() {
 
   const loadActiveCycle = async () => {
     try {
-      const cycles = await api.get('/admin/cycles');
-      const active = cycles.find(c => c.isActive);
+      // Use public endpoint so it works for all users (members, admins, and unauthenticated)
+      const active = await api.get('/active-cycle');
       setActiveCycle(active || null);
       return active || null;
     } catch (e) {
@@ -52,7 +52,8 @@ export default function CoffeeChatsPublic() {
   };
 
   const filterSlotsByCycle = (slotsToFilter, cycle) => {
-    if (!cycle) return slotsToFilter;
+    // If no active cycle, return empty array to only show spots from current cycle
+    if (!cycle) return [];
     
     // If cycle has date range, filter slots by date
     if (cycle.startDate || cycle.endDate) {
@@ -180,6 +181,7 @@ export default function CoffeeChatsPublic() {
   const availableSlots = getAvailableSlots();
   
   // Calculate total available spots and total spots
+  // Note: slots is already filtered by active cycle, so totalSpots only counts spots from current cycle
   const totalAvailableSpots = availableSlots.reduce((sum, slot) => sum + slot.remaining, 0);
   const totalSpots = slots.reduce((sum, slot) => sum + slot.capacity, 0);
 
