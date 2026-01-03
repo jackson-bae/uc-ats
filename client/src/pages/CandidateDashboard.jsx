@@ -52,7 +52,7 @@ export default function CandidateDashboard() {
               <p>Track the status of your application and view feedback.</p>
             </div>
             <div className="action-card" onClick={handleInterviewPrep}>
-              <h3>Interview Prep</h3>
+              <h3>Recruitment Resources</h3>
               <p>Access resources to help you prepare for interviews.</p>
             </div>
             <div className="action-card" onClick={handleJoinMailingList}>

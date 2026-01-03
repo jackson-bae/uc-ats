@@ -201,7 +201,7 @@ router.post('/forgot-password', async (req, res) => {
       }
     });
 
-    const resetLink = `http://localhost:5173/reset-password?token=${resetToken}`;
+    const resetLink = `${config.clientUrl}/reset-password?token=${resetToken}`;
     console.log('Sending email to:', email);
     console.log('Using user:', process.env.EMAIL_USER);
     console.log('Reset link:', resetLink);

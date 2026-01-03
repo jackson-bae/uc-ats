@@ -25,6 +25,9 @@ const config = {
   
   // Base URL for file serving - defaults based on environment
   baseUrl: process.env.BASE_URL || (process.env.NODE_ENV === 'production' ? 'https://uconsultingats.com' : 'http://localhost:3001'),
+  
+  // Client URL for frontend links (password reset, etc.) - defaults based on environment
+  clientUrl: process.env.CLIENT_URL || (process.env.NODE_ENV === 'production' ? 'https://uconsultingats.com' : 'http://localhost:5173'),
 
   form: formConfig,
 };

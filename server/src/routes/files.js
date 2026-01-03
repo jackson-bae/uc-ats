@@ -13,6 +13,15 @@ router.get('/:fileId/image', async (req, res) => {
     const { fileId } = req.params;
     console.log('Serving image file:', fileId);
     
+    // Validate file ID format (basic check)
+    if (!fileId || fileId.trim().length === 0) {
+      return res.status(400).json({ 
+        error: 'Invalid file ID',
+        details: 'File ID is required',
+        fileId: fileId
+      });
+    }
+    
     const meta = await getFileMetadata(fileId);
     const fileStream = await getFileStream(fileId);
     
@@ -23,7 +32,11 @@ router.get('/:fileId/image', async (req, res) => {
     
   } catch (error) {
     console.error('Error serving image:', error);
-    res.status(500).json({ 
+    
+    // Use appropriate status code based on error type
+    const statusCode = error.statusCode || (error.code === 'FILE_NOT_FOUND' ? 404 : error.code === 'ACCESS_DENIED' ? 403 : 500);
+    
+    res.status(statusCode).json({ 
       error: 'Failed to serve image',
       details: error.message,
       fileId: req.params.fileId
@@ -37,6 +50,15 @@ router.get('/:fileId/pdf', async (req, res) => {
     const { fileId } = req.params;
     console.log('Serving PDF file:', fileId);
     
+    // Validate file ID format (basic check)
+    if (!fileId || fileId.trim().length === 0) {
+      return res.status(400).json({ 
+        error: 'Invalid file ID',
+        details: 'File ID is required',
+        fileId: fileId
+      });
+    }
+    
     const meta = await getFileMetadata(fileId);
     const fileStream = await getFileStream(fileId);
     
@@ -48,7 +70,11 @@ router.get('/:fileId/pdf', async (req, res) => {
     
   } catch (error) {
     console.error('Error serving PDF:', error);
-    res.status(500).json({ 
+    
+    // Use appropriate status code based on error type
+    const statusCode = error.statusCode || (error.code === 'FILE_NOT_FOUND' ? 404 : error.code === 'ACCESS_DENIED' ? 403 : 500);
+    
+    res.status(statusCode).json({ 
       error: 'Failed to serve PDF',
       details: error.message,
       fileId: req.params.fileId
