@@ -38,7 +38,6 @@ const contentStyle = {
 export default function DocumentPreviewModal({ src, kind, title, onClose }) {
   const [blobUrl, setBlobUrl] = useState(null);
   const [error, setError] = useState(null);
-  const [videoMimeType, setVideoMimeType] = useState(null);
   const videoRef = useRef(null);
   const { token } = useAuth();
   
@@ -71,28 +70,8 @@ export default function DocumentPreviewModal({ src, kind, title, onClose }) {
         }
         const blob = await resp.blob();
         console.log('Blob created:', blob.size, 'bytes', 'type:', blob.type);
-        
-        // For videos, ensure we have a proper video MIME type
-        if (kind === 'video') {
-          let mimeType = blob.type;
-          // If the blob doesn't have a video MIME type, try to infer it from the URL
-          if (!mimeType || !mimeType.startsWith('video/')) {
-            const urlLower = src.toLowerCase();
-            mimeType = 'video/mp4'; // default
-            if (urlLower.includes('.webm')) mimeType = 'video/webm';
-            else if (urlLower.includes('.mov')) mimeType = 'video/quicktime';
-            else if (urlLower.includes('.avi')) mimeType = 'video/x-msvideo';
-            
-            const typedBlob = new Blob([blob], { type: mimeType });
-            localUrl = URL.createObjectURL(typedBlob);
-            setVideoMimeType(mimeType);
-          } else {
-            localUrl = URL.createObjectURL(blob);
-            setVideoMimeType(mimeType);
-          }
-        } else {
-          localUrl = URL.createObjectURL(blob);
-        }
+
+        localUrl = URL.createObjectURL(blob);
         setBlobUrl(localUrl);
       } catch (e) {
         console.error('Document load error:', e);
@@ -128,8 +107,9 @@ export default function DocumentPreviewModal({ src, kind, title, onClose }) {
               />
             ) : kind === 'video' ? (
               <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#000' }}>
-                <video 
+                <video
                   ref={videoRef}
+                  src={blobUrl}
                   controls
                   preload="auto"
                   style={{ maxWidth: '100%', maxHeight: '100%', width: 'auto', height: 'auto' }}
@@ -165,12 +145,6 @@ export default function DocumentPreviewModal({ src, kind, title, onClose }) {
                     setError(errorMsg);
                   }}
                 >
-                  {blobUrl && videoMimeType && (
-                    <source src={blobUrl} type={videoMimeType} />
-                  )}
-                  {blobUrl && !videoMimeType && (
-                    <source src={blobUrl} />
-                  )}
                   Your browser does not support the video tag.
                 </video>
               </div>
