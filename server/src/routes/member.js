@@ -978,6 +978,69 @@ router.delete('/meeting-slots/:id', requireAuth, async (req, res) => {
   }
 });
 
+// Member: delete a signup
+router.delete('/meeting-signups/:id', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Check if the signup exists and belongs to a slot of this member
+    const signup = await prisma.meetingSignup.findUnique({
+      where: { id },
+      include: {
+        slot: {
+          include: {
+            member: {
+              select: { fullName: true }
+            }
+          }
+        }
+      }
+    });
+
+    if (!signup) {
+      return res.status(404).json({ error: 'Signup not found' });
+    }
+
+    if (signup.slot.memberId !== req.user.id) {
+      return res.status(403).json({ error: 'Not authorized to delete this signup' });
+    }
+
+    // Send cancellation email to the signup
+    const memberName = signup.slot.member?.fullName || 'UC Consulting Member';
+
+    try {
+      await sendMeetingCancellationEmail(
+        signup.email,
+        signup.fullName,
+        memberName,
+        signup.slot.location,
+        signup.slot.startTime,
+        signup.slot.endTime
+      );
+    } catch (emailError) {
+      console.error(`Failed to send cancellation email to ${signup.email}:`, emailError);
+      // Don't fail the deletion if email fails, just log the error
+    }
+
+    // Delete the signup
+    await prisma.meetingSignup.delete({
+      where: { id }
+    });
+
+    res.json({
+      message: 'Signup deleted successfully. Cancellation email sent.',
+      deletedSignup: {
+        id: signup.id,
+        fullName: signup.fullName,
+        email: signup.email
+      }
+    });
+  } catch (error) {
+    console.error('[DELETE /api/member/meeting-signups/:id]', error);
+    res.status(500).json({ error: 'Failed to delete signup' });
+  }
+});
+
 // Member: mark attendance for a signup
 router.patch('/meeting-signups/:id/attendance', requireAuth, async (req, res) => {
   try {
@@ -1024,7 +1087,7 @@ router.patch('/meeting-signups/:id/attendance', requireAuth, async (req, res) =>
 
             if (latestApplication) {
               console.log(`Adding 1 point to application ${latestApplication.id} for meeting attendance (studentId: ${signup.studentId})`);
-              
+
               // Note: The 1 point will be automatically added when the overall score is calculated
               // in the existing scoring system (similar to referral bonus and event points)
               // No need to store this separately as it's calculated dynamically
