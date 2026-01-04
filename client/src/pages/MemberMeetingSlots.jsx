@@ -36,7 +36,8 @@ import {
   Edit as EditIcon,
   OpenInNew as OpenInNewIcon,
   Visibility as VisibilityIcon,
-  Event as EventIcon
+  Event as EventIcon,
+  Delete as DeleteIcon
 } from '@mui/icons-material';
 
 export default function MemberMeetingSlots() {
@@ -235,6 +236,23 @@ export default function MemberMeetingSlots() {
       await load();
     } catch (e) {
       setError(e.message || 'Failed to update attendance');
+    }
+  };
+
+  const deleteSignup = async (signupId, candidateName) => {
+    if (!window.confirm(`Are you sure you want to remove ${candidateName} from this timeslot? This will send them a cancellation email.`)) {
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      setError('');
+      await api.delete(`/member/meeting-signups/${signupId}`);
+      await load();
+    } catch (e) {
+      setError(e.message || 'Failed to remove candidate from timeslot');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -828,6 +846,7 @@ export default function MemberMeetingSlots() {
                                 <TableCell>Email</TableCell>
                                 <TableCell>Student ID</TableCell>
                                 <TableCell align="center">Attended</TableCell>
+                                <TableCell align="center">Actions</TableCell>
                               </TableRow>
                             </TableHead>
                             <TableBody>
@@ -854,6 +873,18 @@ export default function MemberMeetingSlots() {
                                       onChange={(e) => setAttendance(signup.id, e.target.checked)}
                                       color="success"
                                     />
+                                  </TableCell>
+                                  <TableCell align="center">
+                                    <Tooltip title="Remove candidate from this timeslot">
+                                      <IconButton
+                                        size="small"
+                                        onClick={() => deleteSignup(signup.id, signup.fullName)}
+                                        disabled={submitting}
+                                        sx={{ color: 'error.main' }}
+                                      >
+                                        <DeleteIcon fontSize="small" />
+                                      </IconButton>
+                                    </Tooltip>
                                   </TableCell>
                                 </TableRow>
                               ))}
