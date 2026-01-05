@@ -14,7 +14,10 @@ import {
   TrashIcon,
   XMarkIcon,
   UsersIcon,
-  DocumentDuplicateIcon
+  DocumentDuplicateIcon,
+  MagnifyingGlassIcon,
+  ChevronDownIcon,
+  ChevronUpIcon
 } from '@heroicons/react/24/outline';
 import apiClient from '../utils/api';
 import AccessControl from '../components/AccessControl';
@@ -220,6 +223,14 @@ export default function AdminAssignedInterviews() {
   const [behavioralQuestionsConfig, setBehavioralQuestionsConfig] = useState([]);
   const [showBehavioralQuestionsConfig, setShowBehavioralQuestionsConfig] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
+  
+  // Search/filter states for groups management
+  const [memberGroupsSearch, setMemberGroupsSearch] = useState('');
+  const [applicationGroupsSearch, setApplicationGroupsSearch] = useState('');
+  const [collapsedGroups, setCollapsedGroups] = useState(new Set()); // Track collapsed group IDs
+  const [memberSearchByGroup, setMemberSearchByGroup] = useState({}); // Search terms for members within each group
+  const [appGroupSearchByGroup, setAppGroupSearchByGroup] = useState({}); // Search terms for app groups when assigning
+  const [applicationSearchByGroup, setApplicationSearchByGroup] = useState({}); // Search terms for applications within app groups
 
   // Fetch initial data
   useEffect(() => {
@@ -1173,94 +1184,190 @@ export default function AdminAssignedInterviews() {
                                 <PlusIcon className="btn-icon" /> Add
                               </button>
                             </div>
+                            {/* Search for member groups */}
+                            {data.memberGroups?.length > 0 && (
+                              <div className="groups-search-container">
+                                <div className="search-input-wrapper">
+                                  <MagnifyingGlassIcon className="search-icon" />
+                                  <input
+                                    type="text"
+                                    placeholder="Search member groups..."
+                                    value={memberGroupsSearch}
+                                    onChange={e => setMemberGroupsSearch(e.target.value)}
+                                    className="groups-search-input"
+                                  />
+                                </div>
+                              </div>
+                            )}
                             <div className="groups-list">
                               {data.memberGroups?.length === 0 && (
                                 <div className="empty-state">No member groups yet</div>
                               )}
-                              {data.memberGroups?.map(group => (
-                                <div key={group.id} className="group-card-compact">
-                                  <div className="group-header-compact">
-                                    <input
-                                      className="group-name-input-compact"
-                                      value={group.name || ''}
-                                      onChange={e => updateMemberGroup(interview.id, group.id, { name: e.target.value })}
-                                      placeholder="Group name"
-                                    />
-                                    <button className="icon-btn small" onClick={() => removeMemberGroup(interview.id, group.id)}>
-                                      <TrashIcon className="btn-icon" />
-                                    </button>
-                                  </div>
-                                  <div className="group-members-list">
-                                    {/* Admins Section */}
-                                    {allMembers.filter(m => m.role === 'ADMIN').length > 0 && (
-                                      <>
-                                        <div className="members-section-header">Admins</div>
-                                        {allMembers.filter(m => m.role === 'ADMIN').map(m => (
-                                          <label key={m.id} className="member-checkbox admin-member">
-                                            <input
-                                              type="checkbox"
-                                              checked={group.memberIds?.includes(m.id) || false}
-                                              onChange={e => {
-                                                const next = new Set(group.memberIds || []);
-                                                if (e.target.checked) next.add(m.id); else next.delete(m.id);
-                                                updateMemberGroup(interview.id, group.id, { memberIds: Array.from(next) });
-                                              }}
-                                            />
-                                            <span className="member-name">{m.displayName}</span>
-                                          </label>
-                                        ))}
-                                      </>
-                                    )}
-                                    
-                                    {/* Interviewers Section */}
-                                    {allMembers.filter(m => m.role === 'INTERVIEWER').length > 0 && (
-                                      <>
-                                        <div className="members-section-header">Interviewers</div>
-                                        {allMembers.filter(m => m.role === 'INTERVIEWER').map(m => (
-                                          <label key={m.id} className="member-checkbox interviewer-member">
-                                            <input
-                                              type="checkbox"
-                                              checked={group.memberIds?.includes(m.id) || false}
-                                              onChange={e => {
-                                                const next = new Set(group.memberIds || []);
-                                                if (e.target.checked) next.add(m.id); else next.delete(m.id);
-                                                updateMemberGroup(interview.id, group.id, { memberIds: Array.from(next) });
-                                              }}
-                                            />
-                                            <span className="member-name">{m.displayName}</span>
-                                          </label>
-                                        ))}
-                                      </>
-                                    )}
-                                  </div>
+                              {data.memberGroups
+                                ?.filter(group => 
+                                  !memberGroupsSearch || 
+                                  group.name?.toLowerCase().includes(memberGroupsSearch.toLowerCase())
+                                )
+                                .map(group => {
+                                  const isCollapsed = collapsedGroups.has(`member-${group.id}`);
+                                  const memberSearchTerm = memberSearchByGroup[group.id] || '';
+                                  const appGroupSearchTerm = appGroupSearchByGroup[group.id] || '';
                                   
-                                  {/* Application Groups Assignment */}
-                                  <div className="group-assignments">
-                                    <label className="assignments-label">Assigned Application Groups:</label>
-                                    <div className="assignments-list">
-                                      {data.applicationGroups?.map(appGroup => (
-                                        <label key={appGroup.id} className="assignment-checkbox">
-                                          <input
-                                            type="checkbox"
-                                            checked={data.groupAssignments?.[group.id]?.includes(appGroup.id) || false}
-                                            onChange={e => {
-                                              const currentAssignments = data.groupAssignments?.[group.id] || [];
-                                              const newAssignments = e.target.checked
-                                                ? [...currentAssignments, appGroup.id]
-                                                : currentAssignments.filter(id => id !== appGroup.id);
-                                              assignGroupsToMemberGroup(interview.id, group.id, newAssignments);
+                                  // Filter members
+                                  const filteredAdmins = allMembers
+                                    .filter(m => m.role === 'ADMIN')
+                                    .filter(m => !memberSearchTerm || m.displayName?.toLowerCase().includes(memberSearchTerm.toLowerCase()));
+                                  const filteredInterviewers = allMembers
+                                    .filter(m => m.role === 'INTERVIEWER')
+                                    .filter(m => !memberSearchTerm || m.displayName?.toLowerCase().includes(memberSearchTerm.toLowerCase()));
+                                  
+                                  // Filter application groups for assignment
+                                  const filteredAppGroups = data.applicationGroups?.filter(appGroup =>
+                                    !appGroupSearchTerm || appGroup.name?.toLowerCase().includes(appGroupSearchTerm.toLowerCase())
+                                  ) || [];
+                                  
+                                  return (
+                                    <div key={group.id} className="group-card-compact">
+                                      <div className="group-header-compact">
+                                        <input
+                                          className="group-name-input-compact"
+                                          value={group.name || ''}
+                                          onChange={e => updateMemberGroup(interview.id, group.id, { name: e.target.value })}
+                                          placeholder="Group name"
+                                        />
+                                        <div className="group-header-actions">
+                                          <button 
+                                            className="icon-btn small collapse-btn" 
+                                            onClick={() => {
+                                              const newCollapsed = new Set(collapsedGroups);
+                                              if (isCollapsed) {
+                                                newCollapsed.delete(`member-${group.id}`);
+                                              } else {
+                                                newCollapsed.add(`member-${group.id}`);
+                                              }
+                                              setCollapsedGroups(newCollapsed);
                                             }}
-                                          />
-                                          <span>{appGroup.name} ({appGroup.applicationIds?.length || 0} apps)</span>
-                                        </label>
-                                      ))}
-                                      {data.applicationGroups?.length === 0 && (
-                                        <span className="no-assignments">No application groups available</span>
+                                            title={isCollapsed ? "Expand" : "Collapse"}
+                                          >
+                                            {isCollapsed ? <ChevronDownIcon className="btn-icon" /> : <ChevronUpIcon className="btn-icon" />}
+                                          </button>
+                                          <button className="icon-btn small" onClick={() => removeMemberGroup(interview.id, group.id)}>
+                                            <TrashIcon className="btn-icon" />
+                                          </button>
+                                        </div>
+                                      </div>
+                                      
+                                      {!isCollapsed && (
+                                        <>
+                                          {/* Members Section with Search */}
+                                          <div className="group-members-list">
+                                            <div className="members-search-wrapper">
+                                              <MagnifyingGlassIcon className="search-icon small" />
+                                              <input
+                                                type="text"
+                                                placeholder="Search members..."
+                                                value={memberSearchTerm}
+                                                onChange={e => setMemberSearchByGroup(prev => ({ ...prev, [group.id]: e.target.value }))}
+                                                className="members-search-input"
+                                              />
+                                            </div>
+                                            
+                                            {/* Admins Section */}
+                                            {filteredAdmins.length > 0 && (
+                                              <>
+                                                <div className="members-section-header">Admins</div>
+                                                {filteredAdmins.map(m => (
+                                                  <label key={m.id} className="member-checkbox admin-member">
+                                                    <input
+                                                      type="checkbox"
+                                                      checked={group.memberIds?.includes(m.id) || false}
+                                                      onChange={e => {
+                                                        const next = new Set(group.memberIds || []);
+                                                        if (e.target.checked) next.add(m.id); else next.delete(m.id);
+                                                        updateMemberGroup(interview.id, group.id, { memberIds: Array.from(next) });
+                                                      }}
+                                                    />
+                                                    <span className="member-name">{m.displayName}</span>
+                                                  </label>
+                                                ))}
+                                              </>
+                                            )}
+                                            
+                                            {/* Interviewers Section */}
+                                            {filteredInterviewers.length > 0 && (
+                                              <>
+                                                <div className="members-section-header">Interviewers</div>
+                                                {filteredInterviewers.map(m => (
+                                                  <label key={m.id} className="member-checkbox interviewer-member">
+                                                    <input
+                                                      type="checkbox"
+                                                      checked={group.memberIds?.includes(m.id) || false}
+                                                      onChange={e => {
+                                                        const next = new Set(group.memberIds || []);
+                                                        if (e.target.checked) next.add(m.id); else next.delete(m.id);
+                                                        updateMemberGroup(interview.id, group.id, { memberIds: Array.from(next) });
+                                                      }}
+                                                    />
+                                                    <span className="member-name">{m.displayName}</span>
+                                                  </label>
+                                                ))}
+                                              </>
+                                            )}
+                                            
+                                            {filteredAdmins.length === 0 && filteredInterviewers.length === 0 && memberSearchTerm && (
+                                              <div className="no-results">No members found</div>
+                                            )}
+                                          </div>
+                                          
+                                          {/* Application Groups Assignment with Search */}
+                                          <div className="group-assignments">
+                                            <div className="assignments-header">
+                                              <label className="assignments-label">Assigned Application Groups:</label>
+                                              {data.applicationGroups?.length > 0 && (
+                                                <div className="assignments-search-wrapper">
+                                                  <MagnifyingGlassIcon className="search-icon small" />
+                                                  <input
+                                                    type="text"
+                                                    placeholder="Search app groups..."
+                                                    value={appGroupSearchTerm}
+                                                    onChange={e => setAppGroupSearchByGroup(prev => ({ ...prev, [group.id]: e.target.value }))}
+                                                    className="assignments-search-input"
+                                                  />
+                                                </div>
+                                              )}
+                                            </div>
+                                            <div className="assignments-list">
+                                              {filteredAppGroups.length > 0 ? (
+                                                filteredAppGroups.map(appGroup => (
+                                                  <label key={appGroup.id} className="assignment-checkbox">
+                                                    <input
+                                                      type="checkbox"
+                                                      checked={data.groupAssignments?.[group.id]?.includes(appGroup.id) || false}
+                                                      onChange={e => {
+                                                        const currentAssignments = data.groupAssignments?.[group.id] || [];
+                                                        const newAssignments = e.target.checked
+                                                          ? [...currentAssignments, appGroup.id]
+                                                          : currentAssignments.filter(id => id !== appGroup.id);
+                                                        assignGroupsToMemberGroup(interview.id, group.id, newAssignments);
+                                                      }}
+                                                    />
+                                                    <span>{appGroup.name} ({appGroup.applicationIds?.length || 0} apps)</span>
+                                                  </label>
+                                                ))
+                                              ) : (
+                                                <span className="no-assignments">
+                                                  {data.applicationGroups?.length === 0 
+                                                    ? "No application groups available" 
+                                                    : "No groups match your search"}
+                                                </span>
+                                              )}
+                                            </div>
+                                          </div>
+                                        </>
                                       )}
                                     </div>
-                                  </div>
-                                </div>
-                              ))}
+                                  );
+                                })}
                             </div>
                           </div>
 
@@ -1272,46 +1379,112 @@ export default function AdminAssignedInterviews() {
                                 <PlusIcon className="btn-icon" /> Add
                               </button>
                             </div>
+                            {/* Search for application groups */}
+                            {data.applicationGroups?.length > 0 && (
+                              <div className="groups-search-container">
+                                <div className="search-input-wrapper">
+                                  <MagnifyingGlassIcon className="search-icon" />
+                                  <input
+                                    type="text"
+                                    placeholder="Search application groups..."
+                                    value={applicationGroupsSearch}
+                                    onChange={e => setApplicationGroupsSearch(e.target.value)}
+                                    className="groups-search-input"
+                                  />
+                                </div>
+                              </div>
+                            )}
                             <div className="groups-list">
                               {data.applicationGroups?.length === 0 && (
                                 <div className="empty-state">No application groups yet</div>
                               )}
-                              {data.applicationGroups?.map(group => (
-                                <div key={group.id} className="group-card-compact">
-                                  <div className="group-header-compact">
-                                    <input
-                                      className="group-name-input-compact"
-                                      value={group.name || ''}
-                                      onChange={e => updateApplicationGroup(interview.id, group.id, { name: e.target.value })}
-                                      placeholder="Group name"
-                                    />
-                                    <button className="icon-btn small" onClick={() => removeApplicationGroup(interview.id, group.id)}>
-                                      <TrashIcon className="btn-icon" />
-                                    </button>
-                                  </div>
-                                  <div className="group-applications-list">
-                                    <div className="applications-label">Coffee Chat Round Applications:</div>
-                                    {coffeeChatApplications.length === 0 ? (
-                                      <div className="no-applications">No applications in coffee chat round</div>
-                                    ) : (
-                                      coffeeChatApplications.map(app => (
-                                        <label key={app.id} className="application-checkbox">
-                                          <input
-                                            type="checkbox"
-                                            checked={group.applicationIds?.includes(app.id) || false}
-                                            onChange={e => {
-                                              const next = new Set(group.applicationIds || []);
-                                              if (e.target.checked) next.add(app.id); else next.delete(app.id);
-                                              updateApplicationGroup(interview.id, group.id, { applicationIds: Array.from(next) });
+                              {data.applicationGroups
+                                ?.filter(group => 
+                                  !applicationGroupsSearch || 
+                                  group.name?.toLowerCase().includes(applicationGroupsSearch.toLowerCase())
+                                )
+                                .map(group => {
+                                  const isCollapsed = collapsedGroups.has(`app-${group.id}`);
+                                  const applicationSearchTerm = applicationSearchByGroup[group.id] || '';
+                                  
+                                  // Filter applications
+                                  const filteredApplications = coffeeChatApplications.filter(app =>
+                                    !applicationSearchTerm || app.name?.toLowerCase().includes(applicationSearchTerm.toLowerCase())
+                                  );
+                                  
+                                  return (
+                                    <div key={group.id} className="group-card-compact">
+                                      <div className="group-header-compact">
+                                        <input
+                                          className="group-name-input-compact"
+                                          value={group.name || ''}
+                                          onChange={e => updateApplicationGroup(interview.id, group.id, { name: e.target.value })}
+                                          placeholder="Group name"
+                                        />
+                                        <div className="group-header-actions">
+                                          <button 
+                                            className="icon-btn small collapse-btn" 
+                                            onClick={() => {
+                                              const newCollapsed = new Set(collapsedGroups);
+                                              if (isCollapsed) {
+                                                newCollapsed.delete(`app-${group.id}`);
+                                              } else {
+                                                newCollapsed.add(`app-${group.id}`);
+                                              }
+                                              setCollapsedGroups(newCollapsed);
                                             }}
-                                          />
-                                          <span>{app.name}</span>
-                                        </label>
-                                      ))
-                                    )}
-                                  </div>
-                                </div>
-                              ))}
+                                            title={isCollapsed ? "Expand" : "Collapse"}
+                                          >
+                                            {isCollapsed ? <ChevronDownIcon className="btn-icon" /> : <ChevronUpIcon className="btn-icon" />}
+                                          </button>
+                                          <button className="icon-btn small" onClick={() => removeApplicationGroup(interview.id, group.id)}>
+                                            <TrashIcon className="btn-icon" />
+                                          </button>
+                                        </div>
+                                      </div>
+                                      
+                                      {!isCollapsed && (
+                                        <div className="group-applications-list">
+                                          <div className="applications-header">
+                                            <div className="applications-label">Coffee Chat Round Applications:</div>
+                                            {coffeeChatApplications.length > 0 && (
+                                              <div className="applications-search-wrapper">
+                                                <MagnifyingGlassIcon className="search-icon small" />
+                                                <input
+                                                  type="text"
+                                                  placeholder="Search applications..."
+                                                  value={applicationSearchTerm}
+                                                  onChange={e => setApplicationSearchByGroup(prev => ({ ...prev, [group.id]: e.target.value }))}
+                                                  className="applications-search-input"
+                                                />
+                                              </div>
+                                            )}
+                                          </div>
+                                          {coffeeChatApplications.length === 0 ? (
+                                            <div className="no-applications">No applications in coffee chat round</div>
+                                          ) : filteredApplications.length === 0 ? (
+                                            <div className="no-applications">No applications match your search</div>
+                                          ) : (
+                                            filteredApplications.map(app => (
+                                              <label key={app.id} className="application-checkbox">
+                                                <input
+                                                  type="checkbox"
+                                                  checked={group.applicationIds?.includes(app.id) || false}
+                                                  onChange={e => {
+                                                    const next = new Set(group.applicationIds || []);
+                                                    if (e.target.checked) next.add(app.id); else next.delete(app.id);
+                                                    updateApplicationGroup(interview.id, group.id, { applicationIds: Array.from(next) });
+                                                  }}
+                                                />
+                                                <span>{app.name}</span>
+                                              </label>
+                                            ))
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
                             </div>
                           </div>
                         </div>
