@@ -2354,7 +2354,8 @@ router.get('/applications', async (req, res) => {
         where: {
           candidateId: {
             in: applications.map(app => app.candidateId)
-          }
+          },
+          cycleId: activeCycle.id
         },
         select: {
           candidateId: true,
@@ -2395,7 +2396,8 @@ router.get('/applications', async (req, res) => {
         where: {
           candidateId: {
             in: applications.map(app => app.candidateId)
-          }
+          },
+          cycleId: activeCycle.id
         },
         select: {
           candidateId: true,
@@ -2413,7 +2415,8 @@ router.get('/applications', async (req, res) => {
         where: {
           candidateId: {
             in: applications.map(app => app.candidateId)
-          }
+          },
+          cycleId: activeCycle.id
         },
         select: {
           candidateId: true,
@@ -2727,19 +2730,19 @@ router.get('/staging/candidates', async (req, res) => {
     console.log('Starting batch queries...');
     
     const allResumeScores = await prisma.resumeScore.findMany({
-      where: { candidateId: { in: candidateIds } },
+      where: { candidateId: { in: candidateIds }, cycleId: active.id },
       select: { candidateId: true, overallScore: true, adminScore: true }
     });
     console.log('Resume scores fetched:', allResumeScores.length);
     
     const allCoverLetterScores = await prisma.coverLetterScore.findMany({
-      where: { candidateId: { in: candidateIds } },
+      where: { candidateId: { in: candidateIds }, cycleId: active.id },
       select: { candidateId: true, overallScore: true, adminScore: true }
     });
     console.log('Cover letter scores fetched:', allCoverLetterScores.length);
     
     const allVideoScores = await prisma.videoScore.findMany({
-      where: { candidateId: { in: candidateIds } },
+      where: { candidateId: { in: candidateIds }, cycleId: active.id },
       select: { candidateId: true, overallScore: true, adminScore: true }
     });
     console.log('Video scores fetched:', allVideoScores.length);

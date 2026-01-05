@@ -111,7 +111,10 @@ const ResumeGradingModal = ({ open, onClose, application }) => {
   const loadExistingScore = async () => {
     try {
       setLoading(true);
-      const response = await apiClient.get(`/review-teams/resume-score/${application.candidateId}`);
+      const url = application.cycleId 
+        ? `/review-teams/resume-score/${application.candidateId}?cycleId=${application.cycleId}`
+        : `/review-teams/resume-score/${application.candidateId}`;
+      const response = await apiClient.get(url);
       if (response) {
         setExistingScore(response);
         setScoreOne(response.scoreOne || '');
