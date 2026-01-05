@@ -48,16 +48,48 @@ router.post('/meeting-slots/:id/signup', async (req, res) => {
       return res.status(400).json({ error: 'Name, email, and student ID are required' });
     }
 
-    // Check if user has already signed up for any meeting slot
-    const existingSignup = await prisma.meetingSignup.findFirst({
-      where: { email },
-      include: { slot: true }
+    // Get the active recruiting cycle to check for cycle-specific signups
+    const activeCycle = await prisma.recruitingCycle.findFirst({ 
+      where: { isActive: true } 
     });
 
-    if (existingSignup) {
-      return res.status(400).json({ 
-        error: `You have already signed up for a meeting on ${new Date(existingSignup.slot.startTime).toLocaleDateString()}. You can only sign up for one meeting slot.` 
+    // Check if user has already signed up for a meeting slot in the current cycle
+    if (activeCycle && (activeCycle.startDate || activeCycle.endDate)) {
+      const cycleStartDate = activeCycle.startDate ? new Date(activeCycle.startDate) : null;
+      const cycleEndDate = activeCycle.endDate ? new Date(activeCycle.endDate) : null;
+
+      // Find existing signups for this email
+      const existingSignups = await prisma.meetingSignup.findMany({
+        where: { email },
+        include: { slot: true }
       });
+
+      // Check if any existing signup falls within the current cycle's date range
+      const existingSignupInCycle = existingSignups.find(signup => {
+        const slotDate = new Date(signup.slot.startTime);
+        const isAfterStart = !cycleStartDate || slotDate >= cycleStartDate;
+        const isBeforeEnd = !cycleEndDate || slotDate <= cycleEndDate;
+        return isAfterStart && isBeforeEnd;
+      });
+
+      if (existingSignupInCycle) {
+        return res.status(400).json({ 
+          error: `You have already signed up for a meeting on ${new Date(existingSignupInCycle.slot.startTime).toLocaleDateString()}. You can only sign up for one meeting slot per cycle.` 
+        });
+      }
+    } else {
+      // If no active cycle or no date range, fall back to checking all signups
+      // (for backwards compatibility)
+      const existingSignup = await prisma.meetingSignup.findFirst({
+        where: { email },
+        include: { slot: true }
+      });
+
+      if (existingSignup) {
+        return res.status(400).json({ 
+          error: `You have already signed up for a meeting on ${new Date(existingSignup.slot.startTime).toLocaleDateString()}. You can only sign up for one meeting slot.` 
+        });
+      }
     }
 
     // Check if user exists in the system (has an account)

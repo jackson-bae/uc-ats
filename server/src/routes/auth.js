@@ -206,7 +206,7 @@ router.post('/forgot-password', async (req, res) => {
     console.log('Using user:', process.env.EMAIL_USER);
     console.log('Reset link:', resetLink);
     await transporter.sendMail({
-      from: `"Club ATS" <${process.env.EMAIL_USER}>`,
+      from: `"UConsulting ATS" <${process.env.EMAIL_USER}>`,
       to: email,
       subject: 'Reset Your Password',
       html: `<p>You requested a password reset.</p>
