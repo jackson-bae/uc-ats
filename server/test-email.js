@@ -12,7 +12,7 @@ import {
   sendMeetingSignupConfirmation,
   sendMeetingSignupNotification,
   sendMeetingCancellationEmail
-} from './src/services/emailNotifications.js';
+} from './src/services/emailNotificationsTest.js';
 import dotenv from 'dotenv';
 
 // Load environment variables
