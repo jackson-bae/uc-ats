@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import { formatEmailDateTime, formatEmailTime } from '../utils/timezoneUtils.js';
 
 // Create reusable transporter object using SMTP transport
 const createTransporter = () => {
@@ -161,18 +162,7 @@ export const sendAttendanceConfirmation = async (candidateEmail, candidateName, 
 
 // Helper function to format event date
 export const formatEventDate = (date) => {
-  // Convert UTC time to PST for display (subtract 8 hours)
-  const utcDate = new Date(date);
-  const pstDate = new Date(utcDate.getTime() - (8 * 60 * 60 * 1000));
-  
-  return pstDate.toLocaleDateString('en-US', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
+  return formatEmailDateTime(date);
 };
 
 // Create acceptance email template
@@ -756,29 +746,11 @@ export const sendFinalRejectionEmail = async (candidateEmail, candidateName, cur
 // Create meeting signup confirmation email template
 const createMeetingSignupConfirmationEmail = (candidateName, memberName, location, startTime, endTime) => {
   const formatDateTime = (date) => {
-    // Convert UTC time to PST for display (subtract 8 hours)
-    const utcDate = new Date(date);
-    const pstDate = new Date(utcDate.getTime() - (8 * 60 * 60 * 1000));
-    
-    return pstDate.toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    return formatEmailDateTime(date);
   };
 
   const formatTime = (date) => {
-    // Convert UTC time to PST for display (subtract 8 hours)
-    const utcDate = new Date(date);
-    const pstDate = new Date(utcDate.getTime() - (8 * 60 * 60 * 1000));
-    
-    return pstDate.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    return formatEmailTime(date);
   };
 
   return {
@@ -856,29 +828,11 @@ export const sendMeetingSignupConfirmation = async (candidateEmail, candidateNam
 // Create meeting signup notification email template for members
 const createMeetingSignupNotificationEmail = (memberName, candidateName, candidateEmail, studentId, location, startTime, endTime) => {
   const formatDateTime = (date) => {
-    // Convert UTC time to PST for display (subtract 8 hours)
-    const utcDate = new Date(date);
-    const pstDate = new Date(utcDate.getTime() - (8 * 60 * 60 * 1000));
-    
-    return pstDate.toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    return formatEmailDateTime(date);
   };
 
   const formatTime = (date) => {
-    // Convert UTC time to PST for display (subtract 8 hours)
-    const utcDate = new Date(date);
-    const pstDate = new Date(utcDate.getTime() - (8 * 60 * 60 * 1000));
-    
-    return pstDate.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    return formatEmailTime(date);
   };
 
   return {
@@ -952,29 +906,11 @@ export const sendMeetingSignupNotification = async (memberEmail, memberName, can
 // Create meeting cancellation email template
 const createMeetingCancellationEmail = (candidateName, memberName, location, startTime, endTime) => {
   const formatDateTime = (date) => {
-    // Convert UTC time to PST for display (subtract 8 hours)
-    const utcDate = new Date(date);
-    const pstDate = new Date(utcDate.getTime() - (8 * 60 * 60 * 1000));
-    
-    return pstDate.toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    return formatEmailDateTime(date);
   };
 
   const formatTime = (date) => {
-    // Convert UTC time to PST for display (subtract 8 hours)
-    const utcDate = new Date(date);
-    const pstDate = new Date(utcDate.getTime() - (8 * 60 * 60 * 1000));
-    
-    return pstDate.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    return formatEmailTime(date);
   };
 
   return {

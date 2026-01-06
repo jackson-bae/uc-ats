@@ -3,6 +3,7 @@ import { requireAuth } from '../middleware/auth.js';
 import prisma from '../prismaClient.js';
 import { sendSlackMessage } from '../services/slackService.js';
 import { sendMeetingCancellationEmail } from '../services/emailNotifications.js';
+import { localInputToUTC } from '../utils/timezoneUtils.js';
 
 const router = express.Router();
 
@@ -783,41 +784,15 @@ router.post('/meeting-slots', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Location and start time are required' });
     }
     
-    // Convert datetime-local input to UTC
-    // datetime-local sends format: "YYYY-MM-DDTHH:MM" (no timezone info)
-    // We need to treat this as PST time and convert to UTC
-    const createUTCDate = (dateTimeString) => {
-      if (!dateTimeString) return null;
-      
-      console.log('Creating UTC date from:', dateTimeString);
-      
-      // Parse the datetime-local string and treat it as PST
-      const [datePart, timePart] = dateTimeString.split('T');
-      const [year, month, day] = datePart.split('-').map(Number);
-      const [hour, minute] = timePart.split(':').map(Number);
-      
-      console.log('Parsed components:', { year, month, day, hour, minute });
-      
-      // Create date in PST (UTC-8) - note: PST is UTC-8, PDT is UTC-7
-      // For simplicity, we'll use PST (UTC-8) year-round
-      // To convert PST to UTC, we add 8 hours
-      const utcDate = new Date(Date.UTC(year, month - 1, day, hour + 8, minute));
-      
-      console.log('Created UTC date:', utcDate);
-      console.log('UTC date toISOString:', utcDate.toISOString());
-      
-      return utcDate;
-    };
-    
     console.log('Received startTime:', startTime);
     console.log('Received endTime:', endTime);
-    
+
     const slot = await prisma.meetingSlot.create({
       data: {
         memberId: req.user.id,
         location,
-        startTime: createUTCDate(startTime),
-        endTime: endTime ? createUTCDate(endTime) : null,
+        startTime: localInputToUTC(startTime),
+        endTime: endTime ? localInputToUTC(endTime) : null,
         capacity: Number.isInteger(capacity) ? capacity : 2
       }
     });
@@ -877,27 +852,10 @@ router.put('/meeting-slots/:id', requireAuth, async (req, res) => {
       }
     }
     
-    // Convert datetime-local input to UTC (same logic as create)
-    const createUTCDate = (dateTimeString) => {
-      if (!dateTimeString) return null;
-      
-      // Parse the datetime-local string and treat it as PST
-      const [datePart, timePart] = dateTimeString.split('T');
-      const [year, month, day] = datePart.split('-').map(Number);
-      const [hour, minute] = timePart.split(':').map(Number);
-      
-      // Create date in PST (UTC-8) - note: PST is UTC-8, PDT is UTC-7
-      // For simplicity, we'll use PST (UTC-8) year-round
-      // To convert PST to UTC, we add 8 hours
-      const utcDate = new Date(Date.UTC(year, month - 1, day, hour + 8, minute));
-      
-      return utcDate;
-    };
-    
     const updateData = {};
     if (location !== undefined) updateData.location = location;
-    if (startTime !== undefined) updateData.startTime = createUTCDate(startTime);
-    if (endTime !== undefined) updateData.endTime = endTime ? createUTCDate(endTime) : null;
+    if (startTime !== undefined) updateData.startTime = localInputToUTC(startTime);
+    if (endTime !== undefined) updateData.endTime = endTime ? localInputToUTC(endTime) : null;
     if (capacity !== undefined) updateData.capacity = Number.isInteger(capacity) ? capacity : existingSlot.capacity;
     
     const updatedSlot = await prisma.meetingSlot.update({

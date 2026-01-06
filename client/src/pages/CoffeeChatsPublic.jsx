@@ -148,19 +148,16 @@ export default function CoffeeChatsPublic() {
   };
 
   const formatDateTime = (dateTime) => {
-    // Convert UTC time to PST for display
-    const utcDate = new Date(dateTime);
-    // Convert UTC to PST (subtract 8 hours)
-    const pstDate = new Date(utcDate.getTime() - (8 * 60 * 60 * 1000));
-    
-    // Format manually using UTC methods to avoid timezone issues
-    const weekday = pstDate.toLocaleDateString('en-US', { weekday: 'long' });
-    const month = pstDate.toLocaleDateString('en-US', { month: 'long' });
-    const day = pstDate.getUTCDate();
-    const hour = pstDate.getUTCHours();
-    const minute = pstDate.getUTCMinutes();
-    
-    return `${weekday}, ${month} ${day}, ${hour === 0 ? 12 : hour > 12 ? hour - 12 : hour}:${minute.toString().padStart(2, '0')} ${hour < 12 ? 'AM' : 'PM'}`;
+    const date = new Date(dateTime);
+    return date.toLocaleString('en-US', {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: 'America/Los_Angeles'
+    });
   };
 
   const getSelectedSlotData = () => {
@@ -171,8 +168,8 @@ export default function CoffeeChatsPublic() {
   const getAvailableSlots = () => {
     const now = new Date();
     return slots.filter(slot => {
-      // Convert stored UTC time to PST for comparison
-      const startTime = new Date(new Date(slot.startTime).getTime() - (8 * 60 * 60 * 1000));
+      // Compare times in UTC (no conversion needed)
+      const startTime = new Date(slot.startTime);
       // Only show slots that haven't ended yet AND have available capacity
       return startTime >= now && slot.remaining > 0;
     });

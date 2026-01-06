@@ -263,18 +263,24 @@ export default function MemberMeetingSlots() {
     const endDate = slot.endTime ? new Date(slot.endTime) : null;
     
     
-    // Format for datetime-local input - convert from UTC to PST
+    // Format for datetime-local input - convert from UTC to LA time
     const formatForInput = (date) => {
-      // The date is stored as UTC, convert to PST for editing
-      const pstDate = new Date(date.getTime() - (8 * 60 * 60 * 1000));
-      
-      // Format for datetime-local input (YYYY-MM-DDTHH:MM)
-      const year = pstDate.getFullYear();
-      const month = String(pstDate.getMonth() + 1).padStart(2, '0');
-      const day = String(pstDate.getDate()).padStart(2, '0');
-      const hours = String(pstDate.getHours()).padStart(2, '0');
-      const minutes = String(pstDate.getMinutes()).padStart(2, '0');
-      
+      // Convert UTC to LA time string, then parse components
+      const laTimeStr = date.toLocaleString('en-US', {
+        timeZone: 'America/Los_Angeles',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      });
+
+      // Parse the formatted string: "MM/DD/YYYY, HH:MM"
+      const [datePart, timePart] = laTimeStr.split(', ');
+      const [month, day, year] = datePart.split('/');
+      const [hours, minutes] = timePart.split(':');
+
       const formatted = `${year}-${month}-${day}T${hours}:${minutes}`;
       return formatted;
     };
@@ -408,29 +414,24 @@ export default function MemberMeetingSlots() {
   };
 
   const formatDateTime = (dateTime) => {
-    // Convert UTC time to PST for display
-    const utcDate = new Date(dateTime);
-    
-    // Convert UTC to PST (subtract 8 hours)
-    const pstDate = new Date(utcDate.getTime() - (8 * 60 * 60 * 1000));
-    
-    // Format manually using UTC methods to avoid timezone issues
-    const weekday = pstDate.toLocaleDateString('en-US', { weekday: 'short' });
-    const month = pstDate.toLocaleDateString('en-US', { month: 'short' });
-    const day = pstDate.getUTCDate();
-    const hour = pstDate.getUTCHours();
-    const minute = pstDate.getUTCMinutes();
-    
-    const formatted = `${weekday}, ${month} ${day}, ${hour === 0 ? 12 : hour > 12 ? hour - 12 : hour}:${minute.toString().padStart(2, '0')} ${hour < 12 ? 'AM' : 'PM'}`;
-    return formatted;
+    const date = new Date(dateTime);
+    return date.toLocaleString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: 'America/Los_Angeles'
+    });
   };
 
   const getSlotStatus = (slot) => {
     const now = new Date();
-    // Convert stored UTC times back to PST for comparison
-    const startTime = new Date(new Date(slot.startTime).getTime() - (8 * 60 * 60 * 1000));
-    const endTime = slot.endTime ? new Date(new Date(slot.endTime).getTime() - (8 * 60 * 60 * 1000)) : new Date(startTime.getTime() + 60 * 60 * 1000); // Default 1 hour
-    
+    // Compare times in UTC (no conversion needed)
+    const startTime = new Date(slot.startTime);
+    const endTime = slot.endTime ? new Date(slot.endTime) : new Date(startTime.getTime() + 60 * 60 * 1000); // Default 1 hour
+
     if (now < startTime) return 'upcoming';
     if (now >= startTime && now <= endTime) return 'active';
     return 'completed';
