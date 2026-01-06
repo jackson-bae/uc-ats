@@ -1173,16 +1173,43 @@ router.get('/test', requireAuth, async (req, res) => {
 // Save resume score (per evaluator per candidate)
 router.post('/resume-score', requireAuth, async (req, res) => {
   try {
-    const { candidateId, assignedGroupId, scoreOne, scoreTwo, scoreThree, notes } = req.body;
+    const { candidateId, assignedGroupId, scoreOne, scoreTwo, scoreThree, notes, cycleId } = req.body;
     const evaluatorId = req.user.id;
 
     // Calculate overall score (sum of the two scores for resume: Content/Relevance/Impact + Structure/Formatting)
     const scores = [scoreOne, scoreTwo].filter(score => score !== null && score !== undefined);
     const overallScore = scores.length > 0 ? scores.reduce((sum, score) => sum + score, 0) : 0;
 
-    // Check if a score already exists for this candidate and evaluator
+    // Get cycleId from assignedGroup if not provided
+    let finalCycleId = cycleId;
+    if (!finalCycleId && assignedGroupId) {
+      const group = await prisma.groups.findUnique({
+        where: { id: assignedGroupId },
+        select: { cycleId: true }
+      });
+      if (group) {
+        finalCycleId = group.cycleId;
+      }
+    }
+    // If still no cycleId, get from candidate's most recent application
+    if (!finalCycleId) {
+      const application = await prisma.application.findFirst({
+        where: { candidateId },
+        orderBy: { submittedAt: 'desc' },
+        select: { cycleId: true }
+      });
+      if (application?.cycleId) {
+        finalCycleId = application.cycleId;
+      }
+    }
+
+    // Check if a score already exists for this candidate, evaluator, and cycle
+    const existingScoreWhere = { candidateId, evaluatorId };
+    if (finalCycleId) {
+      existingScoreWhere.cycleId = finalCycleId;
+    }
     const existingScore = await prisma.resumeScore.findFirst({
-      where: { candidateId, evaluatorId }
+      where: existingScoreWhere
     });
 
     let resumeScore;
@@ -1197,6 +1224,7 @@ router.post('/resume-score', requireAuth, async (req, res) => {
           scoreThree,
           notes,
           assignedGroupId,
+          cycleId: finalCycleId,
           status: 'completed'
         }
       });
@@ -1212,6 +1240,7 @@ router.post('/resume-score', requireAuth, async (req, res) => {
           scoreTwo,
           scoreThree,
           notes,
+          cycleId: finalCycleId,
           status: 'completed'
         }
       });
@@ -1228,10 +1257,16 @@ router.post('/resume-score', requireAuth, async (req, res) => {
 router.get('/resume-score/:candidateId', requireAuth, async (req, res) => {
   try {
     const { candidateId } = req.params;
+    const { cycleId } = req.query;
     const evaluatorId = req.user.id;
 
+    const whereClause = { candidateId, evaluatorId };
+    if (cycleId) {
+      whereClause.cycleId = cycleId;
+    }
+
     const resumeScore = await prisma.resumeScore.findFirst({
-      where: { candidateId, evaluatorId }
+      where: whereClause
     });
 
     res.json(resumeScore || null);
@@ -1245,9 +1280,15 @@ router.get('/resume-score/:candidateId', requireAuth, async (req, res) => {
 router.get('/resume-scores/:candidateId', requireAuth, async (req, res) => {
   try {
     const { candidateId } = req.params;
+    const { cycleId } = req.query;
+
+    const whereClause = { candidateId };
+    if (cycleId) {
+      whereClause.cycleId = cycleId;
+    }
 
     const resumeScores = await prisma.resumeScore.findMany({
-      where: { candidateId },
+      where: whereClause,
       include: {
         evaluator: {
           select: {
@@ -1272,16 +1313,43 @@ router.get('/resume-scores/:candidateId', requireAuth, async (req, res) => {
 // Save cover letter score (per evaluator per candidate)
 router.post('/cover-letter-score', requireAuth, async (req, res) => {
   try {
-    const { candidateId, assignedGroupId, scoreOne, scoreTwo, scoreThree, notes } = req.body;
+    const { candidateId, assignedGroupId, scoreOne, scoreTwo, scoreThree, notes, cycleId } = req.body;
     const evaluatorId = req.user.id;
 
     // Calculate overall score (average of the three scores)
     const scores = [scoreOne, scoreTwo, scoreThree].filter(score => score !== null && score !== undefined);
     const overallScore = scores.length > 0 ? scores.reduce((sum, score) => sum + score, 0) / scores.length : 0;
 
-    // Check if a score already exists for this candidate and evaluator
+    // Get cycleId from assignedGroup if not provided
+    let finalCycleId = cycleId;
+    if (!finalCycleId && assignedGroupId) {
+      const group = await prisma.groups.findUnique({
+        where: { id: assignedGroupId },
+        select: { cycleId: true }
+      });
+      if (group) {
+        finalCycleId = group.cycleId;
+      }
+    }
+    // If still no cycleId, get from candidate's most recent application
+    if (!finalCycleId) {
+      const application = await prisma.application.findFirst({
+        where: { candidateId },
+        orderBy: { submittedAt: 'desc' },
+        select: { cycleId: true }
+      });
+      if (application?.cycleId) {
+        finalCycleId = application.cycleId;
+      }
+    }
+
+    // Check if a score already exists for this candidate, evaluator, and cycle
+    const existingScoreWhere = { candidateId, evaluatorId };
+    if (finalCycleId) {
+      existingScoreWhere.cycleId = finalCycleId;
+    }
     const existingScore = await prisma.coverLetterScore.findFirst({
-      where: { candidateId, evaluatorId }
+      where: existingScoreWhere
     });
 
     let coverLetterScore;
@@ -1296,6 +1364,7 @@ router.post('/cover-letter-score', requireAuth, async (req, res) => {
           scoreThree,
           notesOne: notes, // Store general notes in notesOne field
           assignedGroupId,
+          cycleId: finalCycleId,
           status: 'completed'
         }
       });
@@ -1311,6 +1380,7 @@ router.post('/cover-letter-score', requireAuth, async (req, res) => {
           scoreTwo,
           scoreThree,
           notesOne: notes, // Store general notes in notesOne field
+          cycleId: finalCycleId,
           status: 'completed'
         }
       });
@@ -1327,10 +1397,16 @@ router.post('/cover-letter-score', requireAuth, async (req, res) => {
 router.get('/cover-letter-score/:candidateId', requireAuth, async (req, res) => {
   try {
     const { candidateId } = req.params;
+    const { cycleId } = req.query;
     const evaluatorId = req.user.id;
 
+    const whereClause = { candidateId, evaluatorId };
+    if (cycleId) {
+      whereClause.cycleId = cycleId;
+    }
+
     const coverLetterScore = await prisma.coverLetterScore.findFirst({
-      where: { candidateId, evaluatorId }
+      where: whereClause
     });
 
     // Transform the response to match frontend expectations
@@ -1353,9 +1429,15 @@ router.get('/cover-letter-score/:candidateId', requireAuth, async (req, res) => 
 router.get('/cover-letter-scores/:candidateId', requireAuth, async (req, res) => {
   try {
     const { candidateId } = req.params;
+    const { cycleId } = req.query;
+
+    const whereClause = { candidateId };
+    if (cycleId) {
+      whereClause.cycleId = cycleId;
+    }
 
     const coverLetterScores = await prisma.coverLetterScore.findMany({
-      where: { candidateId },
+      where: whereClause,
       include: {
         evaluator: {
           select: {
@@ -1380,15 +1462,42 @@ router.get('/cover-letter-scores/:candidateId', requireAuth, async (req, res) =>
 // Save video score (per evaluator per candidate)
 router.post('/video-score', requireAuth, async (req, res) => {
   try {
-    const { candidateId, assignedGroupId, scoreOne, scoreTwo, scoreThree, notes } = req.body;
+    const { candidateId, assignedGroupId, scoreOne, scoreTwo, scoreThree, notes, cycleId } = req.body;
     const evaluatorId = req.user.id;
 
     // Calculate overall score (for video, just use scoreOne since it's a single category)
     const overallScore = scoreOne || 0;
 
-    // Check if a score already exists for this candidate and evaluator
+    // Get cycleId from assignedGroup if not provided
+    let finalCycleId = cycleId;
+    if (!finalCycleId && assignedGroupId) {
+      const group = await prisma.groups.findUnique({
+        where: { id: assignedGroupId },
+        select: { cycleId: true }
+      });
+      if (group) {
+        finalCycleId = group.cycleId;
+      }
+    }
+    // If still no cycleId, get from candidate's most recent application
+    if (!finalCycleId) {
+      const application = await prisma.application.findFirst({
+        where: { candidateId },
+        orderBy: { submittedAt: 'desc' },
+        select: { cycleId: true }
+      });
+      if (application?.cycleId) {
+        finalCycleId = application.cycleId;
+      }
+    }
+
+    // Check if a score already exists for this candidate, evaluator, and cycle
+    const existingScoreWhere = { candidateId, evaluatorId };
+    if (finalCycleId) {
+      existingScoreWhere.cycleId = finalCycleId;
+    }
     const existingScore = await prisma.videoScore.findFirst({
-      where: { candidateId, evaluatorId }
+      where: existingScoreWhere
     });
 
     let videoScore;
@@ -1403,6 +1512,7 @@ router.post('/video-score', requireAuth, async (req, res) => {
           scoreThree,
           notesOne: notes, // Store general notes in notesOne field
           assignedGroupId,
+          cycleId: finalCycleId,
           status: 'completed'
         }
       });
@@ -1418,6 +1528,7 @@ router.post('/video-score', requireAuth, async (req, res) => {
           scoreTwo,
           scoreThree,
           notesOne: notes, // Store general notes in notesOne field
+          cycleId: finalCycleId,
           status: 'completed'
         }
       });
@@ -1434,10 +1545,16 @@ router.post('/video-score', requireAuth, async (req, res) => {
 router.get('/video-score/:candidateId', requireAuth, async (req, res) => {
   try {
     const { candidateId } = req.params;
+    const { cycleId } = req.query;
     const evaluatorId = req.user.id;
 
+    const whereClause = { candidateId, evaluatorId };
+    if (cycleId) {
+      whereClause.cycleId = cycleId;
+    }
+
     const videoScore = await prisma.videoScore.findFirst({
-      where: { candidateId, evaluatorId }
+      where: whereClause
     });
 
     // Transform the response to match frontend expectations
@@ -1460,9 +1577,15 @@ router.get('/video-score/:candidateId', requireAuth, async (req, res) => {
 router.get('/video-scores/:candidateId', requireAuth, async (req, res) => {
   try {
     const { candidateId } = req.params;
+    const { cycleId } = req.query;
+
+    const whereClause = { candidateId };
+    if (cycleId) {
+      whereClause.cycleId = cycleId;
+    }
 
     const videoScores = await prisma.videoScore.findMany({
-      where: { candidateId },
+      where: whereClause,
       include: {
         evaluator: {
           select: {

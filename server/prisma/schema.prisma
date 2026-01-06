@@ -108,12 +108,12 @@ model Application {
 }
 
 model RecruitingCycle {
-  id                String        @id @default(uuid())
+  id                String            @id @default(uuid())
   name              String
-  isActive          Boolean       @default(false)
+  isActive          Boolean           @default(false)
   startDate         DateTime?
   endDate           DateTime?
-  createdAt         DateTime      @default(now())
+  createdAt         DateTime          @default(now())
   formUrl           String?
   resumeDeadline    String?
   coverLetterDeadline String?
@@ -123,6 +123,8 @@ model RecruitingCycle {
   groups            Groups[]
   interviews        Interview[]
   resumeScores      ResumeScore[]
+  coverLetterScores CoverLetterScore[]
+  videoScores       VideoScore[]
 
   @@map("recruiting_cycles")
 }
@@ -213,47 +215,51 @@ model ResumeScore {
 }
 
 model CoverLetterScore {
-  id              String    @id @default(uuid())
-  overallScore    Decimal   @db.Decimal(5, 2)
+  id              String           @id @default(uuid())
+  overallScore    Decimal          @db.Decimal(5, 2)
   scoreOne        Int?
   scoreTwo        Int?
   scoreThree      Int?
   notesOne        String?
   notesTwo        String?
   notesThree      String?
-  adminScore      Decimal?  @db.Decimal(5, 2)
+  adminScore      Decimal?         @db.Decimal(5, 2)
   adminNotes      String?
   status          String?
   candidateId     String
   evaluatorId     String?
   assignedGroupId String?
-  createdAt       DateTime  @default(now())
-  assignedGroup   Groups?   @relation(fields: [assignedGroupId], references: [id])
-  candidate       Candidate @relation(fields: [candidateId], references: [id])
-  evaluator       User?     @relation(fields: [evaluatorId], references: [id])
+  createdAt       DateTime         @default(now())
+  cycleId         String?
+  assignedGroup   Groups?          @relation(fields: [assignedGroupId], references: [id])
+  candidate       Candidate       @relation(fields: [candidateId], references: [id])
+  cycle           RecruitingCycle? @relation(fields: [cycleId], references: [id])
+  evaluator       User?            @relation(fields: [evaluatorId], references: [id])
 
   @@map("cover_letter_scores")
 }
 
 model VideoScore {
-  id              String    @id @default(uuid())
-  overallScore    Decimal   @db.Decimal(5, 2)
+  id              String           @id @default(uuid())
+  overallScore    Decimal          @db.Decimal(5, 2)
   scoreOne        Int?
   scoreTwo        Int?
   scoreThree      Int?
   notesOne        String?
   notesTwo        String?
   notesThree      String?
-  adminScore      Decimal?  @db.Decimal(5, 2)
+  adminScore      Decimal?         @db.Decimal(5, 2)
   adminNotes      String?
   status          String?
   candidateId     String
   evaluatorId     String?
   assignedGroupId String?
-  createdAt       DateTime  @default(now())
-  assignedGroup   Groups?   @relation(fields: [assignedGroupId], references: [id])
-  candidate       Candidate @relation(fields: [candidateId], references: [id])
-  evaluator       User?     @relation(fields: [evaluatorId], references: [id])
+  createdAt       DateTime         @default(now())
+  cycleId         String?
+  assignedGroup   Groups?          @relation(fields: [assignedGroupId], references: [id])
+  candidate       Candidate       @relation(fields: [candidateId], references: [id])
+  cycle           RecruitingCycle? @relation(fields: [cycleId], references: [id])
+  evaluator       User?           @relation(fields: [evaluatorId], references: [id])
 
   @@map("video_scores")
 }

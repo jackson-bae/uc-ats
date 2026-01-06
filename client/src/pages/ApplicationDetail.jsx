@@ -211,36 +211,45 @@ export default function ApplicationDetail() {
     return result;
   };
 
-  const fetchResumeScores = async (candidateId) => {
+  const fetchResumeScores = async (candidateId, cycleId) => {
     try {
       if (!candidateId) {
         return;
       }
-      const scores = await apiClient.get(`/review-teams/resume-scores/${candidateId}`);
+      const url = cycleId 
+        ? `/review-teams/resume-scores/${candidateId}?cycleId=${cycleId}`
+        : `/review-teams/resume-scores/${candidateId}`;
+      const scores = await apiClient.get(url);
       setResumeScores(scores);
     } catch (e) {
       console.error('Error fetching resume scores:', e);
     }
   };
 
-  const fetchCoverLetterScores = async (candidateId) => {
+  const fetchCoverLetterScores = async (candidateId, cycleId) => {
     try {
       if (!candidateId) {
         return;
       }
-      const scores = await apiClient.get(`/review-teams/cover-letter-scores/${candidateId}`);
+      const url = cycleId 
+        ? `/review-teams/cover-letter-scores/${candidateId}?cycleId=${cycleId}`
+        : `/review-teams/cover-letter-scores/${candidateId}`;
+      const scores = await apiClient.get(url);
       setCoverLetterScores(scores);
     } catch (e) {
       console.error('Error fetching cover letter scores:', e);
     }
   };
 
-  const fetchVideoScores = async (candidateId) => {
+  const fetchVideoScores = async (candidateId, cycleId) => {
     try {
       if (!candidateId) {
         return;
       }
-      const scores = await apiClient.get(`/review-teams/video-scores/${candidateId}`);
+      const url = cycleId 
+        ? `/review-teams/video-scores/${candidateId}?cycleId=${cycleId}`
+        : `/review-teams/video-scores/${candidateId}`;
+      const scores = await apiClient.get(url);
       setVideoScores(scores);
     } catch (e) {
       console.error('Error fetching video scores:', e);
@@ -385,9 +394,9 @@ export default function ApplicationDetail() {
         await fetchComments();
         
         // Load document scores
-        await fetchResumeScores(appData.candidateId);
-        await fetchCoverLetterScores(appData.candidateId);
-        await fetchVideoScores(appData.candidateId);
+        await fetchResumeScores(appData.candidateId, appData.cycleId);
+        await fetchCoverLetterScores(appData.candidateId, appData.cycleId);
+        await fetchVideoScores(appData.candidateId, appData.cycleId);
         
         // Load event data
         await fetchEventData();

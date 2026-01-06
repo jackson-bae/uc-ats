@@ -84,7 +84,10 @@ const DocumentGradingModal = ({ open, onClose, application, documentType }) => {
             }
           ],
           apiEndpoint: '/review-teams/resume-score',
-          getScoreEndpoint: (candidateId) => `/review-teams/resume-score/${candidateId}`
+          getScoreEndpoint: (candidateId, cycleId) => {
+            const baseUrl = `/review-teams/resume-score/${candidateId}`;
+            return cycleId ? `${baseUrl}?cycleId=${cycleId}` : baseUrl;
+          }
         };
       case 'coverLetter':
         return {
@@ -128,7 +131,10 @@ const DocumentGradingModal = ({ open, onClose, application, documentType }) => {
             }
           ],
           apiEndpoint: '/review-teams/cover-letter-score',
-          getScoreEndpoint: (candidateId) => `/review-teams/cover-letter-score/${candidateId}`
+          getScoreEndpoint: (candidateId, cycleId) => {
+            const baseUrl = `/review-teams/cover-letter-score/${candidateId}`;
+            return cycleId ? `${baseUrl}?cycleId=${cycleId}` : baseUrl;
+          }
         };
       case 'video':
         return {
@@ -150,7 +156,10 @@ const DocumentGradingModal = ({ open, onClose, application, documentType }) => {
             }
           ],
           apiEndpoint: '/review-teams/video-score',
-          getScoreEndpoint: (candidateId) => `/review-teams/video-score/${candidateId}`
+          getScoreEndpoint: (candidateId, cycleId) => {
+            const baseUrl = `/review-teams/video-score/${candidateId}`;
+            return cycleId ? `${baseUrl}?cycleId=${cycleId}` : baseUrl;
+          }
         };
       default:
         return null;
@@ -245,7 +254,7 @@ const DocumentGradingModal = ({ open, onClose, application, documentType }) => {
   const loadExistingScore = async () => {
     try {
       setLoading(true);
-      const response = await apiClient.get(config.getScoreEndpoint(application.candidateId));
+      const response = await apiClient.get(config.getScoreEndpoint(application.candidateId, application.cycleId));
       if (response) {
         setExistingScore(response);
         setScoreOne(response.scoreOne || '');

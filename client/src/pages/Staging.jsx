@@ -554,10 +554,13 @@ export default function Staging() {
   const [savingScore, setSavingScore] = useState(false);
 
   // Functions to fetch document scores for modal
-  const fetchModalResumeScores = async (candidateId) => {
+  const fetchModalResumeScores = async (candidateId, cycleId) => {
     try {
       if (!candidateId) return;
-      const scores = await apiClient.get(`/review-teams/resume-scores/${candidateId}`);
+      const url = cycleId 
+        ? `/review-teams/resume-scores/${candidateId}?cycleId=${cycleId}`
+        : `/review-teams/resume-scores/${candidateId}`;
+      const scores = await apiClient.get(url);
       setModalResumeScores(scores);
     } catch (e) {
       console.error('Error fetching resume scores:', e);
@@ -565,10 +568,13 @@ export default function Staging() {
     }
   };
 
-  const fetchModalCoverLetterScores = async (candidateId) => {
+  const fetchModalCoverLetterScores = async (candidateId, cycleId) => {
     try {
       if (!candidateId) return;
-      const scores = await apiClient.get(`/review-teams/cover-letter-scores/${candidateId}`);
+      const url = cycleId 
+        ? `/review-teams/cover-letter-scores/${candidateId}?cycleId=${cycleId}`
+        : `/review-teams/cover-letter-scores/${candidateId}`;
+      const scores = await apiClient.get(url);
       setModalCoverLetterScores(scores);
     } catch (e) {
       console.error('Error fetching cover letter scores:', e);
@@ -576,10 +582,13 @@ export default function Staging() {
     }
   };
 
-  const fetchModalVideoScores = async (candidateId) => {
+  const fetchModalVideoScores = async (candidateId, cycleId) => {
     try {
       if (!candidateId) return;
-      const scores = await apiClient.get(`/review-teams/video-scores/${candidateId}`);
+      const url = cycleId 
+        ? `/review-teams/video-scores/${candidateId}?cycleId=${cycleId}`
+        : `/review-teams/video-scores/${candidateId}`;
+      const scores = await apiClient.get(url);
       setModalVideoScores(scores);
     } catch (e) {
       console.error('Error fetching video scores:', e);
@@ -2077,9 +2086,9 @@ export default function Staging() {
                         // Fetch document scores if candidateId is available
                         if (appData.candidateId) {
                           await Promise.all([
-                            fetchModalResumeScores(appData.candidateId),
-                            fetchModalCoverLetterScores(appData.candidateId),
-                            fetchModalVideoScores(appData.candidateId)
+                            fetchModalResumeScores(appData.candidateId, appData.cycleId),
+                            fetchModalCoverLetterScores(appData.candidateId, appData.cycleId),
+                            fetchModalVideoScores(appData.candidateId, appData.cycleId)
                           ]);
                         }
                         

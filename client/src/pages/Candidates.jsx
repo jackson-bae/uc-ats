@@ -118,10 +118,11 @@ export default function Candidates() {
     // Lazy-load averages when expanding
     if (!scoreCache[app.candidateId]) {
       try {
+        const cycleIdParam = app.cycleId ? `?cycleId=${app.cycleId}` : '';
         const [resumeScores, coverScores, videoScores] = await Promise.allSettled([
-          apiClient.get(`/review-teams/resume-scores/${app.candidateId}`),
-          apiClient.get(`/review-teams/cover-letter-scores/${app.candidateId}`),
-          apiClient.get(`/review-teams/video-scores/${app.candidateId}`)
+          apiClient.get(`/review-teams/resume-scores/${app.candidateId}${cycleIdParam}`),
+          apiClient.get(`/review-teams/cover-letter-scores/${app.candidateId}${cycleIdParam}`),
+          apiClient.get(`/review-teams/video-scores/${app.candidateId}${cycleIdParam}`)
         ]);
         const avg = (arr, key) => {
           const list = Array.isArray(arr) ? arr : [];
