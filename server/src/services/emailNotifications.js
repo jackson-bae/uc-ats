@@ -44,7 +44,7 @@ const createRSVPConfirmationEmail = (candidateName, eventName, eventDate, eventL
           
           <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
             Best regards,<br>
-            UC Consulting ATS Team
+            UConsulting ATS Team
           </p>
         </div>
         
@@ -88,7 +88,7 @@ const createAttendanceConfirmationEmail = (candidateName, eventName, eventDate, 
           
           <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
             Best regards,<br>
-            UC Consulting ATS Team
+            UConsulting ATS Team
           </p>
         </div>
         
@@ -106,7 +106,7 @@ const sendEmail = async (to, subject, html) => {
     const transporter = createTransporter();
     
     const mailOptions = {
-      from: `"UC Consulting ATS" <${process.env.EMAIL_USER}>`,
+      from: `"UConsulting ATS" <${process.env.EMAIL_USER}>`,
       to: to,
       subject: subject,
       html: html
@@ -182,7 +182,7 @@ const createAcceptanceEmail = (candidateName, currentCycleName) => {
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <div style="background-color: #28a745; padding: 20px; text-align: center; color: white;">
-          <h2 style="color: white; margin: 0;">UC Consulting ATS</h2>
+          <h2 style="color: white; margin: 0;">UConsulting ATS</h2>
         </div>
         
         <div style="padding: 30px 20px;">
@@ -213,7 +213,7 @@ const createAcceptanceEmail = (candidateName, currentCycleName) => {
           
           <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
             Best regards,<br>
-            UC Consulting Recruitment Team
+            UConsulting Recruitment Team
           </p>
         </div>
         
@@ -232,7 +232,7 @@ const createRejectionEmail = (candidateName, currentCycleName) => {
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <div style="background-color: #dc3545; padding: 20px; text-align: center; color: white;">
-          <h2 style="color: white; margin: 0;">UC Consulting ATS</h2>
+          <h2 style="color: white; margin: 0;">UConsulting ATS</h2>
         </div>
         
         <div style="padding: 30px 20px;">
@@ -243,7 +243,7 @@ const createRejectionEmail = (candidateName, currentCycleName) => {
           </p>
           
           <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
-            Thank you for your interest in UC Consulting and for taking the time to apply to our <strong>${currentCycleName}</strong> recruitment cycle.
+            Thank you for your interest in UConsulting and for taking the time to apply to our <strong>${currentCycleName}</strong> recruitment cycle.
           </p>
           
           <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
@@ -267,7 +267,7 @@ const createRejectionEmail = (candidateName, currentCycleName) => {
           
           <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
             Best regards,<br>
-            UC Consulting Recruitment Team
+            UConsulting Recruitment Team
           </p>
         </div>
         
@@ -326,7 +326,7 @@ const createCoffeeChatAcceptanceEmail = (candidateName, currentCycleName) => {
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <div style="background-color: #007bff; padding: 20px; text-align: center; color: white;">
-          <h2 style="color: white; margin: 0;">UC Consulting ATS</h2>
+          <h2 style="color: white; margin: 0;">UConsulting ATS</h2>
         </div>
         
         <div style="padding: 30px 20px;">
@@ -358,7 +358,7 @@ const createCoffeeChatAcceptanceEmail = (candidateName, currentCycleName) => {
           
           <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
             Best regards,<br>
-            UC Consulting Recruitment Team
+            UConsulting Recruitment Team
           </p>
         </div>
         
@@ -377,7 +377,7 @@ const createCoffeeChatRejectionEmail = (candidateName, currentCycleName) => {
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <div style="background-color: #dc3545; padding: 20px; text-align: center; color: white;">
-          <h2 style="color: white; margin: 0;">UC Consulting ATS</h2>
+          <h2 style="color: white; margin: 0;">UConsulting ATS</h2>
         </div>
         
         <div style="padding: 30px 20px;">
@@ -388,7 +388,7 @@ const createCoffeeChatRejectionEmail = (candidateName, currentCycleName) => {
           </p>
           
           <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
-            Thank you for your interest in UC Consulting and for participating in our <strong>${currentCycleName}</strong> recruitment cycle.
+            Thank you for your interest in UConsulting and for participating in our <strong>${currentCycleName}</strong> recruitment cycle.
           </p>
           
           <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
@@ -413,7 +413,7 @@ const createCoffeeChatRejectionEmail = (candidateName, currentCycleName) => {
           
           <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
             Best regards,<br>
-            UC Consulting Recruitment Team
+            UConsulting Recruitment Team
           </p>
         </div>
         
@@ -434,7 +434,7 @@ const createFirstRoundAcceptanceEmail = (candidateName, currentCycleName) => {
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <div style="background-color: #007bff; padding: 20px; text-align: center; color: white;">
-          <h2 style="color: white; margin: 0;">UC Consulting ATS</h2>
+          <h2 style="color: white; margin: 0;">UConsulting ATS</h2>
         </div>
         
         <div style="padding: 30px 20px;">
@@ -465,7 +465,7 @@ const createFirstRoundAcceptanceEmail = (candidateName, currentCycleName) => {
           
           <p style="color: #555; line-height: 1.6; margin-bottom: 20px;">
             Best regards,<br>
-            The UC Consulting Recruitment Team
+            The UConsulting Recruitment Team
           </p>
         </div>
         
@@ -484,7 +484,7 @@ const createFirstRoundRejectionEmail = (candidateName, currentCycleName) => {
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <div style="background-color: #dc3545; padding: 20px; text-align: center; color: white;">
-          <h2 style="color: white; margin: 0;">UC Consulting ATS</h2>
+          <h2 style="color: white; margin: 0;">UConsulting ATS</h2>
         </div>
         
         <div style="padding: 30px 20px;">
@@ -495,7 +495,7 @@ const createFirstRoundRejectionEmail = (candidateName, currentCycleName) => {
           </p>
           
           <p style="color: #555; line-height: 1.6; margin-bottom: 20px;">
-            Thank you for your interest in joining UC Consulting and for participating in our recruitment process for ${currentCycleName}.
+            Thank you for your interest in joining UConsulting and for participating in our recruitment process for ${currentCycleName}.
           </p>
           
           <p style="color: #555; line-height: 1.6; margin-bottom: 20px;">
@@ -512,7 +512,7 @@ const createFirstRoundRejectionEmail = (candidateName, currentCycleName) => {
           
           <p style="color: #555; line-height: 1.6; margin-bottom: 20px;">
             Best regards,<br>
-            The UC Consulting Recruitment Team
+            The UConsulting Recruitment Team
           </p>
         </div>
         
@@ -567,11 +567,11 @@ export const sendCoffeeChatRejectionEmail = async (candidateEmail, candidateName
 // Create final round acceptance email template
 const createFinalAcceptanceEmail = (candidateName, currentCycleName) => {
   return {
-    subject: `🎉 Congratulations! You've Been Accepted to UC Consulting - ${currentCycleName}`,
+    subject: `🎉 Congratulations! You've Been Accepted to UConsulting - ${currentCycleName}`,
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <div style="background-color: #28a745; padding: 20px; text-align: center; color: white;">
-          <h2 style="color: white; margin: 0;">UC Consulting ATS</h2>
+          <h2 style="color: white; margin: 0;">UConsulting ATS</h2>
         </div>
         
         <div style="padding: 30px 20px;">
@@ -582,15 +582,15 @@ const createFinalAcceptanceEmail = (candidateName, currentCycleName) => {
           </p>
           
           <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
-            We are thrilled to inform you that you have been <strong>ACCEPTED</strong> to join UC Consulting for the <strong>${currentCycleName}</strong> recruitment cycle!
+            We are thrilled to inform you that you have been <strong>ACCEPTED</strong> to join UConsulting for the <strong>${currentCycleName}</strong> recruitment cycle!
           </p>
           
           <div style="background-color: #d4edda; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #28a745;">
             <h4 style="color: #155724; margin: 0 0 10px 0;">What This Means</h4>
             <p style="color: #155724; margin: 5px 0;">🎯 You've successfully completed our entire recruitment process</p>
-            <p style="color: #155724; margin: 5px 0;">✅ You've been selected to join UC Consulting</p>
+            <p style="color: #155724; margin: 5px 0;">✅ You've been selected to join UConsulting</p>
             <p style="color: #155724; margin: 5px 0;">🌟 You'll receive onboarding information soon</p>
-            <p style="color: #155724; margin: 5px 0;">🤝 Welcome to the UC Consulting team!</p>
+            <p style="color: #155724; margin: 5px 0;">🤝 Welcome to the UConsulting team!</p>
           </div>
           
           <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
@@ -602,12 +602,12 @@ const createFinalAcceptanceEmail = (candidateName, currentCycleName) => {
           </p>
           
           <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
-            Congratulations once again, and welcome to UC Consulting!
+            Congratulations once again, and welcome to UConsulting!
           </p>
           
           <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
             Best regards,<br>
-            UC Consulting Recruitment Team
+            UConsulting Recruitment Team
           </p>
         </div>
         
@@ -626,7 +626,7 @@ const createFinalRejectionEmail = (candidateName, currentCycleName) => {
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <div style="background-color: #dc3545; padding: 20px; text-align: center; color: white;">
-          <h2 style="color: white; margin: 0;">UC Consulting ATS</h2>
+          <h2 style="color: white; margin: 0;">UConsulting ATS</h2>
         </div>
         
         <div style="padding: 30px 20px;">
@@ -637,7 +637,7 @@ const createFinalRejectionEmail = (candidateName, currentCycleName) => {
           </p>
           
           <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
-            Thank you for your continued interest in UC Consulting and for your participation throughout our <strong>${currentCycleName}</strong> recruitment process.
+            Thank you for your continued interest in UConsulting and for your participation throughout our <strong>${currentCycleName}</strong> recruitment process.
           </p>
           
           <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
@@ -662,7 +662,7 @@ const createFinalRejectionEmail = (candidateName, currentCycleName) => {
           
           <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
             Best regards,<br>
-            UC Consulting Recruitment Team
+            UConsulting Recruitment Team
           </p>
         </div>
         
@@ -981,7 +981,7 @@ const createMeetingCancellationEmail = (candidateName, memberName, location, sta
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <div style="background-color: #dc3545; padding: 20px; text-align: center; color: white;">
-          <h2 style="color: white; margin: 0;">UC Consulting ATS</h2>
+          <h2 style="color: white; margin: 0;">UConsulting ATS</h2>
         </div>
         
         <div style="padding: 30px 20px;">
@@ -992,7 +992,7 @@ const createMeetingCancellationEmail = (candidateName, memberName, location, sta
           </p>
           
           <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
-            We regret to inform you that your scheduled meeting with UC Consulting has been cancelled.
+            We regret to inform you that your scheduled meeting with UConsulting has been cancelled.
           </p>
           
           <div style="background-color: #f8d7da; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #dc3545;">
@@ -1012,12 +1012,12 @@ const createMeetingCancellationEmail = (candidateName, memberName, location, sta
           </div>
           
           <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
-            We appreciate your interest in UC Consulting and hope you'll consider signing up for another meeting slot.
+            We appreciate your interest in UConsulting and hope you'll consider signing up for another meeting slot.
           </p>
           
           <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
             Best regards,<br>
-            UC Consulting Team
+            UConsulting Team
           </p>
         </div>
         
