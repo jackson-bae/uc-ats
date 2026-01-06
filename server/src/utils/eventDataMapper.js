@@ -29,7 +29,7 @@ export function transformEventFormResponse(formResponse, configType, eventId) {
   // Transform each answer using the field mappings
   for (const [questionId, answerData] of Object.entries(formResponse.answers || {})) {
     let mapping = null;
-    
+
     // First try direct questionId mapping (like your existing form-config.json)
     if (config.database_mappings && config.database_mappings[questionId]) {
       mapping = config.database_mappings[questionId];
@@ -38,7 +38,7 @@ export function transformEventFormResponse(formResponse, configType, eventId) {
       const questionTitle = getQuestionTitle(formResponse, questionId);
       mapping = findMappingByPatterns(config.field_patterns || {}, questionTitle);
     }
-    
+
     if (!mapping) {
       console.warn(`No mapping found for question ID: ${questionId} with title: "${questionTitle}"`);
       continue;
@@ -46,9 +46,21 @@ export function transformEventFormResponse(formResponse, configType, eventId) {
 
     const value = extractAnswerValue(answerData);
     const transformedValue = transformEventValue(value, mapping);
-    
+
     dbRecord[mapping.field] = transformedValue;
   }
+
+  // Post-processing: Handle fullName field
+  // If fullName exists but firstName/lastName don't, split it
+  if (dbRecord.fullName && !dbRecord.firstName && !dbRecord.lastName) {
+    const nameParts = dbRecord.fullName.trim().split(/\s+/);
+    dbRecord.firstName = nameParts[0] || '';
+    dbRecord.lastName = nameParts.slice(1).join(' ') || '';
+    console.log(`Split fullName "${dbRecord.fullName}" into firstName: "${dbRecord.firstName}", lastName: "${dbRecord.lastName}"`);
+    delete dbRecord.fullName; // Remove fullName since we've split it
+  }
+  // If firstName/lastName exist but fullName doesn't, that's fine - no action needed
+  // If neither firstName nor lastName exist, fall back to dynamic mapping later
 
   return dbRecord;
 }
