@@ -4,6 +4,12 @@
     "database_mappings": {
     },
     "field_patterns": {
+        "fullName": {
+            "field": "fullName",
+            "type": "string",
+            "required": true,
+            "patterns": ["full name", "name", "your name", "first & last", "first and last"]
+        },
         "email": {
             "field": "email",
             "type": "string",

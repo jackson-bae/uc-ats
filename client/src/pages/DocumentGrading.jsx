@@ -229,19 +229,39 @@ export default function DocumentGrading() {
     }
   }, [loading]);
 
+  // Get unique years from applications for filter dropdown
+  const availableYears = [...new Set(
+    (Array.isArray(applications) ? applications : [])
+      .map(app => app.year)
+      .filter(year => year && year !== 'N/A')
+  )].sort((a, b) => b - a); // Sort descending (newest first)
+
   // Filter and sort applications based on current filters
   const filteredApplications = (Array.isArray(applications) ? applications : []).filter(app => {
     const matchesSearch = app.studentId.toString().includes(searchTerm) ||
                          app.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          app.major.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesStatus = statusFilter === 'all' || app.status.toLowerCase() === statusFilter;
-    const matchesYear = yearFilter === 'all' || app.year === yearFilter;
+
+    // Determine grading status based on current tab
+    let gradingStatus = 'pending';
+    if (tabValue === 0) {
+      // Resume tab
+      gradingStatus = app.hasResumeScore ? 'completed' : 'pending';
+    } else if (tabValue === 1) {
+      // Cover Letter tab
+      gradingStatus = app.hasCoverLetterScore ? 'completed' : 'pending';
+    } else if (tabValue === 2) {
+      // Video tab
+      gradingStatus = app.hasVideoScore ? 'completed' : 'pending';
+    }
+
+    const matchesStatus = statusFilter === 'all' || gradingStatus === statusFilter;
+    const matchesYear = yearFilter === 'all' || app.year.toString() === yearFilter;
     const matchesGender = genderFilter === 'all' || app.gender.toLowerCase() === genderFilter;
-    const matchesFirstGen = firstGenFilter === 'all' || 
+    const matchesFirstGen = firstGenFilter === 'all' ||
                            (firstGenFilter === 'yes' && app.isFirstGeneration) ||
                            (firstGenFilter === 'no' && !app.isFirstGeneration);
-    const matchesTransfer = transferFilter === 'all' || 
+    const matchesTransfer = transferFilter === 'all' ||
                            (transferFilter === 'yes' && app.isTransferStudent) ||
                            (transferFilter === 'no' && !app.isTransferStudent);
 
@@ -568,8 +588,9 @@ export default function DocumentGrading() {
               onChange={(e) => setYearFilter(e.target.value)}
             >
               <MenuItem value="all">All</MenuItem>
-              <MenuItem value="2025">2025</MenuItem>
-              <MenuItem value="2024">2024</MenuItem>
+              {availableYears.map(year => (
+                <MenuItem key={year} value={year.toString()}>{year}</MenuItem>
+              ))}
             </Select>
           </FormControl>
 

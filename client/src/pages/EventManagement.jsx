@@ -26,6 +26,7 @@ import {
 import { TrashIcon, PencilIcon } from '@heroicons/react/24/outline';
 import apiClient from '../utils/api';
 import AccessControl from '../components/AccessControl';
+import { formatInLA } from '../../../server/src/utils/timezoneUtils';
 
 export default function EventManagement() {
   const [events, setEvents] = useState([]);
@@ -61,6 +62,17 @@ export default function EventManagement() {
     memberRsvpUrl: '',
     cycleId: ''
   });
+
+  function formatForDateTimeLocal(date, timeZone) {
+    const d = new Date(
+      new Date(date).toLocaleString("en-US", { timeZone })
+    )
+
+    const pad = (n) => String(n).padStart(2, "0")
+
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+  }
+
 
   const fetchEvents = async () => {
     try {
@@ -143,11 +155,14 @@ export default function EventManagement() {
   };
 
   const openEditDialog = (event) => {
+    console.log("HELLO")
+    console.dir(event)
+    console.log(new Date(event.eventStartDate).toLocaleString("en-US", { timeZone: "America/Los_Angeles" }).slice(0, 16))
     setSelectedEvent(event);
     setEditForm({
       eventName: event.eventName,
-      eventStartDate: event.eventStartDate.slice(0, 16), // Format for datetime-local input
-      eventEndDate: event.eventEndDate.slice(0, 16), // Format for datetime-local input
+      eventStartDate: formatForDateTimeLocal(event.eventStartDate, "America/Los_Angeles"), // Format for datetime-local input
+      eventEndDate: formatForDateTimeLocal(event.eventEndDate, "America/Los_Angeles"), // Format for datetime-local input
       eventLocation: event.eventLocation || '',
       rsvpForm: event.rsvpForm || '',
       attendanceForm: event.attendanceForm || '',
@@ -318,7 +333,7 @@ export default function EventManagement() {
       // Format dates for Google Calendar
       const startDate = new Date(event.eventStartDate);
       const endDate = event.eventEndDate ? new Date(event.eventEndDate) : new Date(startDate.getTime() + 2 * 60 * 60 * 1000); // Default 2 hours if no end date
-      
+
       // Format dates to YYYYMMDDTHHMMSSZ format (UTC)
       const formatDateForGoogle = (date) => {
         return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
@@ -329,19 +344,21 @@ export default function EventManagement() {
 
       // Create event details with time information
       const eventTitle = event.eventName;
-      const timeString = startDate.toLocaleTimeString('en-US', { 
-        hour: 'numeric', 
+      const timeString = startDate.toLocaleTimeString('en-US', {
+        hour: 'numeric',
         minute: '2-digit',
-        hour12: true 
+        hour12: true,
+        timeZone: 'America/Los_Angeles'
       });
-      const dateString = startDate.toLocaleDateString('en-US', { 
+      const dateString = startDate.toLocaleDateString('en-US', {
         weekday: 'long',
         year: 'numeric',
         month: 'long',
-        day: 'numeric'
+        day: 'numeric',
+        timeZone: 'America/Los_Angeles'
       });
-      
-      const eventDescription = `UConsulting Event: ${event.eventName}\n\nEvent Details:\nDate: ${dateString}\nTime: ${timeString}\nLocation: ${event.eventLocation || 'Location TBD'}\nCycle: ${getCycleName(event.cycleId)}\n\nThis is a UConsulting recruitment event.`;
+
+      const eventDescription = `UConsulting Event: ${event.eventName}\n\nEvent Details:\nDate: ${dateString}\nTime: ${timeString} PT\nLocation: ${event.eventLocation || 'Location TBD'}\nCycle: ${getCycleName(event.cycleId)}\n\nThis is a UConsulting recruitment event.`;
       const eventLocation = event.eventLocation || 'Location TBD';
 
       // Create Google Calendar URL
@@ -353,6 +370,7 @@ export default function EventManagement() {
       googleCalendarUrl.searchParams.set('location', eventLocation);
       googleCalendarUrl.searchParams.set('sf', 'true'); // Show form
       googleCalendarUrl.searchParams.set('output', 'xml'); // Open in new tab
+      googleCalendarUrl.searchParams.set('ctz', 'America/Los_Angeles'); // Ensure Calendar UI opens with the intended timezone
 
       // Open Google Calendar in a new tab
       window.open(googleCalendarUrl.toString(), '_blank');
@@ -750,7 +768,7 @@ export default function EventManagement() {
                 label="End Date & Time *"
                 type="datetime-local"
                 value={editForm.eventEndDate}
-                onChange={(e) => setEditForm({ ...editForm, eventEndDate: e.target.value })}
+                onChange={(e) => {console.log(editForm.eventEndDate); setEditForm({ ...editForm, eventEndDate: e.target.value })}}
                 fullWidth
                 required
                 InputLabelProps={{ shrink: true }}

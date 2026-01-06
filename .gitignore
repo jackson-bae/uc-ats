@@ -10,5 +10,7 @@ server/.env
 .env
 server/google-cloud-key.json
 
+node_modules
+node_bules/.bin
 
 
