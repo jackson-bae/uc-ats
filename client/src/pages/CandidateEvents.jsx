@@ -90,16 +90,18 @@ export default function CandidateEvents() {
       const timeString = startDate.toLocaleTimeString('en-US', {
         hour: 'numeric',
         minute: '2-digit',
-        hour12: true
+        hour12: true,
+        timeZone: 'America/Los_Angeles'
       });
       const dateString = startDate.toLocaleDateString('en-US', {
         weekday: 'long',
         year: 'numeric',
         month: 'long',
-        day: 'numeric'
+        day: 'numeric',
+        timeZone: 'America/Los_Angeles'
       });
 
-      const eventDescription = `${event.description || 'Join us for this exciting UConsulting event!'}\n\nEvent Details:\nDate: ${dateString}\nTime: ${timeString}\nLocation: ${event.eventLocation || 'Location TBD'}`;
+      const eventDescription = `${event.description || 'Join us for this exciting UConsulting event!'}\n\nEvent Details:\nDate: ${dateString}\nTime: ${timeString} PT\nLocation: ${event.eventLocation || 'Location TBD'}`;
       const eventLocation = event.eventLocation || 'Location TBD';
 
       const googleCalendarUrl = new URL('https://calendar.google.com/calendar/render');
@@ -110,6 +112,7 @@ export default function CandidateEvents() {
       googleCalendarUrl.searchParams.set('location', eventLocation);
       googleCalendarUrl.searchParams.set('sf', 'true');
       googleCalendarUrl.searchParams.set('output', 'xml');
+      googleCalendarUrl.searchParams.set('ctz', 'America/Los_Angeles');
 
       window.open(googleCalendarUrl.toString(), '_blank');
     } catch (error) {

@@ -75,7 +75,7 @@ export default function MemberEvents() {
       // Format dates for Google Calendar
       const startDate = new Date(event.eventStartDate);
       const endDate = event.eventEndDate ? new Date(event.eventEndDate) : new Date(startDate.getTime() + 2 * 60 * 60 * 1000); // Default 2 hours if no end date
-      
+
       // Format dates to YYYYMMDDTHHMMSSZ format (UTC)
       const formatDateForGoogle = (date) => {
         return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
@@ -86,19 +86,21 @@ export default function MemberEvents() {
 
       // Create event details with time information
       const eventTitle = event.eventName;
-      const timeString = startDate.toLocaleTimeString('en-US', { 
-        hour: 'numeric', 
+      const timeString = startDate.toLocaleTimeString('en-US', {
+        hour: 'numeric',
         minute: '2-digit',
-        hour12: true 
+        hour12: true,
+        timeZone: 'America/Los_Angeles'
       });
-      const dateString = startDate.toLocaleDateString('en-US', { 
+      const dateString = startDate.toLocaleDateString('en-US', {
         weekday: 'long',
         year: 'numeric',
         month: 'long',
-        day: 'numeric'
+        day: 'numeric',
+        timeZone: 'America/Los_Angeles'
       });
-      
-      const eventDescription = `${event.description || 'Join us for this exciting UConsulting event!'}\n\nEvent Details:\nDate: ${dateString}\nTime: ${timeString}\nLocation: ${event.eventLocation || 'Location TBD'}`;
+
+      const eventDescription = `${event.description || 'Join us for this exciting UConsulting event!'}\n\nEvent Details:\nDate: ${dateString}\nTime: ${timeString} PT\nLocation: ${event.eventLocation || 'Location TBD'}`;
       const eventLocation = event.eventLocation || 'Location TBD';
 
       // Create Google Calendar URL
@@ -110,6 +112,7 @@ export default function MemberEvents() {
       googleCalendarUrl.searchParams.set('location', eventLocation);
       googleCalendarUrl.searchParams.set('sf', 'true'); // Show form
       googleCalendarUrl.searchParams.set('output', 'xml'); // Open in new tab
+      googleCalendarUrl.searchParams.set('ctz', 'America/Los_Angeles'); // Ensure Calendar UI opens with the intended timezone
 
       // Open Google Calendar in a new tab
       window.open(googleCalendarUrl.toString(), '_blank');
