@@ -11,10 +11,8 @@
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
+  },
+  "dependencies": {
+    "date-fns-tz": "^3.2.0"
   }
 }
-
-
-
-
-
