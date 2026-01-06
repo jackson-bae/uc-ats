@@ -26,6 +26,7 @@ import {
 import { TrashIcon, PencilIcon } from '@heroicons/react/24/outline';
 import apiClient from '../utils/api';
 import AccessControl from '../components/AccessControl';
+import { formatInLA } from '../../../server/src/utils/timezoneUtils';
 
 export default function EventManagement() {
   const [events, setEvents] = useState([]);
@@ -61,6 +62,17 @@ export default function EventManagement() {
     memberRsvpUrl: '',
     cycleId: ''
   });
+
+  function formatForDateTimeLocal(date, timeZone) {
+    const d = new Date(
+      new Date(date).toLocaleString("en-US", { timeZone })
+    )
+
+    const pad = (n) => String(n).padStart(2, "0")
+
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+  }
+
 
   const fetchEvents = async () => {
     try {
@@ -143,11 +155,14 @@ export default function EventManagement() {
   };
 
   const openEditDialog = (event) => {
+    console.log("HELLO")
+    console.dir(event)
+    console.log(new Date(event.eventStartDate).toLocaleString("en-US", { timeZone: "America/Los_Angeles" }).slice(0, 16))
     setSelectedEvent(event);
     setEditForm({
       eventName: event.eventName,
-      eventStartDate: event.eventStartDate.slice(0, 16), // Format for datetime-local input
-      eventEndDate: event.eventEndDate.slice(0, 16), // Format for datetime-local input
+      eventStartDate: formatForDateTimeLocal(event.eventStartDate, "America/Los_Angeles"), // Format for datetime-local input
+      eventEndDate: formatForDateTimeLocal(event.eventEndDate, "America/Los_Angeles"), // Format for datetime-local input
       eventLocation: event.eventLocation || '',
       rsvpForm: event.rsvpForm || '',
       attendanceForm: event.attendanceForm || '',
@@ -742,7 +757,7 @@ export default function EventManagement() {
             <Stack direction="row" spacing={2}>
               <TextField
                 label="Start Date & Time *"
-                type="datetime"
+                type="datetime-local"
                 value={editForm.eventStartDate}
                 onChange={(e) => setEditForm({ ...editForm, eventStartDate: e.target.value })}
                 fullWidth
@@ -751,9 +766,9 @@ export default function EventManagement() {
               />
               <TextField
                 label="End Date & Time *"
-                type="datetime"
+                type="datetime-local"
                 value={editForm.eventEndDate}
-                onChange={(e) => setEditForm({ ...editForm, eventEndDate: e.target.value })}
+                onChange={(e) => {console.log(editForm.eventEndDate); setEditForm({ ...editForm, eventEndDate: e.target.value })}}
                 fullWidth
                 required
                 InputLabelProps={{ shrink: true }}
