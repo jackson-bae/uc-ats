@@ -1,5 +1,3 @@
-import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
-
 // Hardcoded timezone for Los Angeles (handles PST/PDT automatically)
 const TIMEZONE = 'America/Los_Angeles';
 
@@ -10,20 +8,109 @@ const TIMEZONE = 'America/Los_Angeles';
 export function localInputToUTC(dateTimeString) {
   if (!dateTimeString) return null;
 
-  // Convert "YYYY-MM-DDTHH:mm" → "YYYY-MM-DD HH:mm"
+  // Parse the datetime-local string (YYYY-MM-DDTHH:mm or YYYY-MM-DD HH:mm)
   const normalized = dateTimeString.replace('T', ' ');
+  const [datePart, timePart] = normalized.split(' ');
+  const [year, month, day] = datePart.split('-').map(Number);
+  const [hours, minutes] = timePart.split(':').map(Number);
 
-  // Interpret the time as LA time and convert to UTC
-  return fromZonedTime(normalized, TIMEZONE);
+  // Use Intl.DateTimeFormat to convert LA time to UTC
+  // We iterate to find the correct UTC time that displays as the desired LA time
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  });
+
+  // Start with assuming the local time IS the LA time (initial guess)
+  let utcGuess = Date.UTC(year, month - 1, day, hours, minutes, 0);
+
+  // Iterate to find the right UTC time
+  // Check what this UTC time shows in LA and adjust
+  for (let i = 0; i < 3; i++) {
+    const guessDate = new Date(utcGuess);
+    const laParts = formatter.formatToParts(guessDate);
+    const laH = parseInt(laParts.find(p => p.type === 'hour').value);
+    const laM = parseInt(laParts.find(p => p.type === 'minute').value);
+    const laD = parseInt(laParts.find(p => p.type === 'day').value);
+    const laMo = parseInt(laParts.find(p => p.type === 'month').value);
+    const laY = parseInt(laParts.find(p => p.type === 'year').value);
+
+    // Calculate difference in minutes
+    const diffMinutes = (laY - year) * 525600 + (laMo - month) * 43200 + (laD - day) * 1440 + (laH - hours) * 60 + (laM - minutes);
+
+    if (diffMinutes === 0) break;
+
+    // Adjust guess
+    utcGuess -= diffMinutes * 60000;
+  }
+
+  return new Date(utcGuess);
 }
 
 /**
  * Format a UTC date for display in Los Angeles time
+ * Converts date-fns format tokens to Intl equivalents
  */
 export function formatInLA(date, formatString) {
   if (!date) return '';
   const utcDate = date instanceof Date ? date : new Date(date);
-  return formatInTimeZone(utcDate, TIMEZONE, formatString);
+
+  // Create formatters for different parts
+  const dayFormatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: TIMEZONE,
+    weekday: 'long'
+  });
+
+  const monthFormatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: TIMEZONE,
+    month: 'long'
+  });
+
+  const yearFormatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: TIMEZONE,
+    year: 'numeric'
+  });
+
+  const dayNumFormatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: TIMEZONE,
+    day: 'numeric'
+  });
+
+  const timeFormatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: TIMEZONE,
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  });
+
+  // Map date-fns tokens to formatted parts
+  const dayName = dayFormatter.format(utcDate);
+  const monthName = monthFormatter.format(utcDate);
+  const year = yearFormatter.format(utcDate);
+  const day = dayNumFormatter.format(utcDate);
+  const time = timeFormatter.format(utcDate);
+
+  // Handle common date-fns format patterns
+  if (formatString === 'EEEE, MMMM d, yyyy, h:mm a') {
+    return `${dayName}, ${monthName} ${day}, ${year}, ${time}`;
+  }
+
+  if (formatString === 'h:mm a') {
+    return time;
+  }
+
+  // Fallback: return a generic formatted string
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: TIMEZONE,
+    dateStyle: 'full',
+    timeStyle: 'short'
+  }).format(utcDate);
 }
 
 /**
