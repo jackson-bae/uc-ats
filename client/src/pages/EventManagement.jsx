@@ -742,7 +742,7 @@ export default function EventManagement() {
             <Stack direction="row" spacing={2}>
               <TextField
                 label="Start Date & Time *"
-                type="datetime-local"
+                type="datetime"
                 value={editForm.eventStartDate}
                 onChange={(e) => setEditForm({ ...editForm, eventStartDate: e.target.value })}
                 fullWidth
@@ -751,7 +751,7 @@ export default function EventManagement() {
               />
               <TextField
                 label="End Date & Time *"
-                type="datetime-local"
+                type="datetime"
                 value={editForm.eventEndDate}
                 onChange={(e) => setEditForm({ ...editForm, eventEndDate: e.target.value })}
                 fullWidth
