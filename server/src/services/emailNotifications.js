@@ -979,13 +979,14 @@ const createMeetingCancellationEmail = (candidateName, memberName, location, sta
   return {
     subject: `Meeting Cancelled - Get to Know UC`,
     html: `
+    
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <div style="background-color: #dc3545; padding: 20px; text-align: center; color: white;">
           <h2 style="color: white; margin: 0;">UConsulting ATS</h2>
         </div>
         
         <div style="padding: 30px 20px;">
-          <h3 style="color: #333; margin-bottom: 20px;">❌ Meeting Cancelled</h3>
+          <h3 style="color: #333; margin-bottom: 20px;">Meeting Cancelled</h3>
           
           <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
             Dear ${candidateName},
@@ -1024,6 +1025,7 @@ const createMeetingCancellationEmail = (candidateName, memberName, location, sta
         <div style="background-color: #f8f9fa; padding: 20px; text-align: center; color: #666; font-size: 12px;">
           <p style="margin: 0;">This is an automated message. Please do not reply to this email.</p>
         </div>
+      </div>
       </div>
     `
   };
