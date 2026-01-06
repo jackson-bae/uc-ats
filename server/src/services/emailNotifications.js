@@ -421,6 +421,7 @@ const createCoffeeChatRejectionEmail = (candidateName, currentCycleName) => {
           <p style="margin: 0;">This is an automated message. Please do not reply to this email.</p>
         </div>
       </div>
+      </div>
     `
   };
 };

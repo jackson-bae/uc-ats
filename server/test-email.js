@@ -32,7 +32,7 @@ const testEmails = async () => {
   console.log('='.repeat(60));
 
   // Test RSVP Confirmation
-  console.log('\n1. Testing RSVP confirmation email...');
+  console.log('\n1. RSVP Confirmation - Fall Recruitment Info Session');
   await sendRSVPConfirmation(
     testEmail,
     'Test Candidate',
@@ -42,7 +42,7 @@ const testEmails = async () => {
   );
 
   // Test Attendance Confirmation
-  console.log('\n2. Testing attendance confirmation email...');
+  console.log('\n2. Attendance Confirmation - Fall Recruitment Info Session');
   await sendAttendanceConfirmation(
     testEmail,
     'Test Candidate',
@@ -52,7 +52,7 @@ const testEmails = async () => {
   );
 
   // Test Resume Review Acceptance (advancing to Coffee Chats)
-  console.log('\n3. Testing resume review acceptance email...');
+  console.log('\n3. Congratulations! You\'ve Advanced to Coffee Chats - Fall 2024 Recruitment');
   await sendAcceptanceEmail(
     testEmail,
     'Test Candidate',
@@ -60,7 +60,7 @@ const testEmails = async () => {
   );
 
   // Test Resume Review Rejection
-  console.log('\n4. Testing resume review rejection email...');
+  console.log('\n4. Update on Your Application - Fall 2024 Recruitment');
   await sendRejectionEmail(
     testEmail,
     'Test Candidate',
@@ -68,7 +68,7 @@ const testEmails = async () => {
   );
 
   // Test Coffee Chat Acceptance (advancing to First Round)
-  console.log('\n5. Testing coffee chat acceptance email...');
+  console.log('\n5. Congratulations! You\'ve Advanced to First Round Interviews - Fall 2024 Recruitment');
   await sendCoffeeChatAcceptanceEmail(
     testEmail,
     'Test Candidate',
@@ -76,7 +76,7 @@ const testEmails = async () => {
   );
 
   // Test Coffee Chat Rejection
-  console.log('\n6. Testing coffee chat rejection email...');
+  console.log('\n6. Update on Your Application - Fall 2024 Recruitment');
   await sendCoffeeChatRejectionEmail(
     testEmail,
     'Test Candidate',
@@ -84,7 +84,7 @@ const testEmails = async () => {
   );
 
   // Test First Round Acceptance (advancing to Final Round)
-  console.log('\n7. Testing first round acceptance email...');
+  console.log('\n7. Congratulations! You\'ve Advanced to Final Round - Fall 2024 Recruitment');
   await sendFirstRoundAcceptanceEmail(
     testEmail,
     'Test Candidate',
@@ -92,7 +92,7 @@ const testEmails = async () => {
   );
 
   // Test First Round Rejection
-  console.log('\n8. Testing first round rejection email...');
+  console.log('\n8. Update on Your Application - Fall 2024 Recruitment');
   await sendFirstRoundRejectionEmail(
     testEmail,
     'Test Candidate',
@@ -100,7 +100,7 @@ const testEmails = async () => {
   );
 
   // Test Final Round Acceptance
-  console.log('\n9. Testing final round acceptance email...');
+  console.log('\n9. 🎉 Congratulations! You\'ve Been Accepted to UConsulting - Fall 2024 Recruitment');
   await sendFinalAcceptanceEmail(
     testEmail,
     'Test Candidate',
@@ -108,7 +108,7 @@ const testEmails = async () => {
   );
 
   // Test Final Round Rejection
-  console.log('\n10. Testing final round rejection email...');
+  console.log('\n10. Update on Your Application - Fall 2024 Recruitment');
   await sendFinalRejectionEmail(
     testEmail,
     'Test Candidate',
@@ -116,7 +116,7 @@ const testEmails = async () => {
   );
 
   // Test Meeting Signup Confirmation
-  console.log('\n11. Testing meeting signup confirmation email...');
+  console.log('\n11. Time Slot Confirmation - Get to Know UC');
   await sendMeetingSignupConfirmation(
     testEmail,
     'Test Candidate',
@@ -127,7 +127,7 @@ const testEmails = async () => {
   );
 
   // Test Meeting Signup Notification (to member)
-  console.log('\n12. Testing meeting signup notification email...');
+  console.log('\n12. New GTKUC Signup - Test Candidate signed up for your slot');
   await sendMeetingSignupNotification(
     testEmail,
     'Test Member',
@@ -140,7 +140,7 @@ const testEmails = async () => {
   );
 
   // Test Meeting Cancellation
-  console.log('\n13. Testing meeting cancellation email...');
+  console.log('\n13. Meeting Cancelled - Get to Know UC');
   await sendMeetingCancellationEmail(
     testEmail,
     'Test Candidate',
