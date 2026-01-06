@@ -963,9 +963,15 @@ router.delete('/meeting-slots/:id', requireAuth, async (req, res) => {
     }
     
     // Delete the meeting slot (this will cascade delete all signups due to foreign key constraint)
-    await prisma.meetingSlot.delete({
-      where: { id }
-    });
+    await prisma.$transaction(async (tx) => {
+      await tx.meetingSignup.deleteMany({
+        where: { slotId: id },
+      })
+
+      await tx.meetingSlot.delete({
+        where: { id },
+      })
+    })
     
     const message = existingSlot.signups.length > 0 
       ? `Meeting slot deleted successfully. Cancellation emails sent to ${existingSlot.signups.length} signup(s).`
