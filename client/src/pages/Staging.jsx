@@ -1,121 +1,4426 @@
-import React from "react";
-import { Box, Typography, Card, CardContent, Grid, LinearProgress } from "@mui/material";
+import React, { useState, useEffect } from 'react';
+import {
+  Box,
+  Typography,
+  Button,
+  Stack,
+  IconButton,
+  Chip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Alert,
+  Snackbar,
+  TextField,
+  CircularProgress,
+  ThemeProvider,
+  CssBaseline,
+  Card,
+  Grid,
+  CardContent,
+  Divider,
+  Badge,
+  Tooltip,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemIcon,
+  Checkbox,
+  FormControlLabel,
+  Switch,
+  Tabs,
+  Tab
+} from '@mui/material';
+import {
+  Edit as EditIcon,
+  ThumbUp as ThumbUpIcon,
+  ThumbDown as ThumbDownIcon,
+  SkipNext as SkipNextIcon,
+  Refresh as RefreshIcon,
+  ExpandMore as ExpandMoreIcon,
+  CheckCircle as CheckCircleIcon,
+  Cancel as CancelIcon,
+  Help as HelpIcon,
+  Event as EventIcon,
+  Grade as GradeIcon,
+  Person as PersonIcon,
+  School as SchoolIcon,
+  Email as EmailIcon,
+  Phone as PhoneIcon,
+  CalendarToday as CalendarIcon,
+  TrendingUp as TrendingUpIcon,
+  Visibility as VisibilityIcon,
+  Send as SendIcon,
+  FilterList as FilterListIcon,
+  Search as SearchIcon,
+  Clear as ClearIcon,
+  Download as DownloadIcon
+} from '@mui/icons-material';
+import globalTheme from '../styles/globalTheme';
+import '../styles/Staging.css';
+import apiClient from '../utils/api';
+import AuthenticatedImage from '../components/AuthenticatedImage';
+import DocumentPreviewModal from '../components/DocumentPreviewModal';
+import AccessControl from '../components/AccessControl';
+import { useAuth } from '../context/AuthContext';
 
-const categories = {
-  graduation: {
-    title: "By Graduation Year",
-    groups: [
-      { label: "Class of 2026", yes: 0, no: 0, maybe: 0, pending: 1 },
-      { label: "Class of 2027", yes: 0, no: 0, maybe: 0, pending: 1 },
-      { label: "Class of 2028", yes: 0, no: 0, maybe: 1, pending: 2 },
-    ]
+// API functions for staging
+const stagingAPI = {
+  async fetchCandidates() {
+    return await apiClient.get('/admin/staging/candidates');
   },
-  gender: {
-    title: "By Gender",
-    groups: [
-      { label: "Male", yes: 0, no: 0, maybe: 0, pending: 5 },
-      { label: "Female", yes: 0, no: 1, maybe: 1, pending: 4 },
-      { label: "Other", yes: 0, no: 0, maybe: 0, pending: 0 },
-    ]
+
+  async fetchActiveCycle() {
+    return await apiClient.get('/admin/cycles/active');
+  },
+
+  async fetchAdminApplications() {
+    return await apiClient.get('/admin/applications');
+  },
+
+  async updateApproval(applicationId, approved) {
+    return await apiClient.patch(`/admin/candidates/${applicationId}/approval`, { approved });
+  },
+
+  async addApplicationComment(applicationId, content) {
+    return await apiClient.post(`/applications/${applicationId}/comments`, { content });
+  },
+
+  async fetchCandidateDetails(candidateId) {
+    return await apiClient.get(`/applications/${candidateId}`);
+  },
+
+  async fetchCandidateScores(candidateId) {
+    return await apiClient.get(`/applications/${candidateId}/grades/average`);
+  },
+
+  async fetchEventAttendance() {
+    return await apiClient.get('/admin/events');
+  },
+
+  async fetchReviewTeams() {
+    return await apiClient.get('/admin/review-teams');
+  },
+
+  async updateCandidateStatus(candidateId, status, notes = '') {
+    return await apiClient.patch(`/admin/staging/candidates/${candidateId}/status`, {
+      status,
+      notes
+    });
+  },
+
+  async submitFinalDecision(candidateId, decision, feedback = '') {
+    return await apiClient.post(`/admin/staging/candidates/${candidateId}/final-decision`, {
+      decision,
+      feedback
+    });
+  },
+
+
+
+  async advanceToNextRound(candidateId, roundNumber) {
+    return await apiClient.post(`/admin/staging/candidates/${candidateId}/advance-round`, {
+      roundNumber
+    });
+  },
+
+  async fetchAdminCandidates() {
+    return await apiClient.get('/admin/candidates');
+  },
+
+  async advanceRound() {
+    return await apiClient.post('/admin/advance-round', {});
+  },
+
+  async processDecisions() {
+    return await apiClient.post('/admin/process-decisions', { sendEmails: false });
+  },
+
+  async processCoffeeDecisions() {
+    return await apiClient.post('/admin/process-coffee-decisions', {});
+  },
+
+  async processFirstRoundDecisions() {
+    return await apiClient.post('/admin/process-first-round-decisions', { sendEmails: false });
+  },
+
+  async processFinalDecisions() {
+    return await apiClient.post('/admin/process-final-decisions', {});
+  },
+
+  async loadExistingDecisions() {
+    return await apiClient.get('/admin/existing-decisions');
+  },
+
+  async saveDecision(candidateId, decision, phase = 'resume') {
+    return await apiClient.post('/admin/save-decision', { 
+      candidateId, 
+      decision, 
+      phase 
+    });
+  },
+
+  async fetchEvaluationSummaries(applicationIds) {
+    return await apiClient.post('/admin/applications/evaluation-summaries', { applicationIds });
   }
 };
 
-const CountRow = ({ yes, no, maybe, pending }) => {
-  const total = yes + no + maybe + pending;
+
+
+// Decision options
+const decisionOptions = [
+  { value: 'ADVANCE', label: 'Advance to Next Round', color: 'success', icon: <ThumbUpIcon /> },
+  { value: 'REJECT', label: 'Reject', color: 'error', icon: <ThumbDownIcon /> },
+  { value: 'WAITLIST', label: 'Waitlist', color: 'warning', icon: <HelpIcon /> },
+  { value: 'HOLD', label: 'Hold for Review', color: 'info', icon: <VisibilityIcon /> }
+];
+
+
+
+const StatusChip = ({ status, size = 'small' }) => {
+  const getStatusConfig = (status) => {
+    switch (status) {
+      case 'SUBMITTED':
+        return { color: 'default', label: 'Submitted' };
+      case 'UNDER_REVIEW':
+        return { color: 'primary', label: 'Under Review' };
+      case 'ACCEPTED':
+        return { color: 'success', label: 'Accepted' };
+      case 'REJECTED':
+        return { color: 'error', label: 'Rejected' };
+      case 'WAITLISTED':
+        return { color: 'warning', label: 'Waitlisted' };
+      default:
+        return { color: 'default', label: status };
+    }
+  };
+
+  const config = getStatusConfig(status);
+  return <Chip label={config.label} color={config.color} size={size} />;
+};
+
+const DecisionChip = ({ decision, size = 'small' }) => {
+  const getDecisionConfig = (decision) => {
+    switch (decision) {
+      case 'ADVANCE':
+        return { color: 'success', label: 'Advance', icon: <ThumbUpIcon fontSize="small" /> };
+      case 'REJECT':
+        return { color: 'error', label: 'Reject', icon: <ThumbDownIcon fontSize="small" /> };
+      case 'WAITLIST':
+        return { color: 'warning', label: 'Waitlist', icon: <HelpIcon fontSize="small" /> };
+      case 'HOLD':
+        return { color: 'info', label: 'Hold', icon: <VisibilityIcon fontSize="small" /> };
+      default:
+        return { color: 'default', label: 'Pending', icon: null };
+    }
+  };
+
+  const config = getDecisionConfig(decision);
+  return (
+    <Chip 
+      label={config.label} 
+      color={config.color} 
+      size={size}
+      icon={config.icon}
+    />
+  );
+};
+
+const ScoreDisplay = ({ score, maxScore = 10 }) => {
+  const percentage = (score / maxScore) * 100;
+  const getColor = (percentage) => {
+    if (percentage >= 80) return 'success';
+    if (percentage >= 60) return 'warning';
+    return 'error';
+  };
 
   return (
-    <Box mt={1}>
-      <Grid container spacing={1}>
-        {[
-          { label: "Yes", value: yes, color: "#4caf50" },
-          { label: "No", value: no, color: "#f44336" },
-          { label: "Maybe", value: maybe, color: "#ff9800" },
-          { label: "Pending", value: pending, color: "#9e9e9e" }
-        ].map((item) => (
-          <Grid item xs={6} sm={3} key={item.label}>
-            <Card sx={{ backgroundColor: item.color + "22" }}>
-              <CardContent sx={{ textAlign: "center", py: 1.5 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>{item.label}</Typography>
-                <Typography variant="h6">{item.value}</Typography>
-                {total > 0 && (
-                  <LinearProgress
-                    variant="determinate"
-                    value={(item.value / total) * 100}
-                    sx={{
-                      height: 6,
-                      borderRadius: 3,
-                      mt: 1,
-                      backgroundColor: "#e0e0e0",
-                      "& .MuiLinearProgress-bar": {
-                        backgroundColor: item.color
-                      }
-                    }}
-                  />
-                )}
-              </CardContent>
-            </Card>
-          </Grid>
-        ))}
-      </Grid>
+    <Box display="flex" alignItems="center" gap={1}>
+      <Typography variant="body2" fontWeight="bold">
+        {score.toFixed(1)}
+      </Typography>
+      <Box
+        sx={{
+          width: 40,
+          height: 8,
+          backgroundColor: 'grey.200',
+          borderRadius: 1,
+          overflow: 'hidden'
+        }}
+      >
+        <Box
+          sx={{
+            width: `${percentage}%`,
+            height: '100%',
+            backgroundColor: `${getColor(percentage)}.main`,
+            transition: 'width 0.3s ease'
+          }}
+        />
+      </Box>
     </Box>
   );
 };
 
-export default function Staging() {
+const AttendanceDisplay = ({ attendance, events }) => {
+  
+  if (!events || events.length === 0) {
+    return (
+      <Box display="flex" alignItems="center" justifyContent="center" minHeight="60px">
+        <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+          No events available for this cycle
+        </Typography>
+      </Box>
+    );
+  }
+
+  // Handle different attendance data structures
+  const getAttendanceStatus = (event) => {
+    // The events API returns events with eventName property
+    // The attendance object uses eventName as the key
+    const eventName = event.eventName || event.name || event.id;
+    
+    // Try different ways to access attendance data
+    let isAttended = false;
+    
+    if (attendance && eventName) {
+      // Try direct key access with eventName
+      if (attendance[eventName] !== undefined) {
+        isAttended = Boolean(attendance[eventName]);
+      } else {
+        // Try to find any key that might match
+        const attendanceKeys = Object.keys(attendance);
+        const matchingKey = attendanceKeys.find(key => 
+          key.toLowerCase() === eventName.toLowerCase() ||
+          key.toLowerCase().includes(eventName.toLowerCase()) || 
+          eventName.toLowerCase().includes(key.toLowerCase())
+        );
+        if (matchingKey !== undefined) {
+          isAttended = Boolean(attendance[matchingKey]);
+        }
+      }
+    }
+    
+    return isAttended;
+  };
+
+  // Filter to only show attended events
+  const attendedEventsList = events.filter(event => getAttendanceStatus(event));
+  const attendedEventsCount = attendedEventsList.length;
+
+  // Handle case where no events were attended
+  if (attendedEventsCount === 0) {
+    return (
+      <Box display="flex" alignItems="center" justifyContent="center" minHeight="60px">
+        <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+          No events attended
+        </Typography>
+      </Box>
+    );
+  }
+
   return (
-    <Box p={3}>
-      <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
-        📊 Demographics Overview
-      </Typography>
+    <Stack spacing={0.5}>
+      {/* Summary row */}
+      <Box display="flex" alignItems="center" gap={1} sx={{ mb: 0.5 }}>
+        <Typography 
+          variant="caption" 
+          color="success.main"
+          sx={{ 
+            fontWeight: 600, 
+            fontSize: '0.75rem'
+          }}
+        >
+          {attendedEventsCount} event{attendedEventsCount !== 1 ? 's' : ''} attended
+        </Typography>
+      </Box>
+      
+      {/* Individual attended events only */}
+      {attendedEventsList.map((event) => {
+        const eventName = event.eventName || event.name || event.id;
+        
+        return (
+          <Box key={event.id || event.name} display="flex" alignItems="center" gap={0.5}>
+            <Checkbox
+              checked={true}
+              disabled
+              size="small"
+              sx={{ padding: 0.5 }}
+              icon={<CancelIcon fontSize="small" />}
+              checkedIcon={<CheckCircleIcon fontSize="small" />}
+            />
+            <Typography 
+              variant="caption" 
+              color="success.main"
+              sx={{ 
+                fontSize: '0.7rem',
+                fontWeight: 500,
+                maxWidth: '120px',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              {eventName}
+            </Typography>
+          </Box>
+        );
+      })}
+    </Stack>
+  );
+};
 
-      {/* Summary Section */}
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Typography variant="h6" sx={{ mb: 1 }}>Overall Summary</Typography>
+// Highlight config for inline decision selector
+const getDecisionHighlight = (decision) => {
+  switch (decision) {
+    case 'yes':
+      return { bg: 'success.light', border: 'success.main' };
+    case 'maybe_yes':
+      return { bg: 'info.light', border: 'info.main' };
+    case 'maybe_no':
+      return { bg: 'warning.light', border: 'warning.main' };
+    case 'no':
+      return { bg: 'error.light', border: 'error.main' };
+    default:
+      return { bg: 'grey.50', border: 'grey.300' };
+  }
+};
 
-          {(() => {
-            const all = [...categories.graduation.groups, ...categories.gender.groups];
-            const total = all.reduce((sum, g) => sum + g.yes + g.no + g.maybe + g.pending, 0);
+// Helper function to check if a decision is valid for pushing
+const isValidDecision = (decision) => {
+  return decision === 'yes' || decision === 'no';
+};
 
-            return (
-              <Typography variant="body1">
-                Total Applicants: <b>{total}</b>
-              </Typography>
-            );
-          })()}
-        </CardContent>
-      </Card>
+const GradingStatusDisplay = ({ candidate, gradingData }) => {
+  if (!gradingData) {
+    return (
+      <Chip label="No Grading Data" color="default" size="small" />
+    );
+  }
+  
+  const { complete, hasResume, hasCoverLetter, hasVideo, hasResumeScore, hasCoverLetterScore, hasVideoScore } = gradingData;
+  
+  if (complete) {
+    const tooltipText = `All available documents have been scored:
+${hasResume ? '✓ Resume' : '✗ No Resume'}
+${hasCoverLetter ? '✓ Cover Letter' : '✗ No Cover Letter'}
+${hasVideo ? '✓ Video' : '✗ No Video'}`;
+    
+    return (
+      <Tooltip title={tooltipText} arrow>
+        <Chip label="Grading Complete" color="success" size="small" />
+      </Tooltip>
+    );
+  }
+  
+  // Show what's missing
+  const missingItems = [];
+  if (hasResume && !hasResumeScore) missingItems.push('Resume Score');
+  if (hasCoverLetter && !hasCoverLetterScore) missingItems.push('Cover Letter Score');
+  if (hasVideo && !hasVideoScore) missingItems.push('Video Score');
+  
+  const tooltipText = `Grading Progress:
+${hasResume ? (hasResumeScore ? '✓ Resume Scored' : '⏳ Resume Pending') : '✗ No Resume'}
+${hasCoverLetter ? (hasCoverLetterScore ? '✓ Cover Letter Scored' : '⏳ Cover Letter Pending') : '✗ No Cover Letter'}
+${hasVideo ? (hasVideoScore ? '✓ Video Scored' : '⏳ Video Pending') : '✗ No Video'}`;
+  
+  return (
+    <Tooltip title={tooltipText} arrow>
+      <Box>
+        <Chip label="Grading in Progress" color="warning" size="small" sx={{ mb: 1 }} />
+        <Typography variant="caption" display="block" color="text.secondary">
+          Missing: {missingItems.join(', ')}
+        </Typography>
+        <Typography variant="caption" display="block" color="text.secondary">
+          Documents: {[hasResume && 'Resume', hasCoverLetter && 'Cover Letter', hasVideo && 'Video'].filter(Boolean).join(', ')}
+        </Typography>
+      </Box>
+    </Tooltip>
+  );
+};
 
-      {/* Demographic Sections */}
-      {Object.values(categories).map((section) => (
-        <Box key={section.title} mb={4}>
-          <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-            {section.title}
-          </Typography>
-          <Grid container spacing={3}>
-            {section.groups.map((group) => {
-              const total = group.yes + group.no + group.maybe + group.pending;
-              return (
-                <Grid item xs={12} md={4} key={group.label}>
-                  <Card>
-                    <CardContent>
-                      <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                        {group.label} ({total} total)
-                      </Typography>
-                      <CountRow
-                        yes={group.yes}
-                        no={group.no}
-                        maybe={group.maybe}
-                        pending={group.pending}
-                      />
-                    </CardContent>
-                  </Card>
-                </Grid>
-              );
-            })}
-          </Grid>
+export default function Staging() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
+  
+  const [candidates, setCandidates] = useState([]);
+  const [events, setEvents] = useState([]); // Add events state
+  const [reviewTeams, setReviewTeams] = useState([]); // Add review teams state
+  const [adminApplications, setAdminApplications] = useState([]); // Add admin applications state
+
+  // Pagination state
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 50,
+    total: 0,
+    totalPages: 0,
+    hasNextPage: false,
+    hasPrevPage: false
+  });
+
+  const [loading, setLoading] = useState(true);
+  const [currentCycle, setCurrentCycle] = useState(null);
+  const [gradingCompleteByCandidate, setGradingCompleteByCandidate] = useState({});
+  const [inlineDecisions, setInlineDecisions] = useState({});
+  const [selectedCandidate, setSelectedCandidate] = useState(null);
+  const [decisionDialogOpen, setDecisionDialogOpen] = useState(false);
+  const [finalDecisionDialogOpen, setFinalDecisionDialogOpen] = useState(false);
+  const [currentTab, setCurrentTab] = useState(0);
+  const [filters, setFilters] = useState({
+    status: 'all',
+    round: 'all',
+    decision: 'all',
+    attendance: 'all',
+    reviewTeam: 'all',
+    referral: 'all',
+    search: ''
+  });
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  const [pushAllDialogOpen, setPushAllDialogOpen] = useState(false);
+  const [pushAllConfirmText, setPushAllConfirmText] = useState('');
+  const [pushAllAcknowledge, setPushAllAcknowledge] = useState(false);
+  const [pushAllLoading, setPushAllLoading] = useState(false);
+  const [pushAllPreview, setPushAllPreview] = useState({ 
+    totalApproved: 0, 
+    invalidDecisions: 0,
+    invalidDecisionCandidates: []
+  });
+  const [demographics, setDemographics] = useState({ graduationYear: {}, gender: {} });
+  const [appModalOpen, setAppModalOpen] = useState(false);
+  const [appModalLoading, setAppModalLoading] = useState(false);
+  const [appModal, setAppModal] = useState(null);
+  const [interviewEvaluations, setInterviewEvaluations] = useState([]);
+  const [evaluationsLoading, setEvaluationsLoading] = useState(false);
+  
+  // Test For note (admin only)
+  const [testForNote, setTestForNote] = useState('');
+  const [isEditingTestFor, setIsEditingTestFor] = useState(false);
+  const [savingTestFor, setSavingTestFor] = useState(false);
+  
+  // Coffee chat interview filter
+  const [coffeeChatInterviewFilter, setCoffeeChatInterviewFilter] = useState('all');
+  const [coffeeChatInterviews, setCoffeeChatInterviews] = useState([]);
+  
+  // Coffee chat decision filter
+  const [coffeeChatDecisionFilter, setCoffeeChatDecisionFilter] = useState('all');
+  
+  // First Round interview filter
+  const [firstRoundInterviewFilter, setFirstRoundInterviewFilter] = useState('all');
+  const [firstRoundInterviews, setFirstRoundInterviews] = useState([]);
+  
+  // First Round decision filter
+  const [firstRoundDecisionFilter, setFirstRoundDecisionFilter] = useState('all');
+  
+  // Document scores for modal
+  const [modalResumeScores, setModalResumeScores] = useState([]);
+  const [modalCoverLetterScores, setModalCoverLetterScores] = useState([]);
+  const [modalVideoScores, setModalVideoScores] = useState([]);
+  const [scoresLoading, setScoresLoading] = useState(false);
+  const [docPreview, setDocPreview] = useState({ open: false, src: '', kind: 'pdf', title: '' });
+  
+  // Final round interview notes modal
+  const [finalRoundNotesModalOpen, setFinalRoundNotesModalOpen] = useState(false);
+  const [finalRoundNotesLoading, setFinalRoundNotesLoading] = useState(false);
+  const [finalRoundInterviewNotes, setFinalRoundInterviewNotes] = useState([]);
+  const [selectedCandidateForNotes, setSelectedCandidateForNotes] = useState(null);
+  
+  // Edit score modal state
+  const [editScoreModalOpen, setEditScoreModalOpen] = useState(false);
+  const [editingScore, setEditingScore] = useState(null);
+  const [editingScoreType, setEditingScoreType] = useState(null); // 'resume', 'coverLetter', 'video'
+  const [editScoreForm, setEditScoreForm] = useState({
+    overallScore: '',
+    scoreOne: '',
+    scoreTwo: '',
+    scoreThree: '',
+    notes: '',
+    adminScore: '',
+    adminNotes: ''
+  });
+  const [savingScore, setSavingScore] = useState(false);
+
+  // Functions to fetch document scores for modal
+  const fetchModalResumeScores = async (candidateId, cycleId) => {
+    try {
+      if (!candidateId) return;
+      const url = cycleId 
+        ? `/review-teams/resume-scores/${candidateId}?cycleId=${cycleId}`
+        : `/review-teams/resume-scores/${candidateId}`;
+      const scores = await apiClient.get(url);
+      setModalResumeScores(scores);
+    } catch (e) {
+      console.error('Error fetching resume scores:', e);
+      setModalResumeScores([]);
+    }
+  };
+
+  const fetchModalCoverLetterScores = async (candidateId, cycleId) => {
+    try {
+      if (!candidateId) return;
+      const url = cycleId 
+        ? `/review-teams/cover-letter-scores/${candidateId}?cycleId=${cycleId}`
+        : `/review-teams/cover-letter-scores/${candidateId}`;
+      const scores = await apiClient.get(url);
+      setModalCoverLetterScores(scores);
+    } catch (e) {
+      console.error('Error fetching cover letter scores:', e);
+      setModalCoverLetterScores([]);
+    }
+  };
+
+  const fetchModalVideoScores = async (candidateId, cycleId) => {
+    try {
+      if (!candidateId) return;
+      const url = cycleId 
+        ? `/review-teams/video-scores/${candidateId}?cycleId=${cycleId}`
+        : `/review-teams/video-scores/${candidateId}`;
+      const scores = await apiClient.get(url);
+      setModalVideoScores(scores);
+    } catch (e) {
+      console.error('Error fetching video scores:', e);
+      setModalVideoScores([]);
+    }
+  };
+
+  // Handle opening edit score modal
+  const handleEditScore = (score, scoreType) => {
+    setEditingScore(score);
+    setEditingScoreType(scoreType);
+    setEditScoreForm({
+      overallScore: score.overallScore?.toString() || '',
+      scoreOne: score.scoreOne?.toString() || '',
+      scoreTwo: score.scoreTwo?.toString() || '',
+      scoreThree: score.scoreThree?.toString() || '',
+      notes: score.notes || score.notesOne || '',
+      adminScore: score.adminScore?.toString() || '',
+      adminNotes: score.adminNotes || ''
+    });
+    setEditScoreModalOpen(true);
+  };
+
+  // Handle saving edited score
+  const handleSaveScore = async () => {
+    try {
+      setSavingScore(true);
+      
+      const endpointMap = {
+        resume: '/admin/resume-scores',
+        coverLetter: '/admin/cover-letter-scores',
+        video: '/admin/video-scores'
+      };
+      
+      const endpoint = `${endpointMap[editingScoreType]}/${editingScore.id}`;
+      
+      const updateData = {
+        overallScore: editScoreForm.overallScore ? parseFloat(editScoreForm.overallScore) : undefined,
+        scoreOne: editScoreForm.scoreOne ? parseInt(editScoreForm.scoreOne) : undefined,
+        scoreTwo: editScoreForm.scoreTwo ? parseInt(editScoreForm.scoreTwo) : undefined,
+        scoreThree: editScoreForm.scoreThree ? parseInt(editScoreForm.scoreThree) : undefined,
+        adminScore: editScoreForm.adminScore ? parseFloat(editScoreForm.adminScore) : undefined,
+        adminNotes: editScoreForm.adminNotes || undefined
+      };
+      
+      // For resume, use 'notes', for cover letter and video use 'notesOne'
+      if (editingScoreType === 'resume') {
+        updateData.notes = editScoreForm.notes || undefined;
+      } else {
+        updateData.notesOne = editScoreForm.notes || undefined;
+      }
+      
+      await apiClient.patch(endpoint, updateData);
+      
+      // Refresh the scores
+      if (appModal?.candidateId) {
+        await Promise.all([
+          fetchModalResumeScores(appModal.candidateId),
+          fetchModalCoverLetterScores(appModal.candidateId),
+          fetchModalVideoScores(appModal.candidateId)
+        ]);
+      }
+      
+      // Refresh candidates list to update rankings
+      await fetchCandidates();
+      
+      setEditScoreModalOpen(false);
+      setSnackbar({ open: true, message: 'Score updated successfully. Rankings have been updated.', severity: 'success' });
+    } catch (error) {
+      console.error('Error updating score:', error);
+      setSnackbar({ open: true, message: 'Failed to update score', severity: 'error' });
+    } finally {
+      setSavingScore(false);
+    }
+  };
+
+  // Handle saving testFor note
+  const handleSaveTestFor = async () => {
+    if (!appModal?.id) return;
+    
+    try {
+      setSavingTestFor(true);
+      await apiClient.patch(`/admin/applications/${appModal.id}/test-for`, { testFor: testForNote });
+      setAppModal(prev => prev ? { ...prev, testFor: testForNote } : null);
+      setIsEditingTestFor(false);
+      setSnackbar({ open: true, message: 'Test For note saved successfully', severity: 'success' });
+    } catch (error) {
+      console.error('Error saving testFor note:', error);
+      setSnackbar({ open: true, message: 'Failed to save testFor note', severity: 'error' });
+    } finally {
+      setSavingTestFor(false);
+    }
+  };
+
+  const loadFinalRoundInterviewNotes = async (applicationId) => {
+    try {
+      setFinalRoundNotesLoading(true);
+      setSelectedCandidateForNotes(applicationId);
+      
+      // Fetch final round interview evaluations for this application
+      const notes = await apiClient.get(`/admin/applications/${applicationId}/final-round-interview-evaluations`);
+      
+      // Notes are already parsed by the backend, no need to parse again
+      setFinalRoundInterviewNotes(notes);
+      setFinalRoundNotesModalOpen(true);
+    } catch (error) {
+      console.error('Failed to load final round interview notes:', error);
+      setSnackbar({ open: true, message: 'Failed to load interview notes', severity: 'error' });
+    } finally {
+      setFinalRoundNotesLoading(false);
+    }
+  };
+  const [evaluationSummaries, setEvaluationSummaries] = useState({});
+  const [evaluationSummariesFirstRound, setEvaluationSummariesFirstRound] = useState({});
+
+  // Pagination control functions
+  const handlePageChange = (newPage) => {
+    setPagination(prev => ({ ...prev, page: newPage }));
+  };
+
+  const handleLimitChange = (newLimit) => {
+    setPagination(prev => ({ ...prev, limit: newLimit, page: 1 }));
+  };
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    setPagination(prev => ({ ...prev, page: 1 }));
+  }, [filters]);
+
+  // Decision state
+  const [currentDecision, setCurrentDecision] = useState({
+    candidateId: null,
+    decision: '',
+    notes: '',
+    round: null
+  });
+
+  // Final decision state
+  const [finalDecision, setFinalDecision] = useState({
+    candidateId: null,
+    decision: '',
+    feedback: ''
+  });
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const [candidatesResponse, activeCycle, adminApplicationsResponse, eventsData, reviewTeamsData, existingDecisionsData] = await Promise.all([
+          stagingAPI.fetchCandidates(),
+          stagingAPI.fetchActiveCycle(),
+          stagingAPI.fetchAdminApplications(),
+          stagingAPI.fetchEventAttendance(),
+          stagingAPI.fetchReviewTeams(),
+          stagingAPI.loadExistingDecisions()
+        ]);
+        
+        // Handle paginated responses
+        const candidatesData = candidatesResponse.candidates || candidatesResponse;
+        const adminApplicationsData = adminApplicationsResponse.applications || adminApplicationsResponse;
+        
+        setCandidates(candidatesData);
+        setCurrentCycle(activeCycle);
+        setAdminApplications(adminApplicationsData || []); // Store admin applications data
+        setEvents(eventsData || []); // Store events data
+        setReviewTeams(reviewTeamsData || []); // Store review teams data
+        
+        // Calculate demographics after initial data load
+        calculateDemographics(candidatesData, false);
+        
+        // Update pagination state based on total candidates count
+        setPagination(prev => ({
+          ...prev,
+          total: candidatesData.length,
+          totalPages: Math.ceil(candidatesData.length / prev.limit),
+          hasNextPage: prev.page < Math.ceil(candidatesData.length / prev.limit),
+          hasPrevPage: prev.page > 1
+        }));
+
+        // Load existing decisions from database
+        if (existingDecisionsData && existingDecisionsData.decisions) {
+          setInlineDecisions(existingDecisionsData.decisions);
+        }
+
+        // Build grading completion map by candidateId
+        const gradingMap = {};
+        (adminApplicationsData || []).forEach(app => {
+          // Check which documents the candidate has
+          const hasResume = Boolean(app.resumeUrl);
+          const hasCoverLetter = Boolean(app.coverLetterUrl);
+          const hasVideo = Boolean(app.videoUrl);
+          
+          // Check which documents have been scored
+          const hasResumeScore = Boolean(app.hasResumeScore);
+          const hasCoverLetterScore = Boolean(app.hasCoverLetterScore);
+          const hasVideoScore = Boolean(app.hasVideoScore);
+          
+          // Grading is complete if all available documents have scores
+          let gradingComplete = true;
+          
+          if (hasResume && !hasResumeScore) gradingComplete = false;
+          if (hasCoverLetter && !hasCoverLetterScore) gradingComplete = false;
+          if (hasVideo && !hasVideoScore) gradingComplete = false;
+          
+          gradingMap[app.candidateId] = {
+            complete: gradingComplete,
+            hasResume,
+            hasCoverLetter,
+            hasVideo,
+            hasResumeScore,
+            hasCoverLetterScore,
+            hasVideoScore
+          };
+        });
+        setGradingCompleteByCandidate(gradingMap);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        setSnackbar({
+          open: true,
+          message: 'Error loading data',
+          severity: 'error'
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  // Fetch evaluation summaries when coffee chat tab is active
+  useEffect(() => {
+    if (currentTab === 1 && adminApplications.length > 0) {
+      const coffeeChatApps = adminApplications.filter(app => String(app.currentRound) === '2');
+      if (coffeeChatApps.length > 0) {
+        fetchCoffeeChatEvaluations(coffeeChatApps);
+      }
+    }
+  }, [currentTab, adminApplications]);
+
+  // Fetch coffee chat interviews when coffee chat tab is active
+  useEffect(() => {
+    if (currentTab === 1) {
+      fetchCoffeeChatInterviews();
+    }
+  }, [currentTab]);
+
+  // Fetch first round interviews when first round tab is active
+  useEffect(() => {
+    if (currentTab === 2) {
+      fetchFirstRoundInterviews();
+    }
+  }, [currentTab]);
+
+  // Recalculate demographics when tab changes
+  useEffect(() => {
+    if (currentTab === 0) {
+      // Resume Review tab - use all candidates
+      if (candidates && candidates.length > 0) {
+        calculateDemographics(candidates, false);
+      }
+    } else if (currentTab === 1) {
+      // Coffee Chat tab - use coffee chat applications
+      if (adminApplications && adminApplications.length > 0) {
+        const coffeeChatApps = adminApplications.filter(app => String(app.currentRound) === '2');
+        calculateDemographics(coffeeChatApps, true);
+      }
+    } else if (currentTab === 2) {
+      // First Round tab - use first round applications
+      if (adminApplications && adminApplications.length > 0) {
+        const firstRoundApps = adminApplications.filter(app => String(app.currentRound) === '3');
+        calculateDemographics(firstRoundApps, true);
+      }
+    } else if (currentTab === 3) {
+      // Final Round tab - use final round applications
+      if (adminApplications && adminApplications.length > 0) {
+        const finalRoundApps = adminApplications.filter(app => String(app.currentRound) === '4' && app.candidate);
+        calculateDemographics(finalRoundApps, true);
+      }
+    }
+  }, [currentTab, candidates, adminApplications, inlineDecisions]);
+
+  // Fetch evaluation summaries when first round tab is active
+  useEffect(() => {
+    if (currentTab === 2 && adminApplications.length > 0) {
+      const firstRoundApps = (adminApplications || []).filter(app => String(app.currentRound) === '3');
+      if (firstRoundApps.length > 0) {
+        fetchFirstRoundEvaluations(firstRoundApps);
+      }
+    }
+  }, [currentTab, adminApplications]);
+
+  const fetchCandidates = async () => {
+    try {
+      const [candidatesResponse, adminApplicationsResponse, eventsData, reviewTeamsData, existingDecisionsData] = await Promise.all([
+        stagingAPI.fetchCandidates(),
+        stagingAPI.fetchAdminApplications(),
+        stagingAPI.fetchEventAttendance(),
+        stagingAPI.fetchReviewTeams(),
+        stagingAPI.loadExistingDecisions()
+      ]);
+      
+      // Handle paginated responses
+      const candidatesData = candidatesResponse.candidates || candidatesResponse;
+      const adminApplicationsData = adminApplicationsResponse.applications || adminApplicationsResponse;
+      
+      setCandidates(candidatesData);
+      setAdminApplications(adminApplicationsData || []); // Update admin applications data
+      setEvents(eventsData || []); // Update events data
+      setReviewTeams(reviewTeamsData || []); // Update review teams data
+      
+      // Calculate demographics after data is loaded
+      calculateDemographics(candidatesData, false);
+      
+      // Update pagination state based on total candidates count
+      setPagination(prev => ({
+        ...prev,
+        total: candidatesData.length,
+        totalPages: Math.ceil(candidatesData.length / prev.limit),
+        hasNextPage: prev.page < Math.ceil(candidatesData.length / prev.limit),
+        hasPrevPage: prev.page > 1
+      }));
+      
+      // Update inline decisions with fresh data from database
+      if (existingDecisionsData && existingDecisionsData.decisions) {
+        setInlineDecisions(existingDecisionsData.decisions);
+      }
+      
+      const gradingMap = {};
+      (adminApplicationsData || []).forEach(app => {
+        // Check which documents the candidate has
+        const hasResume = Boolean(app.resumeUrl);
+        const hasCoverLetter = Boolean(app.coverLetterUrl);
+        const hasVideo = Boolean(app.videoUrl);
+        
+        // Check which documents have been scored
+        const hasResumeScore = Boolean(app.hasResumeScore);
+        const hasCoverLetterScore = Boolean(app.hasCoverLetterScore);
+        const hasVideoScore = Boolean(app.hasVideoScore);
+        
+        // Grading is complete if all available documents have scores
+        let gradingComplete = true;
+        
+        if (hasResume && !hasResumeScore) gradingComplete = false;
+        if (hasCoverLetter && !hasCoverLetterScore) gradingComplete = false;
+        if (hasVideo && !hasVideoScore) gradingComplete = false;
+        
+        gradingMap[app.candidateId] = {
+          complete: gradingComplete,
+          hasResume,
+          hasCoverLetter,
+          hasVideo,
+          hasResumeScore,
+          hasCoverLetterScore,
+          hasVideoScore
+        };
+      });
+      setGradingCompleteByCandidate(gradingMap);
+    } catch (error) {
+      console.error('Error fetching candidates:', error);
+      setSnackbar({
+        open: true,
+        message: 'Error loading candidates',
+        severity: 'error'
+      });
+    }
+  };
+
+  // Function to calculate ranking score based on evaluation decisions
+  const calculateRankingScore = (evaluations) => {
+    if (!evaluations || evaluations.length === 0) return 0;
+    
+    // Scoring system: YES=4, MAYBE_YES=3, UNSURE=2, MAYBE_NO=1, NO=0
+    const decisionScores = {
+      'YES': 4,
+      'MAYBE_YES': 3,
+      'UNSURE': 2,
+      'MAYBE_NO': 1,
+      'NO': 0
+    };
+    
+    // Filter out evaluations without decisions (null, undefined, or empty string)
+    const evaluationsWithDecisions = evaluations.filter(evaluation => 
+      evaluation.decision && 
+      evaluation.decision.trim() !== '' && 
+      decisionScores.hasOwnProperty(evaluation.decision)
+    );
+    
+    // If no evaluations have decisions, return 0
+    if (evaluationsWithDecisions.length === 0) return 0;
+    
+    const totalScore = evaluationsWithDecisions.reduce((sum, evaluation) => {
+      return sum + decisionScores[evaluation.decision];
+    }, 0);
+    
+    return totalScore / evaluationsWithDecisions.length; // Average score of only evaluations with decisions
+  };
+
+  // Function to calculate First Round ranking score based on behavioral and market sizing scores
+  const calculateFirstRoundRankingScore = (evaluations) => {
+    if (!evaluations || evaluations.length === 0) return 0;
+    
+    // Filter evaluations that have behavioral and market sizing scores
+    const evaluationsWithScores = evaluations.filter(evaluation => 
+      evaluation.behavioralTotal !== null && 
+      evaluation.behavioralTotal !== undefined &&
+      evaluation.marketSizingTotal !== null && 
+      evaluation.marketSizingTotal !== undefined
+    );
+    
+    // If no evaluations have scores, fall back to decision-based scoring
+    if (evaluationsWithScores.length === 0) {
+      return calculateRankingScore(evaluations);
+    }
+    
+    // Calculate average behavioral and market sizing scores
+    const totalBehavioral = evaluationsWithScores.reduce((sum, evaluation) => {
+      return sum + (evaluation.behavioralTotal || 0);
+    }, 0);
+    
+    const totalMarketSizing = evaluationsWithScores.reduce((sum, evaluation) => {
+      return sum + (evaluation.marketSizingTotal || 0);
+    }, 0);
+    
+    const avgBehavioral = totalBehavioral / evaluationsWithScores.length;
+    const avgMarketSizing = totalMarketSizing / evaluationsWithScores.length;
+    
+    // Combine behavioral and market sizing scores (each out of 15, so total out of 30)
+    // Convert to a 0-10 scale for consistency with other ranking systems
+    const combinedScore = ((avgBehavioral + avgMarketSizing) / 30) * 10;
+    
+    return combinedScore;
+  };
+
+  // Function to fetch coffee chat interviews from server
+  const fetchCoffeeChatInterviews = async () => {
+    try {
+      const interviews = await apiClient.get('/admin/interviews');
+      const coffeeChatInterviews = interviews.filter(interview => 
+        interview.interviewType === 'COFFEE_CHAT'
+      );
+      setCoffeeChatInterviews(coffeeChatInterviews);
+    } catch (error) {
+      console.error('Error fetching coffee chat interviews:', error);
+      setCoffeeChatInterviews([]);
+    }
+  };
+
+  // Function to fetch first round interviews from server
+  const fetchFirstRoundInterviews = async () => {
+    try {
+      const interviews = await apiClient.get('/admin/interviews');
+      const firstRoundInterviews = interviews.filter(interview => 
+        interview.interviewType === 'ROUND_ONE'
+      );
+      setFirstRoundInterviews(firstRoundInterviews);
+    } catch (error) {
+      console.error('Error fetching first round interviews:', error);
+      setFirstRoundInterviews([]);
+    }
+  };
+
+  // Function to get applications assigned to a specific interview
+  const getApplicationsForInterview = (interviewId) => {
+    const interview = coffeeChatInterviews.find(i => i.id === interviewId);
+    if (!interview) return [];
+
+    // Parse interview configuration to get application groups
+    let config = {};
+    try {
+      config = typeof interview.description === 'string' 
+        ? JSON.parse(interview.description) 
+        : interview.description || {};
+    } catch (e) {
+      console.warn('Failed to parse interview description:', e);
+      return [];
+    }
+
+    // Get all application IDs from the interview's application groups
+    const applicationIds = new Set();
+    config.applicationGroups?.forEach(group => {
+      group.applicationIds?.forEach(appId => applicationIds.add(appId));
+    });
+
+    // Filter admin applications to only include those assigned to this interview
+    return adminApplications.filter(app => applicationIds.has(app.id));
+  };
+
+  // Function to get applications assigned to a specific first round interview
+  const getApplicationsForFirstRoundInterview = (interviewId) => {
+    const interview = firstRoundInterviews.find(i => i.id === interviewId);
+    if (!interview) return [];
+
+    // Parse interview configuration to get application groups
+    let config = {};
+    try {
+      config = typeof interview.description === 'string' 
+        ? JSON.parse(interview.description) 
+        : interview.description || {};
+    } catch (e) {
+      console.warn('Failed to parse interview description:', e);
+      return [];
+    }
+
+    // Get all application IDs from the interview's application groups
+    const applicationIds = new Set();
+    config.applicationGroups?.forEach(group => {
+      group.applicationIds?.forEach(appId => applicationIds.add(appId));
+    });
+
+    // Filter admin applications to only include those assigned to this interview
+    return adminApplications.filter(app => applicationIds.has(app.id));
+  };
+
+  // Function to fetch evaluation summaries for coffee chat applications
+  const fetchCoffeeChatEvaluations = async (applications) => {
+    try {
+      const applicationIds = applications.map(app => app.id);
+      const summaries = await stagingAPI.fetchEvaluationSummaries(applicationIds);
+
+      // Only include evaluations from Coffee Chat interviews
+      const filteredSummaries = {};
+      Object.entries(summaries || {}).forEach(([appId, summary]) => {
+        const onlyCoffeeChat = (summary?.evaluations || []).filter(e => e?.interview?.interviewType === 'COFFEE_CHAT');
+        filteredSummaries[appId] = { evaluations: onlyCoffeeChat };
+      });
+
+      setEvaluationSummaries(filteredSummaries);
+    } catch (error) {
+      console.error('Error fetching evaluation summaries:', error);
+    }
+  };
+
+  // Function to fetch evaluation summaries for first round applications
+  const fetchFirstRoundEvaluations = async (applications) => {
+    try {
+      const applicationIds = applications.map(app => app.id);
+      const summaries = await stagingAPI.fetchEvaluationSummaries(applicationIds);
+
+      // Only include evaluations from First Round interviews
+      const filteredSummaries = {};
+      Object.entries(summaries || {}).forEach(([appId, summary]) => {
+        const onlyFirstRound = (summary?.evaluations || []).filter(e => e?.interview?.interviewType === 'ROUND_ONE');
+        filteredSummaries[appId] = { evaluations: onlyFirstRound };
+      });
+
+      setEvaluationSummariesFirstRound(filteredSummaries);
+    } catch (error) {
+      console.error('Error fetching first round evaluation summaries:', error);
+    }
+  };
+
+  const handleDecisionSubmit = async () => {
+    try {
+      await stagingAPI.updateCandidateStatus(
+        currentDecision.candidateId,
+        currentDecision.decision,
+        currentDecision.notes
+      );
+      
+      setDecisionDialogOpen(false);
+      setCurrentDecision({ candidateId: null, decision: '', notes: '', round: null });
+      await fetchCandidates();
+      
+      setSnackbar({
+        open: true,
+        message: 'Decision submitted successfully',
+        severity: 'success'
+      });
+    } catch (error) {
+      console.error('Error submitting decision:', error);
+      setSnackbar({
+        open: true,
+        message: 'Error submitting decision',
+        severity: 'error'
+      });
+    }
+  };
+
+  const handleFinalDecisionSubmit = async () => {
+    try {
+      await stagingAPI.submitFinalDecision(
+        finalDecision.candidateId,
+        finalDecision.decision,
+        finalDecision.feedback
+      );
+      
+      setFinalDecisionDialogOpen(false);
+      setFinalDecision({ candidateId: null, decision: '', feedback: '' });
+      await fetchCandidates();
+      
+      setSnackbar({
+        open: true,
+        message: 'Final decision submitted successfully',
+        severity: 'success'
+      });
+    } catch (error) {
+      console.error('Error submitting final decision:', error);
+      setSnackbar({
+        open: true,
+        message: 'Error submitting final decision',
+        severity: 'error'
+      });
+    }
+  };
+
+  const openDecisionDialog = (candidate, round) => {
+    setCurrentDecision({
+      candidateId: candidate.id,
+      decision: '',
+      notes: '',
+      round
+    });
+    setSelectedCandidate(candidate);
+    setDecisionDialogOpen(true);
+  };
+
+  const openFinalDecisionDialog = (candidate) => {
+    setFinalDecision({
+      candidateId: candidate.id,
+      decision: '',
+      feedback: ''
+    });
+    setSelectedCandidate(candidate);
+    setFinalDecisionDialogOpen(true);
+  };
+
+  const calculateDemographics = (data, isApplicationData = false) => {
+    // Initialize with specific categories
+    const graduationYearBreakdown = {
+      '2026': { total: 0, yes: 0, no: 0, maybe: 0, pending: 0 },
+      '2027': { total: 0, yes: 0, no: 0, maybe: 0, pending: 0 },
+      '2028': { total: 0, yes: 0, no: 0, maybe: 0, pending: 0 },
+      '2029': { total: 0, yes: 0, no: 0, maybe: 0, pending: 0 }
+    };
+    
+    const genderBreakdown = {
+      'Male': { total: 0, yes: 0, no: 0, maybe: 0, pending: 0 },
+      'Female': { total: 0, yes: 0, no: 0, maybe: 0, pending: 0 },
+      'Other': { total: 0, yes: 0, no: 0, maybe: 0, pending: 0 }
+    };
+    
+    data.forEach((item, index) => {
+      // For application data, we need to access the candidate info differently
+      const candidate = isApplicationData ? item.candidate : item;
+      
+      // Skip if candidate is undefined or null (only for candidate data, not application data)
+      if (!isApplicationData && !candidate) {
+        console.warn('Skipping item with undefined candidate:', item);
+        return;
+      }
+      
+      // For application data, use the application's own graduationYear and gender fields
+      // For candidate data, use the candidate's fields
+      let year, gender;
+      if (isApplicationData) {
+        year = item.year || item.graduationYear; // Application data has 'year' field
+        gender = item.gender;
+      } else {
+        year = candidate.graduationYear;
+        gender = candidate.gender;
+      }
+      
+      // Graduation year breakdown - map to specific years
+      if (!year || !['2026', '2027', '2028', '2029'].includes(year)) {
+        year = '2026'; // Default to 2026 if not in our list
+      }
+      
+      graduationYearBreakdown[year].total++;
+      
+      // Get decision for this candidate
+      let decision = '';
+      if (isApplicationData) {
+        // For applications, check both inline decisions and database decisions
+        decision = inlineDecisions[item.id] || (item.approved === true ? 'yes' : item.approved === false ? 'no' : '');
+      } else {
+        // For candidates, use inline decisions
+        decision = inlineDecisions[candidate.id] || '';
+      }
+      
+      if (decision === 'yes') {
+        graduationYearBreakdown[year].yes++;
+      } else if (decision === 'no') {
+        graduationYearBreakdown[year].no++;
+      } else if (decision === 'maybe_yes' || decision === 'maybe_no') {
+        graduationYearBreakdown[year].maybe++;
+      } else {
+        graduationYearBreakdown[year].pending++;
+      }
+      
+      // Gender breakdown - normalize to our categories
+      if (!gender) {
+        gender = 'Other';
+      } else if (gender.toLowerCase() === 'male' || gender.toLowerCase() === 'm') {
+        gender = 'Male';
+      } else if (gender.toLowerCase() === 'female' || gender.toLowerCase() === 'f') {
+        gender = 'Female';
+      } else {
+        gender = 'Other';
+      }
+      
+      genderBreakdown[gender].total++;
+      
+      if (decision === 'yes') {
+        genderBreakdown[gender].yes++;
+      } else if (decision === 'no') {
+        genderBreakdown[gender].no++;
+      } else if (decision === 'maybe_yes' || decision === 'maybe_no') {
+        genderBreakdown[gender].maybe++;
+      } else {
+        genderBreakdown[gender].pending++;
+      }
+    });
+    
+    setDemographics({ graduationYear: graduationYearBreakdown, gender: genderBreakdown });
+  };
+
+  const handleInlineDecisionChange = async (item, value, phase = 'resume') => {
+    try {
+      console.log('Saving decision:', { itemId: item.id, value, phase });
+      
+      // Save decision to database immediately
+      // Note: item.id is the application ID (works for both candidates and applications)
+      const response = await stagingAPI.saveDecision(item.id, value, phase);
+      console.log('Decision save response:', response);
+
+      // Update local UI selection
+      setInlineDecisions(prev => ({ ...prev, [item.id]: value }));
+
+      // Show success message
+      setSnackbar({ open: true, message: 'Decision saved successfully', severity: 'success' });
+      
+      // Refresh data to show updated state
+      await fetchCandidates();
+    } catch (error) {
+      console.error('Error saving inline decision:', error);
+      console.error('Error details:', error.response?.data || error.message);
+      setSnackbar({ open: true, message: 'Failed to save decision', severity: 'error' });
+      
+      // Revert the UI change if save failed
+      setInlineDecisions(prev => ({ ...prev, [item.id]: prev[item.id] || '' }));
+    }
+  };
+
+  const openPushAll = async () => {
+    try {
+      const adminCandidates = await stagingAPI.fetchAdminCandidates();
+      const eligibleStatuses = ['SUBMITTED', 'UNDER_REVIEW', 'WAITLISTED'];
+      const totalApproved = adminCandidates.filter(c => c.approved === true && eligibleStatuses.includes(c.status)).length;
+      
+      // Check for applications with invalid decisions (not "yes" or "no") or no decisions
+      const invalidDecisions = adminCandidates.filter(c => {
+        // Check if candidate has a decision that's not "yes" or "no", or no decision at all
+        const decision = c.approved; // Use the approved field from the database
+        return decision === null || (decision !== true && decision !== false);
+      });
+      
+      setPushAllPreview({ 
+        totalApproved,
+        invalidDecisions: invalidDecisions.length,
+        invalidDecisionCandidates: invalidDecisions
+      });
+    } catch (e) {
+      console.error('Error preparing push-all preview:', e);
+      setPushAllPreview({ totalApproved: 0, invalidDecisions: 0, invalidDecisionCandidates: [] });
+    }
+    setPushAllConfirmText('');
+    setPushAllAcknowledge(false);
+    setPushAllDialogOpen(true);
+  };
+
+  const openPushAllCoffee = async () => {
+    try {
+      const adminCandidates = await stagingAPI.fetchAdminCandidates();
+      // Consider only applications in Coffee Chat round (currentRound === '2')
+      const coffeeCandidates = adminCandidates.filter(c => String(c.currentRound) === '2');
+
+      const invalidDecisions = coffeeCandidates.filter(c => {
+        // Only count as valid if in phase 2 AND decision is yes/no
+        const decision = c.approved;
+        return decision === null || (decision !== true && decision !== false);
+      });
+
+      setPushAllPreview({
+        totalApproved: coffeeCandidates.length,
+        invalidDecisions: invalidDecisions.length,
+        invalidDecisionCandidates: invalidDecisions
+      });
+    } catch (e) {
+      console.error('Error preparing coffee chat push-all preview:', e);
+      setPushAllPreview({ totalApproved: 0, invalidDecisions: 0, invalidDecisionCandidates: [] });
+    }
+    setPushAllConfirmText('');
+    setPushAllAcknowledge(false);
+    setPushAllDialogOpen(true);
+  };
+
+  const openPushAllFirstRound = async () => {
+    try {
+      const firstRoundApps = (adminApplications || []).filter(app => String(app.currentRound) === '3');
+      
+      const invalidDecisions = firstRoundApps.filter(app => {
+        const decision = app.approved;
+        return decision === null || (decision !== true && decision !== false);
+      });
+
+      setPushAllPreview({
+        totalCandidates: firstRoundApps.length,
+        validDecisions: firstRoundApps.length - invalidDecisions.length,
+        invalidDecisions: invalidDecisions.length,
+        invalidCandidates: invalidDecisions.map(app => ({
+          name: `${app.firstName} ${app.lastName}`,
+          issue: app.approved === null ? 'No decision' : 'Unclear decision'
+        }))
+      });
+
+      setPushAllConfirmText('');
+      setPushAllAcknowledge(false);
+      setPushAllDialogOpen(true);
+    } catch (error) {
+      console.error('Error preparing first round push all:', error);
+      setSnackbar({ open: true, message: 'Failed to prepare first round processing', severity: 'error' });
+    }
+  };
+
+  const openPushAllFinal = async () => {
+    try {
+      const adminCandidates = await stagingAPI.fetchAdminCandidates();
+      // Consider only applications in Final Round (currentRound = '4')
+      const finalCandidates = adminCandidates.filter(c => String(c.currentRound) === '4');
+
+      const invalidDecisions = finalCandidates.filter(c => {
+        // Only count as valid if in final round AND decision is yes/no
+        const decision = c.approved;
+        return decision === null || (decision !== true && decision !== false);
+      });
+
+      setPushAllPreview({
+        totalApproved: finalCandidates.length,
+        invalidDecisions: invalidDecisions.length,
+        invalidDecisionCandidates: invalidDecisions
+      });
+    } catch (e) {
+      console.error('Error preparing final round push-all preview:', e);
+      setPushAllPreview({ totalApproved: 0, invalidDecisions: 0, invalidDecisionCandidates: [] });
+    }
+    setPushAllConfirmText('');
+    setPushAllAcknowledge(false);
+    setPushAllDialogOpen(true);
+  };
+
+  const confirmPushAll = async () => {
+    try {
+      setPushAllLoading(true);
+      
+      // Determine which tab is active to choose processing route
+      let result;
+      if (currentTab === 1) {
+        result = await stagingAPI.processCoffeeDecisions();
+      } else if (currentTab === 2) {
+        result = await stagingAPI.processFirstRoundDecisions();
+      } else if (currentTab === 3) {
+        result = await stagingAPI.processFinalDecisions();
+      } else {
+        result = await stagingAPI.processDecisions();
+      }
+      
+      setPushAllDialogOpen(false);
+      
+      // Show success message with results
+      const { summary } = result;
+      if (summary) {
+        const emailMessage = currentTab === 0 ? 'No emails sent (resume review round)' : 
+                           currentTab === 1 ? 'No emails sent (coffee chat round)' :
+                           currentTab === 2 ? 'No emails sent (first round)' :
+                           `${summary.emailsSent} emails sent`;
+        setSnackbar({ 
+          open: true, 
+          message: `Successfully processed ${summary.totalApplications} candidates: ${summary.accepted} accepted, ${summary.rejected} rejected. ${emailMessage}.`, 
+          severity: 'success' 
+        });
+      } else {
+        setSnackbar({ open: true, message: 'Processed decisions.', severity: 'success' });
+      }
+      
+      // Refresh candidates data
+      await fetchCandidates();
+      
+    } catch (e) {
+      console.error('Error processing decisions:', e);
+      setSnackbar({ open: true, message: 'Failed to process decisions', severity: 'error' });
+    } finally {
+      setPushAllLoading(false);
+    }
+  };
+
+  const fixInvalidDecision = async (candidateId, newDecision) => {
+    try {
+      // Update the decision
+      // Note: candidateId is actually the application ID from the staging candidates endpoint
+      await stagingAPI.saveDecision(candidateId, newDecision, 'resume');
+      
+      // Update the preview to reflect the change
+      setPushAllPreview(prev => ({
+        ...prev,
+        invalidDecisions: prev.invalidDecisions - 1,
+        invalidDecisionCandidates: prev.invalidDecisionCandidates.filter(c => c.id !== candidateId)
+      }));
+      
+      // Refresh candidates to get updated data
+      await fetchCandidates();
+      
+      setSnackbar({ open: true, message: 'Decision updated successfully', severity: 'success' });
+    } catch (error) {
+      console.error('Error fixing invalid decision:', error);
+      setSnackbar({ open: true, message: 'Failed to update decision', severity: 'error' });
+    }
+  };
+
+  const handleExportDecisions = () => {
+    // Use adminApplications as the data source since it contains the actual candidate data
+    const dataSource = adminApplications || [];
+    
+    if (dataSource.length === 0) {
+      setSnackbar({ 
+        open: true, 
+        message: 'No candidate data available to export', 
+        severity: 'warning' 
+      });
+      return;
+    }
+    
+    // Filter by current round based on active tab
+    let roundFilteredData = dataSource;
+    let roundName = 'all rounds';
+    
+    if (currentTab === 0) {
+      // Resume Review tab - filter for currentRound === '1'
+      roundFilteredData = dataSource.filter(app => String(app.currentRound) === '1');
+      roundName = 'Resume Review';
+    } else if (currentTab === 1) {
+      // Coffee Chat tab - filter for currentRound === '2'
+      roundFilteredData = dataSource.filter(app => String(app.currentRound) === '2');
+      roundName = 'Coffee Chat';
+    } else if (currentTab === 2) {
+      // First Round tab - filter for currentRound === '3'
+      roundFilteredData = dataSource.filter(app => String(app.currentRound) === '3');
+      roundName = 'First Round';
+    } else if (currentTab === 3) {
+      // Final Round tab - filter for currentRound === '4'
+      roundFilteredData = dataSource.filter(app => String(app.currentRound) === '4');
+      roundName = 'Final Round';
+    }
+    
+    if (roundFilteredData.length === 0) {
+      setSnackbar({ 
+        open: true, 
+        message: `No candidates found in ${roundName} round`, 
+        severity: 'warning' 
+      });
+      return;
+    }
+    
+    // Create a dialog to let user choose export options
+    const exportDialog = window.confirm(
+      `Export ${roundName} Round Decisions:\n\n` +
+      'OK = Export candidates with decisions (Yes/No)\n' +
+      'Cancel = Export all candidates regardless of decision status'
+    );
+    
+    let candidatesToExport = roundFilteredData;
+    
+    if (exportDialog) {
+      // Export only candidates with Yes/No decisions
+      candidatesToExport = roundFilteredData.filter(app => 
+        app.approved === true || app.approved === false
+      );
+    }
+    
+    // Create CSV content
+    const csvHeaders = ['Name', 'Email', 'Student ID', 'Decision'];
+    const csvRows = candidatesToExport.map(app => {
+      const name = app.name || `${app.firstName || ''} ${app.lastName || ''}`.trim();
+      
+      // Try different possible email field names
+      const email = app.email || app.applicationEmail || app.candidateEmail || '';
+      const studentId = app.studentId || '';
+      const decision = app.approved === true ? 'Yes' : 
+                     app.approved === false ? 'No' : 'Pending';
+      
+      // Debug: Log the first few entries to see what data we're getting
+      if (candidatesToExport.indexOf(app) < 3) {
+        console.log('Export data for app:', {
+          name,
+          email,
+          studentId,
+          decision,
+          availableFields: Object.keys(app),
+          emailField: app.email,
+          applicationEmail: app.applicationEmail,
+          candidateEmail: app.candidateEmail,
+          fullApp: app
+        });
+      }
+      
+      return [name, email, studentId, decision];
+    });
+    
+    // Combine headers and rows
+    const csvContent = [csvHeaders, ...csvRows]
+      .map(row => row.map(field => `"${field}"`).join(','))
+      .join('\n');
+    
+    // Create and download file
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `${roundName.toLowerCase().replace(' ', '_')}_decisions_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    setSnackbar({ 
+      open: true, 
+      message: `Exported ${candidatesToExport.length} ${roundName} candidates to CSV`, 
+      severity: 'success' 
+    });
+  };
+
+  const filteredCandidates = candidates.filter(candidate => {
+    const matchesStatus = filters.status === 'all' || candidate.status === filters.status;
+    const matchesRound = filters.round === 'all' || parseInt(candidate.currentRound) === parseInt(filters.round);
+    const matchesDecision = filters.decision === 'all' || 
+      (filters.decision === 'pending' && !candidate.decisions[`round${candidate.currentRound}`]) ||
+      (filters.decision !== 'pending' && candidate.decisions[`round${candidate.currentRound}`] === filters.decision);
+    
+    // Attendance filtering
+    let matchesAttendance = true;
+    if (filters.attendance !== 'all' && events.length > 0) {
+      const totalEvents = events.length;
+      const attendedEvents = events.filter(event => {
+        const eventName = event.eventName || event.name || event.id;
+        if (!candidate.attendance || !eventName) return false;
+        
+        // Try direct key access with eventName
+        if (candidate.attendance[eventName] !== undefined) {
+          return Boolean(candidate.attendance[eventName]);
+        }
+        
+        // Try to find any key that might match
+        const attendanceKeys = Object.keys(candidate.attendance);
+        const matchingKey = attendanceKeys.find(key => 
+          key.toLowerCase() === eventName.toLowerCase() ||
+          key.toLowerCase().includes(eventName.toLowerCase()) || 
+          eventName.toLowerCase().includes(key.toLowerCase())
+        );
+        return matchingKey !== undefined ? Boolean(candidate.attendance[matchingKey]) : false;
+      }).length;
+      const attendancePercentage = totalEvents > 0 ? Math.round((attendedEvents / totalEvents) * 100) : 0;
+      
+      switch (filters.attendance) {
+        case 'high':
+          matchesAttendance = attendancePercentage >= 80;
+          break;
+        case 'medium':
+          matchesAttendance = attendancePercentage >= 60 && attendancePercentage < 80;
+          break;
+        case 'low':
+          matchesAttendance = attendancePercentage >= 40 && attendancePercentage < 60;
+          break;
+        case 'very_low':
+          matchesAttendance = attendancePercentage < 40;
+          break;
+        case 'none':
+          matchesAttendance = attendedEvents === 0;
+          break;
+        default:
+          matchesAttendance = true;
+      }
+    }
+    
+    // Review team filtering
+    let matchesReviewTeam = true;
+    if (filters.reviewTeam !== 'all') {
+      if (filters.reviewTeam === 'unassigned') {
+        matchesReviewTeam = !candidate.reviewTeam;
+      } else {
+        matchesReviewTeam = candidate.reviewTeam && candidate.reviewTeam.id === filters.reviewTeam;
+      }
+    }
+    
+    // Referral filtering
+    let matchesReferral = true;
+    if (filters.referral !== 'all') {
+      if (filters.referral === 'yes') {
+        matchesReferral = candidate.hasReferral === true;
+      } else if (filters.referral === 'no') {
+        matchesReferral = candidate.hasReferral === false;
+      }
+    }
+    
+    const matchesSearch = filters.search === '' || 
+      `${candidate.firstName} ${candidate.lastName}`.toLowerCase().includes(filters.search.toLowerCase()) ||
+      candidate.email.toLowerCase().includes(filters.search.toLowerCase());
+
+    return matchesStatus && matchesRound && matchesDecision && matchesAttendance && matchesReviewTeam && matchesReferral && matchesSearch;
+  }).sort((a, b) => {
+    // Sort by overall score (highest to lowest)
+    return b.scores.overall - a.scores.overall;
+  });
+
+  // Apply client-side pagination to filtered results
+  const paginatedCandidates = filteredCandidates.slice(
+    (pagination.page - 1) * pagination.limit,
+    pagination.page * pagination.limit
+  );
+
+  if (loading) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  return (
+    <AccessControl allowedRoles={['ADMIN', 'MEMBER']}>
+      <ThemeProvider theme={globalTheme}>
+      <CssBaseline />
+      <Box className="staging-page">
+        {/* Header */}
+        <Box mb={3} display="flex" alignItems="center" justifyContent="space-between">
+          <Box>
+            <Typography variant="h4" gutterBottom sx={{ fontWeight: 700, color: '#042742' }}>
+              Candidate Staging
+            </Typography>
+            <Typography variant="body1" color="text.secondary">
+              Review candidates, track attendance, evaluate scores, and make decisions
+            </Typography>
+          </Box>
+          <Box display="flex" alignItems="center" gap={2}>
+            <Button
+              variant="outlined"
+              startIcon={<DownloadIcon />}
+              onClick={handleExportDecisions}
+              sx={{ 
+                borderColor: 'primary.main',
+                color: 'primary.main',
+                '&:hover': {
+                  borderColor: 'primary.dark',
+                  backgroundColor: 'primary.light',
+                  color: 'primary.dark'
+                }
+              }}
+            >
+              Export Decisions
+            </Button>
+            <Chip 
+              label={currentCycle ? `Current Cycle: ${currentCycle.name}` : 'No Active Cycle'}
+              color={currentCycle ? 'primary' : 'default'}
+            />
+          </Box>
         </Box>
-      ))}
-    </Box>
+
+        {/* Invalid Decisions Summary */}
+        {(() => {
+          // Check candidates from the database for decisions
+          const invalidDecisionsCount = candidates.filter(c => 
+            c.approved === null || (c.approved !== true && c.approved !== false)
+          ).length;
+          
+          
+          return null;
+        })()}
+
+
+        {/* Tabs */}
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            <Tabs value={currentTab} onChange={(e, v) => setCurrentTab(v)}>
+              <Tab label="Resume Review" />
+              <Tab label="Coffee Chats" />
+              <Tab label="First Round" />
+              <Tab label="Final Round" />
+            </Tabs>
+          </CardContent>
+        </Card>
+
+        {/* Demographics Section */}
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+              📊 Demographics Overview
+            </Typography>
+            
+            <Grid container spacing={3}>
+              {/* Graduation Year Breakdown */}
+              <Grid item xs={12} md={6}>
+                <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main', mb: 2 }}>
+                  By Graduation Year
+                </Typography>
+                <Stack spacing={2}>
+                  {['2026', '2027', '2028', '2029'].map((year) => {
+                    const stats = demographics.graduationYear[year] || { total: 0, yes: 0, no: 0, maybe: 0, pending: 0 };
+                    return (
+                      <Box key={year} sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1, bgcolor: 'background.paper' }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 2, color: 'text.primary' }}>
+                          Class of {year} ({stats.total} total)
+                        </Typography>
+                        <Grid container spacing={1}>
+                          <Grid item xs={3}>
+                            <Box sx={{ textAlign: 'center', p: 1.5, bgcolor: 'success.light', borderRadius: 1, border: '1px solid', borderColor: 'success.main' }}>
+                              <Typography variant="caption" display="block" sx={{ fontWeight: 'bold', color: 'success.dark' }}>Yes</Typography>
+                              <Typography variant="h6" sx={{ color: 'success.dark', fontWeight: 'bold' }}>{stats.yes}</Typography>
+                            </Box>
+                          </Grid>
+                          <Grid item xs={3}>
+                            <Box sx={{ textAlign: 'center', p: 1.5, bgcolor: 'error.light', borderRadius: 1, border: '1px solid', borderColor: 'error.main' }}>
+                              <Typography variant="caption" display="block" sx={{ fontWeight: 'bold', color: 'error.dark' }}>No</Typography>
+                              <Typography variant="h6" sx={{ color: 'error.dark', fontWeight: 'bold' }}>{stats.no}</Typography>
+                            </Box>
+                          </Grid>
+                          <Grid item xs={3}>
+                            <Box sx={{ textAlign: 'center', p: 1.5, bgcolor: 'warning.light', borderRadius: 1, border: '1px solid', borderColor: 'warning.main' }}>
+                              <Typography variant="caption" display="block" sx={{ fontWeight: 'bold', color: 'warning.dark' }}>Maybe</Typography>
+                              <Typography variant="h6" sx={{ color: 'warning.dark', fontWeight: 'bold' }}>{stats.maybe}</Typography>
+                            </Box>
+                          </Grid>
+                          <Grid item xs={3}>
+                            <Box sx={{ textAlign: 'center', p: 1.5, bgcolor: 'grey.100', borderRadius: 1, border: '1px solid', borderColor: 'grey.300' }}>
+                              <Typography variant="caption" display="block" sx={{ fontWeight: 'bold', color: 'grey.700' }}>Pending</Typography>
+                              <Typography variant="h6" sx={{ color: 'grey.700', fontWeight: 'bold' }}>{stats.pending}</Typography>
+                            </Box>
+                          </Grid>
+                        </Grid>
+                      </Box>
+                    );
+                  })}
+                </Stack>
+              </Grid>
+
+              {/* Gender Breakdown */}
+              <Grid item xs={12} md={6}>
+                <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main', mb: 2 }}>
+                  By Gender
+                </Typography>
+                <Stack spacing={2}>
+                  {['Male', 'Female', 'Other'].map((gender) => {
+                    const stats = demographics.gender[gender] || { total: 0, yes: 0, no: 0, maybe: 0, pending: 0 };
+                    return (
+                      <Box key={gender} sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1, bgcolor: 'background.paper' }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 2, color: 'text.primary' }}>
+                          {gender} ({stats.total} total)
+                        </Typography>
+                        <Grid container spacing={1}>
+                          <Grid item xs={3}>
+                            <Box sx={{ textAlign: 'center', p: 1.5, bgcolor: 'success.light', borderRadius: 1, border: '1px solid', borderColor: 'success.main' }}>
+                              <Typography variant="caption" display="block" sx={{ fontWeight: 'bold', color: 'success.dark' }}>Yes</Typography>
+                              <Typography variant="h6" sx={{ color: 'success.dark', fontWeight: 'bold' }}>{stats.yes}</Typography>
+                            </Box>
+                          </Grid>
+                          <Grid item xs={3}>
+                            <Box sx={{ textAlign: 'center', p: 1.5, bgcolor: 'error.light', borderRadius: 1, border: '1px solid', borderColor: 'error.main' }}>
+                              <Typography variant="caption" display="block" sx={{ fontWeight: 'bold', color: 'error.dark' }}>No</Typography>
+                              <Typography variant="h6" sx={{ color: 'error.dark', fontWeight: 'bold' }}>{stats.no}</Typography>
+                            </Box>
+                          </Grid>
+                          <Grid item xs={3}>
+                            <Box sx={{ textAlign: 'center', p: 1.5, bgcolor: 'warning.light', borderRadius: 1, border: '1px solid', borderColor: 'warning.main' }}>
+                              <Typography variant="caption" display="block" sx={{ fontWeight: 'bold', color: 'warning.dark' }}>Maybe</Typography>
+                              <Typography variant="h6" sx={{ color: 'warning.dark', fontWeight: 'bold' }}>{stats.maybe}</Typography>
+                            </Box>
+                          </Grid>
+                          <Grid item xs={3}>
+                            <Box sx={{ textAlign: 'center', p: 1.5, bgcolor: 'grey.100', borderRadius: 1, border: '1px solid', borderColor: 'grey.300' }}>
+                              <Typography variant="caption" display="block" sx={{ fontWeight: 'bold', color: 'grey.700' }}>Pending</Typography>
+                              <Typography variant="h6" sx={{ color: 'grey.700', fontWeight: 'bold' }}>{stats.pending}</Typography>
+                            </Box>
+                          </Grid>
+                        </Grid>
+                      </Box>
+                    );
+                  })}
+                </Stack>
+              </Grid>
+            </Grid>
+          </CardContent>
+        </Card>
+
+        {/* Filters */}
+        {currentTab === 0 && (
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            <Grid container spacing={2} alignItems="center">
+              <Grid item xs={12} md={3}>
+                <TextField
+                  fullWidth
+                  placeholder="Search candidates..."
+                  value={filters.search}
+                  onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+                  InputProps={{
+                    startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12} md={2}>
+                <FormControl fullWidth>
+                  <InputLabel>Status</InputLabel>
+                  <Select
+                    value={filters.status}
+                    onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+                    label="Status"
+                  >
+                    <MenuItem value="all">All Statuses</MenuItem>
+                    <MenuItem value="SUBMITTED">Submitted</MenuItem>
+                    <MenuItem value="UNDER_REVIEW">Under Review</MenuItem>
+                    <MenuItem value="ACCEPTED">Accepted</MenuItem>
+                    <MenuItem value="REJECTED">Rejected</MenuItem>
+                    <MenuItem value="WAITLISTED">Waitlisted</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} md={2}>
+                <FormControl fullWidth>
+                  <InputLabel>Round</InputLabel>
+                  <Select
+                    value={filters.round}
+                    onChange={(e) => setFilters({ ...filters, round: e.target.value })}
+                    label="Round"
+                  >
+                    <MenuItem value="all">All Rounds</MenuItem>
+                    <MenuItem value={1}>Resume Review</MenuItem>
+                    <MenuItem value={2}>Coffee Chats</MenuItem>
+                    <MenuItem value={3}>First Round Interviews</MenuItem>
+                    <MenuItem value={4}>Final Decision</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} md={2}>
+                <FormControl fullWidth>
+                  <InputLabel>Decision</InputLabel>
+                  <Select
+                    value={filters.decision}
+                    onChange={(e) => setFilters({ ...filters, decision: e.target.value })}
+                    label="Decision"
+                  >
+                    <MenuItem value="all">All Decisions</MenuItem>
+                    <MenuItem value="pending">Pending</MenuItem>
+                    <MenuItem value="ADVANCE">Advance</MenuItem>
+                    <MenuItem value="REJECT">Reject</MenuItem>
+                    <MenuItem value="WAITLIST">Waitlist</MenuItem>
+                    <MenuItem value="HOLD">Hold</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} md={2}>
+                <FormControl fullWidth>
+                  <InputLabel>Attendance</InputLabel>
+                  <Select
+                    value={filters.attendance}
+                    onChange={(e) => setFilters({ ...filters, attendance: e.target.value })}
+                    label="Attendance"
+                  >
+                    <MenuItem value="all">All Attendance</MenuItem>
+                    <MenuItem value="high">High (≥80%)</MenuItem>
+                    <MenuItem value="medium">Medium (60-79%)</MenuItem>
+                    <MenuItem value="low">Low (40-59%)</MenuItem>
+                    <MenuItem value="very_low">Very Low (&lt;40%)</MenuItem>
+                    <MenuItem value="none">No Events</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} md={2}>
+                <FormControl fullWidth>
+                  <InputLabel>Review Team</InputLabel>
+                  <Select
+                    value={filters.reviewTeam}
+                    onChange={(e) => setFilters({ ...filters, reviewTeam: e.target.value })}
+                    label="Review Team"
+                  >
+                    <MenuItem value="all">All Teams</MenuItem>
+                    <MenuItem value="unassigned">Unassigned</MenuItem>
+                    {reviewTeams.map((team) => (
+                      <MenuItem key={team.id} value={team.id}>
+                        {team.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} md={2}>
+                <FormControl fullWidth>
+                  <InputLabel>Referral</InputLabel>
+                  <Select
+                    value={filters.referral}
+                    onChange={(e) => setFilters({ ...filters, referral: e.target.value })}
+                    label="Referral"
+                  >
+                    <MenuItem value="all">All Referrals</MenuItem>
+                    <MenuItem value="yes">Has Referral</MenuItem>
+                    <MenuItem value="no">No Referral</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} md={1}>
+                <Stack direction="row" spacing={1}>
+                  <Button
+                    variant="outlined"
+                    startIcon={<RefreshIcon />}
+                    onClick={fetchCandidates}
+                  >
+                    Refresh
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    startIcon={<ClearIcon />}
+                    onClick={() => setFilters({
+                      status: 'all',
+                      round: 'all',
+                      decision: 'all',
+                      attendance: 'all',
+                      reviewTeam: 'all',
+                      referral: 'all',
+                      search: ''
+                    })}
+                  >
+                    Clear Filters
+                  </Button>
+                </Stack>
+              </Grid>
+            </Grid>
+          </CardContent>
+        </Card>
+        )}
+
+        {/* Resume Review: Applications for current cycle */}
+        {currentTab === 0 && (
+        <Card>
+          <CardContent>
+            <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
+              Resume Review — Applications ({filteredCandidates.length})
+            </Typography>
+            <Box mb={2} display="flex" justifyContent="space-between" alignItems="center">
+              <Typography variant="body2" color="text.secondary">
+                ⚠️ All candidates must have a "Yes" or "No" decision. "Yes" advances to Coffee Chats (no email), "No" marks as rejected (no email).
+              </Typography>
+              <Button variant="contained" color="primary" startIcon={<SkipNextIcon />} onClick={openPushAll}>
+                Process All Decisions
+                {(() => {
+                  const invalidCount = candidates.filter(c => 
+                    c.approved === null || (c.approved !== true && c.approved !== false)
+                  ).length;
+                  return invalidCount > 0 ? ` (${invalidCount} issues)` : '';
+                })()}
+              </Button>
+            </Box>
+            
+            <TableContainer sx={{ width: '100%' }}>
+              <Table sx={{ width: '100%', tableLayout: 'fixed' }}>
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={{ width: '8%' }}>Rank</TableCell>
+                    <TableCell sx={{ width: '12%' }}>Scores</TableCell>
+                    <TableCell sx={{ width: '18%' }}>Candidate</TableCell>
+                    <TableCell sx={{ width: '14%' }}>Grading Status</TableCell>
+                    <TableCell sx={{ width: '14%' }}>Review Team</TableCell>
+                    <TableCell sx={{ width: '10%' }}>Referral</TableCell>
+                    <TableCell sx={{ width: '12%' }}>Attendance</TableCell>
+                    <TableCell sx={{ width: '12%' }}>Decisions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {paginatedCandidates.map((candidate, index) => {
+                    // Calculate the correct rank based on current page and items per page
+                    const actualRank = ((pagination.page - 1) * pagination.limit) + index + 1;
+                    return (
+                    <TableRow key={candidate.id} hover sx={{ cursor: 'pointer' }} onClick={async () => {
+                      try {
+                        setAppModalLoading(true);
+                        setEvaluationsLoading(true);
+                        setScoresLoading(true);
+                        
+                        // Load application data, interview evaluations, and document scores in parallel
+                        const [appData, evaluationsData] = await Promise.all([
+                          apiClient.get(`/applications/${candidate.id}`),
+                          apiClient.get(`/admin/applications/${candidate.id}/interview-evaluations`)
+                        ]);
+                        
+                        setAppModal(appData);
+                        setTestForNote(appData.testFor || '');
+                        setInterviewEvaluations(evaluationsData);
+                        
+                        // Fetch document scores if candidateId is available
+                        if (appData.candidateId) {
+                          await Promise.all([
+                            fetchModalResumeScores(appData.candidateId, appData.cycleId),
+                            fetchModalCoverLetterScores(appData.candidateId, appData.cycleId),
+                            fetchModalVideoScores(appData.candidateId, appData.cycleId)
+                          ]);
+                        }
+                        
+                        setAppModalOpen(true);
+                      } catch (e) {
+                        console.error('Failed to load application', e);
+                        setSnackbar({ open: true, message: 'Failed to load application', severity: 'error' });
+                      } finally {
+                        setAppModalLoading(false);
+                        setEvaluationsLoading(false);
+                        setScoresLoading(false);
+                      }
+                    }}>
+                      <TableCell>
+                        <Typography 
+                          variant="h6" 
+                          fontWeight="bold" 
+                          color="primary"
+                          sx={{ 
+                            textAlign: 'center',
+                            minWidth: '50px'
+                          }}
+                        >
+                          #{actualRank}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Tooltip 
+                          title={
+                            <Box>
+                              <Typography variant="body2" fontWeight="bold" sx={{ mb: 0.5 }}>
+                                Score Breakdown:
+                              </Typography>
+                              <Typography variant="body2" display="block">
+                                Overall: {candidate.scores.overall}
+                              </Typography>
+                              <Typography variant="body2" display="block">
+                                Resume: {candidate.scores.resume}
+                              </Typography>
+                              <Typography variant="body2" display="block">
+                                Cover: {candidate.scores.coverLetter}
+                              </Typography>
+                              <Typography variant="body2" display="block">
+                                Video: {candidate.scores.video}
+                              </Typography>
+                            </Box>
+                          }
+                          arrow
+                          placement="top"
+                        >
+                          <Typography variant="body2" fontWeight="bold" sx={{ cursor: 'help' }}>
+                            {candidate.scores.overall}
+                          </Typography>
+                        </Tooltip>
+                      </TableCell>
+                      <TableCell>
+                        <Box>
+                          <Typography variant="subtitle2" fontWeight="bold">
+                            {candidate.firstName} {candidate.lastName}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {candidate.major} | {candidate.graduationYear}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {candidate.email}
+                          </Typography>
+                          <Stack direction="row" spacing={0.5} mt={0.5}>
+                            {candidate.isFirstGeneration && (
+                              <Chip label="First Gen" size="small" variant="outlined" />
+                            )}
+                            {candidate.isTransferStudent && (
+                              <Chip label="Transfer" size="small" variant="outlined" />
+                            )}
+                          </Stack>
+                        </Box>
+                      </TableCell>
+                      <TableCell>
+                        <GradingStatusDisplay candidate={candidate} gradingData={gradingCompleteByCandidate[candidate.candidateId]} />
+                      </TableCell>
+                      <TableCell>
+                        {candidate.reviewTeam ? (
+                          <Tooltip 
+                            title={
+                              <Box>
+                                <Typography variant="body2" fontWeight="bold" sx={{ mb: 0.5 }}>
+                                  Team Members:
+                                </Typography>
+                                {candidate.reviewTeam.members.map((member, index) => (
+                                  <Typography key={index} variant="body2" display="block">
+                                    {member.fullName}
+                                  </Typography>
+                                ))}
+                              </Box>
+                            }
+                            arrow
+                            placement="top"
+                          >
+                            <Typography variant="body2" fontWeight="bold" color="primary" sx={{ cursor: 'help' }}>
+                              {candidate.reviewTeam.name}
+                            </Typography>
+                          </Tooltip>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                            Unassigned
+                          </Typography>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {candidate.hasReferral ? (
+                          <Tooltip 
+                            title={
+                              <Box>
+                                <Typography variant="body2" fontWeight="bold" sx={{ mb: 0.5 }}>
+                                  Referral Details:
+                                </Typography>
+                                <Typography variant="body2" display="block">
+                                  Referrer: {candidate.referral.referrerName}
+                                </Typography>
+                                <Typography variant="body2" display="block">
+                                  Relationship: {candidate.referral.relationship}
+                                </Typography>
+                              </Box>
+                            }
+                            arrow
+                            placement="top"
+                          >
+                            <Typography variant="body2" fontWeight="bold" color="success.main" sx={{ cursor: 'help' }}>
+                              Yes
+                            </Typography>
+                          </Tooltip>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">
+                            No
+                          </Typography>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <AttendanceDisplay attendance={candidate.attendance} events={events} />
+                      </TableCell>
+                      <TableCell>
+                        <Box>
+                          <Typography variant="caption" display="block">
+                            Next Round: Coffee Chat
+                          </Typography>
+                          <FormControl size="small" fullWidth onClick={(e) => e.stopPropagation()}>
+                            <Select
+                              value={inlineDecisions[candidate.id] || ''}
+                              displayEmpty
+                              onChange={(e) => handleInlineDecisionChange(candidate, e.target.value, 'resume')}
+                              sx={() => {
+                                const sel = inlineDecisions[candidate.id] || '';
+                                const c = getDecisionHighlight(sel);
+                                return {
+                                  '& .MuiSelect-select': {
+                                    bgcolor: c.bg,
+                                    border: `1px solid`,
+                                    borderColor: c.border,
+                                    borderRadius: 1,
+                                  }
+                                };
+                              }}
+                              renderValue={(selected) => {
+                                if (!selected) return 'Select decision';
+                                const labels = {
+                                  yes: 'Yes',
+                                  maybe_yes: 'Maybe - Yes',
+                                  maybe_no: 'Maybe - No',
+                                  no: 'No'
+                                };
+                                return labels[selected];
+                              }}
+                            >
+                              <MenuItem value=""><em>Select decision</em></MenuItem>
+                              <MenuItem value="yes">Yes</MenuItem>
+                              <MenuItem value="maybe_yes">Maybe - Yes</MenuItem>
+                              <MenuItem value="maybe_no">Maybe - No</MenuItem>
+                              <MenuItem value="no">No</MenuItem>
+                            </Select>
+                          </FormControl>
+                          
+                          {/* Decision outcome indicator */}
+                          {candidate.approved === true && (
+                            <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <Alert severity="success" sx={{ py: 0, px: 1, fontSize: '0.7rem' }}>
+                                ✅ Will advance to Coffee Chats + acceptance email
+                              </Alert>
+                            </Box>
+                          )}
+                          
+                          {candidate.approved === false && (
+                            <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <Alert severity="error" sx={{ py: 0, px: 1, fontSize: '0.7rem' }}>
+                                ❌ Will receive rejection email
+                              </Alert>
+                            </Box>
+                          )}
+                          
+                          {/* Intermediate decision indicator */}
+                          {candidate.approved === null && inlineDecisions[candidate.id] && 
+                           (inlineDecisions[candidate.id] === 'maybe_yes' || inlineDecisions[candidate.id] === 'maybe_no') && (
+                            <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <Alert severity="info" sx={{ py: 0, px: 1, fontSize: '0.7rem' }}>
+                                ℹ️ Intermediate decision: {inlineDecisions[candidate.id] === 'maybe_yes' ? 'Maybe - Yes' : 'Maybe - No'} (needs final decision)
+                              </Alert>
+                            </Box>
+                          )}
+                        </Box>
+                      </TableCell>
+                      
+                    </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </TableContainer>
+            
+            {/* Pagination Controls */}
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2, px: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Typography variant="body2" color="text.secondary">
+                  Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, filteredCandidates.length)} of {filteredCandidates.length} candidates
+                </Typography>
+                <FormControl size="small" sx={{ minWidth: 80 }}>
+                  <InputLabel>Per page</InputLabel>
+                  <Select
+                    value={pagination.limit}
+                    label="Per page"
+                    onChange={(e) => handleLimitChange(e.target.value)}
+                  >
+                    <MenuItem value={25}>25</MenuItem>
+                    <MenuItem value={50}>50</MenuItem>
+                    <MenuItem value={100}>100</MenuItem>
+                  </Select>
+                </FormControl>
+              </Box>
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  disabled={pagination.page <= 1}
+                  onClick={() => handlePageChange(pagination.page - 1)}
+                >
+                  Previous
+                </Button>
+                <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', px: 2 }}>
+                  Page {pagination.page} of {Math.ceil(filteredCandidates.length / pagination.limit)}
+                </Typography>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  disabled={pagination.page >= Math.ceil(filteredCandidates.length / pagination.limit)}
+                  onClick={() => handlePageChange(pagination.page + 1)}
+                >
+                  Next
+                </Button>
+              </Box>
+            </Box>
+          </CardContent>
+        </Card>
+        )}
+
+        {/* Coffee Chats tab - Applications (Round 2) */}
+        {currentTab === 1 && (
+        <Card>
+          <CardContent>
+            <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
+              Coffee Chats — Applications
+            </Typography>
+            <Box mb={2}>
+              <Typography variant="body2" color="text.secondary">
+                ℹ️ Coffee Chat Round: Previously accepted candidates need new decisions. "Yes" advances to First Round Interviews, "No" remains in Coffee Chats for reconsideration.
+              </Typography>
+              <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                <Button 
+                  variant="outlined" 
+                  size="small" 
+                  onClick={fetchCandidates}
+                >
+                  Refresh Data
+                </Button>
+                <Button 
+                  variant="contained" 
+                  color="primary"
+                  size="small"
+                  startIcon={<SkipNextIcon />}
+                  onClick={openPushAllCoffee}
+                >
+                  Process All Decisions
+                </Button>
+              </Stack>
+              
+              {/* Filters */}
+              <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+                <Typography variant="body2" fontWeight="medium">
+                  Filter by Interview:
+                </Typography>
+                <FormControl size="small" sx={{ minWidth: 200 }}>
+                  <Select
+                    value={coffeeChatInterviewFilter}
+                    onChange={(e) => setCoffeeChatInterviewFilter(e.target.value)}
+                    displayEmpty
+                  >
+                    <MenuItem value="all">All Interviews</MenuItem>
+                    {coffeeChatInterviews.map((interview) => (
+                      <MenuItem key={interview.id} value={interview.id}>
+                        {interview.title}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                
+                <Typography variant="body2" fontWeight="medium" sx={{ ml: 2 }}>
+                  Filter by Decision:
+                </Typography>
+                <FormControl size="small" sx={{ minWidth: 150 }}>
+                  <Select
+                    value={coffeeChatDecisionFilter}
+                    onChange={(e) => setCoffeeChatDecisionFilter(e.target.value)}
+                    displayEmpty
+                  >
+                    <MenuItem value="all">All Decisions</MenuItem>
+                    <MenuItem value="yes">Yes</MenuItem>
+                    <MenuItem value="maybe_yes">Maybe - Yes</MenuItem>
+                    <MenuItem value="maybe_no">Maybe - No</MenuItem>
+                    <MenuItem value="no">No</MenuItem>
+                    <MenuItem value="pending">Pending</MenuItem>
+                  </Select>
+                </FormControl>
+              </Box>
+            </Box>
+            <TableContainer>
+              <Table sx={{ minWidth: 1000 }}>
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={{ width: '80px' }}>Rank</TableCell>
+                    <TableCell sx={{ width: '320px' }}>Application</TableCell>
+                    <TableCell sx={{ width: '300px' }}>Evaluation Summary</TableCell>
+                    <TableCell sx={{ width: '200px', minWidth: '180px' }}>Decisions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {(() => {
+                    // Filter for applications in coffee chat round (currentRound === '2')
+                    let filteredApps = adminApplications.filter(app => String(app.currentRound) === '2');
+                    
+                    // Apply interview filter if not "all"
+                    if (coffeeChatInterviewFilter !== 'all') {
+                      const interviewApps = getApplicationsForInterview(coffeeChatInterviewFilter);
+                      filteredApps = filteredApps.filter(app => 
+                        interviewApps.some(interviewApp => interviewApp.id === app.id)
+                      );
+                    }
+                    
+                    // Apply decision filter if not "all"
+                    if (coffeeChatDecisionFilter !== 'all') {
+                      filteredApps = filteredApps.filter(app => {
+                        const decision = inlineDecisions[app.id] || (app.approved === true ? 'yes' : app.approved === false ? 'no' : '');
+                        
+                        if (coffeeChatDecisionFilter === 'pending') {
+                          return !decision || decision === '';
+                        } else {
+                          return decision === coffeeChatDecisionFilter;
+                        }
+                      });
+                    }
+                    
+                    // Sort applications by ranking score (highest first)
+                    const sortedApps = filteredApps.sort((a, b) => {
+                      const scoreA = calculateRankingScore(evaluationSummaries[a.id]?.evaluations || []);
+                      const scoreB = calculateRankingScore(evaluationSummaries[b.id]?.evaluations || []);
+                      return scoreB - scoreA; // Descending order (highest score first)
+                    });
+                    
+                    return sortedApps.map((application, index) => {
+                      
+                      // Coffee chat round decisions start fresh for this round
+                      const displayDecision = inlineDecisions[application.id] || '';
+                      
+                      return (
+                        <TableRow key={application.id} hover sx={{ cursor: 'pointer' }} onClick={async () => {
+                          try {
+                            setAppModalLoading(true);
+                            setEvaluationsLoading(true);
+                            
+                            // Load application data and interview evaluations in parallel
+                            const [appData, evaluationsData] = await Promise.all([
+                              apiClient.get(`/applications/${application.id}`),
+                              apiClient.get(`/admin/applications/${application.id}/interview-evaluations`)
+                            ]);
+                            
+                            setAppModal(appData);
+                            setTestForNote(appData.testFor || '');
+                            setInterviewEvaluations(evaluationsData);
+                            setAppModalOpen(true);
+                          } catch (e) {
+                            console.error('Failed to load application', e);
+                            setSnackbar({ open: true, message: 'Failed to load application', severity: 'error' });
+                          } finally {
+                            setAppModalLoading(false);
+                            setEvaluationsLoading(false);
+                          }
+                        }}>
+                          <TableCell>
+                            <Box display="flex" alignItems="center" gap={1}>
+                              <Typography variant="h6" fontWeight="bold" color="primary">
+                                #{index + 1}
+                              </Typography>
+                              <Box>
+                                <Typography variant="caption" color="text.secondary">
+                                  Score: {calculateRankingScore(evaluationSummaries[application.id]?.evaluations || []).toFixed(1)}
+                                </Typography>
+                              </Box>
+                            </Box>
+                          </TableCell>
+                          <TableCell>
+                            <Box display="flex" alignItems="center" gap={2}>
+                              {/* Headshot */}
+                              <Box sx={{ 
+                                width: 48, 
+                                height: 48, 
+                                borderRadius: '50%', 
+                                overflow: 'hidden',
+                                flexShrink: 0,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                backgroundColor: '#f5f5f5'
+                              }}>
+                                {application.headshotUrl ? (
+                                  <AuthenticatedImage
+                                    src={application.headshotUrl}
+                                    alt={application.name}
+                                    style={{
+                                      width: '100%',
+                                      height: '100%',
+                                      objectFit: 'cover'
+                                    }}
+                                  />
+                                ) : (
+                                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
+                                    <PersonIcon sx={{ color: '#666', fontSize: 24 }} />
+                                    <Typography variant="caption" sx={{ fontSize: '8px', color: '#999' }}>
+                                      No photo
+                                    </Typography>
+                                  </Box>
+                                )}
+                              </Box>
+                              
+                              {/* Application Details */}
+                              <Box>
+                                <Typography variant="subtitle2" fontWeight="bold">
+                                  {application.name}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                  {application.email}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  {application.major} • {application.year} • GPA: {application.gpa}
+                                </Typography>
+                              </Box>
+                            </Box>
+                          </TableCell>
+                          <TableCell>
+                            {(() => {
+                              const evaluations = evaluationSummaries[application.id]?.evaluations || [];
+                              if (evaluations.length === 0) {
+                                return (
+                                  <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                                    No evaluations yet
+                                  </Typography>
+                                );
+                              }
+                              
+                              // Count each decision type
+                              const counts = evaluations.reduce((acc, evaluation) => {
+                                acc[evaluation.decision] = (acc[evaluation.decision] || 0) + 1;
+                                return acc;
+                              }, {});
+                              
+                              return (
+                                <Box>
+                                  <Typography variant="caption" display="block">
+                                    Total: {evaluations.length} evaluation{evaluations.length !== 1 ? 's' : ''}
+                                  </Typography>
+                                  {counts.YES > 0 && (
+                                    <Typography variant="caption" display="block" color="success.main">
+                                      YES: {counts.YES}
+                                    </Typography>
+                                  )}
+                                  {counts.MAYBE_YES > 0 && (
+                                    <Typography variant="caption" display="block" color="success.main">
+                                      Maybe-Yes: {counts.MAYBE_YES}
+                                    </Typography>
+                                  )}
+                                  {counts.UNSURE > 0 && (
+                                    <Typography variant="caption" display="block" color="warning.main">
+                                      Unsure: {counts.UNSURE}
+                                    </Typography>
+                                  )}
+                                  {counts.MAYBE_NO > 0 && (
+                                    <Typography variant="caption" display="block" color="error.main">
+                                      Maybe-No: {counts.MAYBE_NO}
+                                    </Typography>
+                                  )}
+                                  {counts.NO > 0 && (
+                                    <Typography variant="caption" display="block" color="error.main">
+                                      NO: {counts.NO}
+                                    </Typography>
+                                  )}
+                                </Box>
+                              );
+                            })()}
+                          </TableCell>
+                          <TableCell>
+                            <Box>
+                              <Typography variant="caption" display="block">
+                                Next Round: First Round Interview
+                              </Typography>
+                              <FormControl size="small" fullWidth onClick={(e) => e.stopPropagation()}>
+                                <Select
+                                  value={displayDecision}
+                                  displayEmpty
+                                  onChange={(e) => handleInlineDecisionChange(application, e.target.value, 'coffee')}
+                                  sx={() => {
+                                    const sel = displayDecision;
+                                    const c = getDecisionHighlight(sel);
+                                    return {
+                                      '& .MuiSelect-select': {
+                                        bgcolor: c.bg,
+                                        border: `1px solid`,
+                                        borderColor: c.border,
+                                        borderRadius: 1,
+                                      }
+                                    };
+                                  }}
+                                  renderValue={(selected) => {
+                                    if (!selected) return 'Select decision';
+                                    const labels = {
+                                      yes: 'Yes',
+                                      maybe_yes: 'Maybe - Yes',
+                                      maybe_no: 'Maybe - No',
+                                      no: 'No'
+                                    };
+                                    return labels[selected];
+                                  }}
+                                >
+                                  <MenuItem value=""><em>Select decision</em></MenuItem>
+                                  <MenuItem value="yes">Yes</MenuItem>
+                                  <MenuItem value="maybe_yes">Maybe - Yes</MenuItem>
+                                  <MenuItem value="maybe_no">Maybe - No</MenuItem>
+                                  <MenuItem value="no">No</MenuItem>
+                                </Select>
+                              </FormControl>
+                              
+                              {/* Decision indicators for coffee chat round */}
+                              {/* Removed info text for cleaner interface */}
+                              
+                              {/* Show intermediate decision indicators if they exist */}
+                              {/* Note: For coffee chat round, we don't show previous round decisions */}
+                              {/* Only show intermediate decisions if they were made in this round */}
+                              {false && inlineDecisions[application.id] && 
+                               (inlineDecisions[application.id] === 'maybe_yes' || inlineDecisions[application.id] === 'maybe_no') && (
+                                <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                  <Alert severity="info" sx={{ py: 0, px: 1, fontSize: '0.7rem' }}>
+                                    ℹ️ Intermediate decision: {inlineDecisions[application.id] === 'maybe_yes' ? 'Maybe - Yes' : 'Maybe - No'} (needs final decision)
+                                  </Alert>
+                                </Box>
+                              )}
+                            </Box>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    });
+                  })()}
+                </TableBody>
+              </Table>
+            </TableContainer>
+            
+            {/* Pagination Controls */}
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2, px: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Typography variant="body2" color="text.secondary">
+                  Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} candidates
+                </Typography>
+                <FormControl size="small" sx={{ minWidth: 80 }}>
+                  <InputLabel>Per page</InputLabel>
+                  <Select
+                    value={pagination.limit}
+                    label="Per page"
+                    onChange={(e) => handleLimitChange(e.target.value)}
+                  >
+                    <MenuItem value={25}>25</MenuItem>
+                    <MenuItem value={50}>50</MenuItem>
+                    <MenuItem value={100}>100</MenuItem>
+                  </Select>
+                </FormControl>
+              </Box>
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  disabled={!pagination.hasPrevPage}
+                  onClick={() => handlePageChange(pagination.page - 1)}
+                >
+                  Previous
+                </Button>
+                <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', px: 2 }}>
+                  Page {pagination.page} of {pagination.totalPages}
+                </Typography>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  disabled={!pagination.hasNextPage}
+                  onClick={() => handlePageChange(pagination.page + 1)}
+                >
+                  Next
+                </Button>
+              </Box>
+            </Box>
+          </CardContent>
+        </Card>
+        )}
+
+        {/* First Round tab - Applications (Round 3) */}
+        {currentTab === 2 && (
+        <Card>
+          <CardContent>
+            <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
+              First Round — Applications
+            </Typography>
+            <Box mb={2} display="flex" justifyContent="space-between" alignItems="center">
+              <Typography variant="body2" color="text.secondary">
+                ℹ️ First Round: Coffee Chat-advanced candidates need new decisions. "Yes" advances to Final Round (stays visible here with "Yes"), "No" remains in First Round for reconsideration.
+              </Typography>
+              <Button variant="contained" color="primary" startIcon={<SkipNextIcon />} onClick={openPushAllFirstRound}>
+                Process All Decisions
+                {(() => {
+                  const firstRoundApps = (adminApplications || []).filter(app => String(app.currentRound) === '3');
+                  const invalidCount = firstRoundApps.filter(app => 
+                    app.approved === null || (app.approved !== true && app.approved !== false)
+                  ).length;
+                  return invalidCount > 0 ? ` (${invalidCount} issues)` : '';
+                })()}
+              </Button>
+            </Box>
+            
+            {/* Filters */}
+            <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+              <Typography variant="body2" fontWeight="medium">
+                Filter by Interview:
+              </Typography>
+              <FormControl size="small" sx={{ minWidth: 200 }}>
+                <Select
+                  value={firstRoundInterviewFilter}
+                  onChange={(e) => setFirstRoundInterviewFilter(e.target.value)}
+                  displayEmpty
+                >
+                  <MenuItem value="all">All Interviews</MenuItem>
+                  {firstRoundInterviews.map((interview) => (
+                    <MenuItem key={interview.id} value={interview.id}>
+                      {interview.title}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              
+              <Typography variant="body2" fontWeight="medium" sx={{ ml: 2 }}>
+                Filter by Decision:
+              </Typography>
+              <FormControl size="small" sx={{ minWidth: 150 }}>
+                <Select
+                  value={firstRoundDecisionFilter}
+                  onChange={(e) => setFirstRoundDecisionFilter(e.target.value)}
+                  displayEmpty
+                >
+                  <MenuItem value="all">All Decisions</MenuItem>
+                  <MenuItem value="yes">Yes</MenuItem>
+                  <MenuItem value="maybe_yes">Maybe - Yes</MenuItem>
+                  <MenuItem value="maybe_no">Maybe - No</MenuItem>
+                  <MenuItem value="no">No</MenuItem>
+                  <MenuItem value="pending">Pending</MenuItem>
+                </Select>
+              </FormControl>
+            </Box>
+            <TableContainer>
+              <Table sx={{ minWidth: 1000 }}>
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={{ width: '80px' }}>Rank</TableCell>
+                    <TableCell sx={{ width: '250px' }}>Application</TableCell>
+                    <TableCell sx={{ width: '300px' }}>Evaluation Summary</TableCell>
+                    <TableCell sx={{ width: '200px', minWidth: '180px' }}>Decisions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {(() => {
+                    // Filter for applications in first round (currentRound === '3')
+                    let filteredApps = (adminApplications || []).filter(app => String(app.currentRound) === '3');
+                    
+                    // Apply interview filter if not "all"
+                    if (firstRoundInterviewFilter !== 'all') {
+                      const interviewApps = getApplicationsForFirstRoundInterview(firstRoundInterviewFilter);
+                      filteredApps = filteredApps.filter(app => 
+                        interviewApps.some(interviewApp => interviewApp.id === app.id)
+                      );
+                    }
+                    
+                    // Apply decision filter if not "all"
+                    if (firstRoundDecisionFilter !== 'all') {
+                      filteredApps = filteredApps.filter(app => {
+                        const decision = inlineDecisions[app.id] || (app.approved === true ? 'yes' : app.approved === false ? 'no' : '');
+                        
+                        if (firstRoundDecisionFilter === 'pending') {
+                          return !decision || decision === '';
+                        } else {
+                          return decision === firstRoundDecisionFilter;
+                        }
+                      });
+                    }
+                    
+                    // Sort applications by ranking score (highest first)
+                    const sortedApps = filteredApps.sort((a, b) => {
+                      const scoreA = calculateFirstRoundRankingScore(evaluationSummariesFirstRound[a.id]?.evaluations || []);
+                      const scoreB = calculateFirstRoundRankingScore(evaluationSummariesFirstRound[b.id]?.evaluations || []);
+                      return scoreB - scoreA;
+                    });
+                    return sortedApps.map((application, index) => {
+                      const displayDecision = inlineDecisions[application.id] || '';
+                      const evaluations = evaluationSummariesFirstRound[application.id]?.evaluations || [];
+                      return (
+                        <TableRow key={application.id} hover sx={{ cursor: 'pointer' }} onClick={async () => {
+                          try {
+                            setAppModalLoading(true);
+                            setEvaluationsLoading(true);
+                            
+                            // Load application data and interview evaluations in parallel
+                            const [appData, evaluationsData] = await Promise.all([
+                              apiClient.get(`/applications/${application.id}`),
+                              apiClient.get(`/admin/applications/${application.id}/interview-evaluations`)
+                            ]);
+                            
+                            setAppModal(appData);
+                            setTestForNote(appData.testFor || '');
+                            setInterviewEvaluations(evaluationsData);
+                            setAppModalOpen(true);
+                          } catch (e) {
+                            console.error('Failed to load application', e);
+                            setSnackbar({ open: true, message: 'Failed to load application', severity: 'error' });
+                          } finally {
+                            setAppModalLoading(false);
+                            setEvaluationsLoading(false);
+                          }
+                        }}>
+                          <TableCell>
+                            <Box display="flex" alignItems="center" gap={1}>
+                              <Typography variant="h6" fontWeight="bold" color="primary">#{index + 1}</Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                Score: {calculateFirstRoundRankingScore(evaluations).toFixed(1)}
+                              </Typography>
+                            </Box>
+                          </TableCell>
+                          <TableCell>
+                            <Box display="flex" alignItems="center" gap={2}>
+                              {/* Headshot */}
+                              <Box sx={{ 
+                                width: 48, 
+                                height: 48, 
+                                borderRadius: '50%', 
+                                overflow: 'hidden',
+                                flexShrink: 0,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                backgroundColor: '#f5f5f5'
+                              }}>
+                                {application.headshotUrl ? (
+                                  <AuthenticatedImage
+                                    src={application.headshotUrl}
+                                    alt={application.name}
+                                    style={{
+                                      width: '100%',
+                                      height: '100%',
+                                      objectFit: 'cover'
+                                    }}
+                                  />
+                                ) : (
+                                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
+                                    <PersonIcon sx={{ color: '#666', fontSize: 24 }} />
+                                    <Typography variant="caption" sx={{ fontSize: '8px', color: '#999' }}>
+                                      No photo
+                                    </Typography>
+                                  </Box>
+                                )}
+                              </Box>
+                              
+                              {/* Application Details */}
+                              <Box>
+                                <Typography variant="subtitle2" fontWeight="bold">{application.name}</Typography>
+                                <Typography variant="body2" color="text.secondary">{application.email}</Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  {application.major} • {application.year} • GPA: {application.gpa}
+                                </Typography>
+                              </Box>
+                            </Box>
+                          </TableCell>
+                          <TableCell>
+                            {(() => {
+                              if (evaluations.length === 0) {
+                                return (
+                                  <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                                    No evaluations yet
+                                  </Typography>
+                                );
+                              }
+                              
+                              // Calculate behavioral and market sizing averages
+                              const evaluationsWithScores = evaluations.filter(e => 
+                                e.behavioralTotal !== null && e.behavioralTotal !== undefined &&
+                                e.marketSizingTotal !== null && e.marketSizingTotal !== undefined
+                              );
+                              
+                              const counts = evaluations.reduce((acc, evaluation) => {
+                                acc[evaluation.decision] = (acc[evaluation.decision] || 0) + 1;
+                                return acc;
+                              }, {});
+                              
+                              return (
+                                <Box>
+                                  <Typography variant="caption" display="block">
+                                    Total: {evaluations.length} evaluation{evaluations.length !== 1 ? 's' : ''}
+                                  </Typography>
+                                  
+                                  {/* Show behavioral and market sizing scores if available */}
+                                  {evaluationsWithScores.length > 0 && (
+                                    <>
+                                      <Typography variant="caption" display="block" color="primary.main" sx={{ fontWeight: 'bold', mt: 1 }}>
+                                        Avg Scores:
+                                      </Typography>
+                                      <Typography variant="caption" display="block" color="primary.main">
+                                        Behavioral: {(evaluationsWithScores.reduce((sum, e) => sum + (e.behavioralTotal || 0), 0) / evaluationsWithScores.length).toFixed(1)}/15
+                                      </Typography>
+                                      <Typography variant="caption" display="block" color="primary.main">
+                                        Market Sizing: {(evaluationsWithScores.reduce((sum, e) => sum + (e.marketSizingTotal || 0), 0) / evaluationsWithScores.length).toFixed(1)}/15
+                                      </Typography>
+                                    </>
+                                  )}
+                                  
+                                  {/* Show decision counts */}
+                                  {counts.YES > 0 && (
+                                    <Typography variant="caption" display="block" color="success.main">YES: {counts.YES}</Typography>
+                                  )}
+                                  {counts.MAYBE_YES > 0 && (
+                                    <Typography variant="caption" display="block" color="success.main">Maybe-Yes: {counts.MAYBE_YES}</Typography>
+                                  )}
+                                  {counts.UNSURE > 0 && (
+                                    <Typography variant="caption" display="block" color="warning.main">Unsure: {counts.UNSURE}</Typography>
+                                  )}
+                                  {counts.MAYBE_NO > 0 && (
+                                    <Typography variant="caption" display="block" color="error.main">Maybe-No: {counts.MAYBE_NO}</Typography>
+                                  )}
+                                  {counts.NO > 0 && (
+                                    <Typography variant="caption" display="block" color="error.main">NO: {counts.NO}</Typography>
+                                  )}
+                                </Box>
+                              );
+                            })()}
+                          </TableCell>
+                          <TableCell>
+                            <Box>
+                              <Typography variant="caption" display="block">Next Round: Final Decision</Typography>
+                              <FormControl size="small" fullWidth>
+                                <Select
+                                  value={displayDecision}
+                                  displayEmpty
+                                  onChange={(e) => handleInlineDecisionChange(application, e.target.value, 'round_one')}
+                                  sx={() => {
+                                    const sel = displayDecision;
+                                    const c = getDecisionHighlight(sel);
+                                    return {
+                                      '& .MuiSelect-select': {
+                                        bgcolor: c.bg,
+                                        border: `1px solid`,
+                                        borderColor: c.border,
+                                        borderRadius: 1,
+                                      }
+                                    };
+                                  }}
+                                  renderValue={(selected) => {
+                                    if (!selected) return 'Select decision';
+                                    const labels = { yes: 'Yes', maybe_yes: 'Maybe - Yes', maybe_no: 'Maybe - No', no: 'No' };
+                                    return labels[selected];
+                                  }}
+                                >
+                                  <MenuItem value=""><em>Select decision</em></MenuItem>
+                                  <MenuItem value="yes">Yes</MenuItem>
+                                  <MenuItem value="maybe_yes">Maybe - Yes</MenuItem>
+                                  <MenuItem value="maybe_no">Maybe - No</MenuItem>
+                                  <MenuItem value="no">No</MenuItem>
+                                </Select>
+                              </FormControl>
+                            </Box>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    });
+                  })()}
+                </TableBody>
+              </Table>
+            </TableContainer>
+            
+            {/* Pagination Controls */}
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2, px: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Typography variant="body2" color="text.secondary">
+                  Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} candidates
+                </Typography>
+                <FormControl size="small" sx={{ minWidth: 80 }}>
+                  <InputLabel>Per page</InputLabel>
+                  <Select
+                    value={pagination.limit}
+                    label="Per page"
+                    onChange={(e) => handleLimitChange(e.target.value)}
+                  >
+                    <MenuItem value={25}>25</MenuItem>
+                    <MenuItem value={50}>50</MenuItem>
+                    <MenuItem value={100}>100</MenuItem>
+                  </Select>
+                </FormControl>
+              </Box>
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  disabled={!pagination.hasPrevPage}
+                  onClick={() => handlePageChange(pagination.page - 1)}
+                >
+                  Previous
+                </Button>
+                <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', px: 2 }}>
+                  Page {pagination.page} of {pagination.totalPages}
+                </Typography>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  disabled={!pagination.hasNextPage}
+                  onClick={() => handlePageChange(pagination.page + 1)}
+                >
+                  Next
+                </Button>
+              </Box>
+            </Box>
+          </CardContent>
+        </Card>
+        )}
+
+        {/* Final Round tab - Applications (Round 4) */}
+        {currentTab === 3 && (
+        <Card>
+          <CardContent>
+            <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
+              Final Round — Applications
+            </Typography>
+            <Box mb={2}>
+              <Typography variant="body2" color="text.secondary">
+                ℹ️ Final Round: First Round-advanced candidates need final decisions. "Yes" advances to final stage.
+              </Typography>
+              <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                <Button 
+                  variant="outlined" 
+                  size="small" 
+                  onClick={fetchCandidates}
+                >
+                  Refresh Data
+                </Button>
+                <Button 
+                  variant="contained" 
+                  color="primary"
+                  size="small"
+                  startIcon={<SkipNextIcon />}
+                  onClick={openPushAllFinal}
+                >
+                  Process All Decisions
+                </Button>
+              </Stack>
+            </Box>
+            <TableContainer>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Application</TableCell>
+                    <TableCell>Evaluation Summary</TableCell>
+                    <TableCell>Decisions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {(() => {
+                    const filteredApps = (adminApplications || []).filter(app => String(app.currentRound) === '4');
+                    const sortedApps = filteredApps.sort((a, b) => {
+                      const scoreA = calculateRankingScore(evaluationSummariesFirstRound[a.id]?.evaluations || []);
+                      const scoreB = calculateRankingScore(evaluationSummariesFirstRound[b.id]?.evaluations || []);
+                      return scoreB - scoreA;
+                    });
+                    return sortedApps.map((application, index) => {
+                      const displayDecision = inlineDecisions[application.id] || '';
+                      const evaluations = evaluationSummariesFirstRound[application.id]?.evaluations || [];
+                      return (
+                        <TableRow key={application.id} hover sx={{ cursor: 'pointer' }} onClick={() => {
+                          // Load and display final round interview evaluations
+                          loadFinalRoundInterviewNotes(application.id);
+                        }}>
+                          <TableCell>
+                            <Box>
+                              <Typography variant="subtitle2" fontWeight="bold" sx={{ cursor: 'pointer', color: 'primary.main', '&:hover': { textDecoration: 'underline' } }}>{application.name}</Typography>
+                              <Typography variant="body2" color="text.secondary">{application.email}</Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {application.major} • {application.year} • GPA: {application.gpa}
+                              </Typography>
+                            </Box>
+                          </TableCell>
+                          <TableCell>
+                            {(() => {
+                              if (evaluations.length === 0) {
+                                return (
+                                  <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                                    No evaluations yet
+                                  </Typography>
+                                );
+                              }
+                              const counts = evaluations.reduce((acc, evaluation) => {
+                                acc[evaluation.decision] = (acc[evaluation.decision] || 0) + 1;
+                                return acc;
+                              }, {});
+                              return (
+                                <Box>
+                                  <Typography variant="caption" display="block">
+                                    Total: {evaluations.length} evaluation{evaluations.length !== 1 ? 's' : ''}
+                                  </Typography>
+                                  {counts.YES > 0 && (
+                                    <Typography variant="caption" display="block" color="success.main">YES: {counts.YES}</Typography>
+                                  )}
+                                  {counts.MAYBE_YES > 0 && (
+                                    <Typography variant="caption" display="block" color="success.main">Maybe-Yes: {counts.MAYBE_YES}</Typography>
+                                  )}
+                                  {counts.UNSURE > 0 && (
+                                    <Typography variant="caption" display="block" color="warning.main">Unsure: {counts.UNSURE}</Typography>
+                                  )}
+                                  {counts.MAYBE_NO > 0 && (
+                                    <Typography variant="caption" display="block" color="error.main">Maybe-No: {counts.MAYBE_NO}</Typography>
+                                  )}
+                                  {counts.NO > 0 && (
+                                    <Typography variant="caption" display="block" color="error.main">NO: {counts.NO}</Typography>
+                                  )}
+                                </Box>
+                              );
+                            })()}
+                          </TableCell>
+                          <TableCell>
+                            <Box>
+                              <Typography variant="caption" display="block">Final Decision</Typography>
+                              <FormControl size="small" fullWidth>
+                                <Select
+                                  value={displayDecision}
+                                  displayEmpty
+                                  onChange={(e) => handleInlineDecisionChange(application, e.target.value, 'final_round')}
+                                  sx={() => {
+                                    const sel = displayDecision;
+                                    const c = getDecisionHighlight(sel);
+                                    return {
+                                      '& .MuiSelect-select': {
+                                        bgcolor: c.bg,
+                                        border: `1px solid`,
+                                        borderColor: c.border,
+                                        borderRadius: 1,
+                                      }
+                                    };
+                                  }}
+                                  renderValue={(selected) => {
+                                    if (!selected) return 'Select decision';
+                                    const labels = { yes: 'Yes', maybe_yes: 'Maybe - Yes', maybe_no: 'Maybe - No', no: 'No' };
+                                    return labels[selected];
+                                  }}
+                                >
+                                  <MenuItem value=""><em>Select decision</em></MenuItem>
+                                  <MenuItem value="yes">Yes</MenuItem>
+                                  <MenuItem value="maybe_yes">Maybe - Yes</MenuItem>
+                                  <MenuItem value="maybe_no">Maybe - No</MenuItem>
+                                  <MenuItem value="no">No</MenuItem>
+                                </Select>
+                              </FormControl>
+                            </Box>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    });
+                  })()}
+                </TableBody>
+              </Table>
+            </TableContainer>
+            
+            {/* Pagination Controls */}
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2, px: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Typography variant="body2" color="text.secondary">
+                  Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} candidates
+                </Typography>
+                <FormControl size="small" sx={{ minWidth: 80 }}>
+                  <InputLabel>Per page</InputLabel>
+                  <Select
+                    value={pagination.limit}
+                    label="Per page"
+                    onChange={(e) => handleLimitChange(e.target.value)}
+                  >
+                    <MenuItem value={25}>25</MenuItem>
+                    <MenuItem value={50}>50</MenuItem>
+                    <MenuItem value={100}>100</MenuItem>
+                  </Select>
+                </FormControl>
+              </Box>
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  disabled={!pagination.hasPrevPage}
+                  onClick={() => handlePageChange(pagination.page - 1)}
+                >
+                  Previous
+                </Button>
+                <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', px: 2 }}>
+                  Page {pagination.page} of {pagination.totalPages}
+                </Typography>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  disabled={!pagination.hasNextPage}
+                  onClick={() => handlePageChange(pagination.page + 1)}
+                >
+                  Next
+                </Button>
+              </Box>
+            </Box>
+          </CardContent>
+        </Card>
+        )}
+
+        {/* Application Detail Modal */}
+        <Dialog open={appModalOpen} onClose={() => setAppModalOpen(false)} maxWidth="md" fullWidth>
+          <DialogTitle>
+            <Box display="flex" alignItems="center" gap={2}>
+              {/* Headshot */}
+              <Box sx={{ 
+                width: 80, 
+                height: 80, 
+                borderRadius: '50%', 
+                overflow: 'hidden',
+                flexShrink: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: '#f5f5f5'
+              }}>
+                {appModal?.headshotUrl ? (
+                  <AuthenticatedImage
+                    src={appModal.headshotUrl}
+                    alt={appModal ? `${appModal.firstName} ${appModal.lastName}` : 'Application'}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover'
+                    }}
+                  />
+                ) : (
+                  <PersonIcon sx={{ color: '#666', fontSize: 40 }} />
+                )}
+              </Box>
+              
+              {/* Name */}
+              <Typography variant="h6">
+                {appModal ? `${appModal.firstName} ${appModal.lastName}` : 'Application'}
+              </Typography>
+            </Box>
+          </DialogTitle>
+          <DialogContent>
+            {appModalLoading ? (
+              <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
+                <CircularProgress />
+              </Box>
+            ) : appModal ? (
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={6}>
+                  <Typography variant="subtitle2">Email</Typography>
+                  <Typography variant="body2" gutterBottom>{appModal.email}</Typography>
+                  <Typography variant="subtitle2">Submitted</Typography>
+                  <Typography variant="body2" gutterBottom>{new Date(appModal.submittedAt).toLocaleDateString()}</Typography>
+                  <Typography variant="subtitle2">Documents</Typography>
+                  <Stack spacing={1} mt={1}>
+                    {appModal.resumeUrl && (
+                      <Button size="small" variant="outlined" onClick={(e) => { e.stopPropagation(); setDocPreview({ open: true, src: appModal.resumeUrl, kind: 'pdf', title: `${appModal.firstName} ${appModal.lastName} – Resume` }); }}>View Resume</Button>
+                    )}
+                    {appModal.coverLetterUrl && (
+                      <Button size="small" variant="outlined" onClick={(e) => { e.stopPropagation(); setDocPreview({ open: true, src: appModal.coverLetterUrl, kind: 'pdf', title: `${appModal.firstName} ${appModal.lastName} – Cover Letter` }); }}>View Cover Letter</Button>
+                    )}
+                    {appModal.videoUrl && (
+                      <Button size="small" variant="outlined" onClick={(e) => { e.stopPropagation(); setDocPreview({ open: true, src: appModal.videoUrl, kind: 'video', title: `${appModal.firstName} ${appModal.lastName} – Video` }); }}>View Video</Button>
+                    )}
+                  </Stack>
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <Typography variant="subtitle2">Status</Typography>
+                  <StatusChip status={appModal.status} />
+                  <Box mt={2}>
+                    <Typography variant="subtitle2">Details</Typography>
+                    <Typography variant="body2" gutterBottom>Major: {appModal.major1}</Typography>
+                    <Typography variant="body2" gutterBottom>Graduation Year: {appModal.graduationYear}</Typography>
+                  </Box>
+                </Grid>
+              </Grid>
+            ) : (
+              <Typography variant="body2">No application data</Typography>
+            )}
+            
+            {/* Document Scores Section */}
+            {appModal && (
+              <Box mt={3}>
+                <Divider sx={{ mb: 2 }} />
+                <Typography variant="h6" gutterBottom>
+                  Document Scores
+                </Typography>
+                
+                {scoresLoading ? (
+                  <Box display="flex" justifyContent="center" alignItems="center" minHeight="100px">
+                    <CircularProgress />
+                  </Box>
+                ) : (
+                  <Grid container spacing={2}>
+                    {/* Resume Scores */}
+                    <Grid item xs={12} md={4}>
+                      <Card variant="outlined">
+                        <CardContent>
+                          <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                            Resume Scores ({modalResumeScores?.length || 0})
+                          </Typography>
+                          {modalResumeScores && modalResumeScores.length > 0 ? (
+                            <Stack spacing={1}>
+                              {modalResumeScores.map((score) => (
+                              <Box key={score.id} sx={{ 
+                                p: 1, 
+                                border: '1px solid', 
+                                borderColor: 'grey.300', 
+                                borderRadius: 1,
+                                backgroundColor: 'grey.50',
+                                position: 'relative'
+                              }}>
+                                {isAdmin && (
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => handleEditScore(score, 'resume')}
+                                    sx={{
+                                      position: 'absolute',
+                                      top: 4,
+                                      right: 4,
+                                      padding: '4px'
+                                    }}
+                                  >
+                                    <EditIcon fontSize="small" />
+                                  </IconButton>
+                                )}
+                                <Typography variant="body2" fontWeight="bold">
+                                  {score.evaluator?.fullName || 'Unknown Evaluator'}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                  {new Date(score.createdAt).toLocaleDateString()}
+                                </Typography>
+                                <Typography variant="h6" color="success.main" fontWeight="bold">
+                                  {score.adminScore !== null && score.adminScore !== undefined 
+                                    ? `${score.adminScore}/13 (Admin Override)`
+                                    : `${score.overallScore}/13`}
+                                </Typography>
+                                {score.notes && (
+                                  <Typography variant="caption" sx={{ 
+                                    display: 'block', 
+                                    mt: 0.5,
+                                    fontStyle: 'italic'
+                                  }}>
+                                    {score.notes}
+                                  </Typography>
+                                )}
+                                {score.adminNotes && (
+                                  <Typography variant="caption" sx={{ 
+                                    display: 'block', 
+                                    mt: 0.5,
+                                    fontStyle: 'italic',
+                                    color: 'primary.main',
+                                    fontWeight: 'bold'
+                                  }}>
+                                    Admin Notes: {score.adminNotes}
+                                  </Typography>
+                                )}
+                              </Box>
+                            ))}
+                          </Stack>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                            No resume scores yet.
+                          </Typography>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </Grid>
+
+                    {/* Cover Letter Scores */}
+                    <Grid item xs={12} md={4}>
+                      <Card variant="outlined">
+                        <CardContent>
+                          <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                            Cover Letter Scores ({modalCoverLetterScores?.length || 0})
+                          </Typography>
+                          {modalCoverLetterScores && modalCoverLetterScores.length > 0 ? (
+                            <Stack spacing={1}>
+                              {modalCoverLetterScores.map((score) => (
+                              <Box key={score.id} sx={{ 
+                                p: 1, 
+                                border: '1px solid', 
+                                borderColor: 'grey.300', 
+                                borderRadius: 1,
+                                backgroundColor: 'grey.50',
+                                position: 'relative'
+                              }}>
+                                {isAdmin && (
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => handleEditScore(score, 'coverLetter')}
+                                    sx={{
+                                      position: 'absolute',
+                                      top: 4,
+                                      right: 4,
+                                      padding: '4px'
+                                    }}
+                                  >
+                                    <EditIcon fontSize="small" />
+                                  </IconButton>
+                                )}
+                                <Typography variant="body2" fontWeight="bold">
+                                  {score.evaluator?.fullName || 'Unknown Evaluator'}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                  {new Date(score.createdAt).toLocaleDateString()}
+                                </Typography>
+                                <Typography variant="h6" color="success.main" fontWeight="bold">
+                                  {score.adminScore !== null && score.adminScore !== undefined 
+                                    ? `${score.adminScore}/3 (Admin Override)`
+                                    : `${score.overallScore}/3`}
+                                </Typography>
+                                {(score.notes || score.notesOne) && (
+                                  <Typography variant="caption" sx={{ 
+                                    display: 'block', 
+                                    mt: 0.5,
+                                    fontStyle: 'italic'
+                                  }}>
+                                    {score.notes || score.notesOne}
+                                  </Typography>
+                                )}
+                                {score.adminNotes && (
+                                  <Typography variant="caption" sx={{ 
+                                    display: 'block', 
+                                    mt: 0.5,
+                                    fontStyle: 'italic',
+                                    color: 'primary.main',
+                                    fontWeight: 'bold'
+                                  }}>
+                                    Admin Notes: {score.adminNotes}
+                                  </Typography>
+                                )}
+                              </Box>
+                            ))}
+                          </Stack>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                            No cover letter scores yet.
+                          </Typography>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </Grid>
+
+                    {/* Video Scores */}
+                    <Grid item xs={12} md={4}>
+                      <Card variant="outlined">
+                        <CardContent>
+                          <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                            Video Scores ({modalVideoScores?.length || 0})
+                          </Typography>
+                          {modalVideoScores && modalVideoScores.length > 0 ? (
+                            <Stack spacing={1}>
+                              {modalVideoScores.map((score) => (
+                              <Box key={score.id} sx={{ 
+                                p: 1, 
+                                border: '1px solid', 
+                                borderColor: 'grey.300', 
+                                borderRadius: 1,
+                                backgroundColor: 'grey.50',
+                                position: 'relative'
+                              }}>
+                                {isAdmin && (
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => handleEditScore(score, 'video')}
+                                    sx={{
+                                      position: 'absolute',
+                                      top: 4,
+                                      right: 4,
+                                      padding: '4px'
+                                    }}
+                                  >
+                                    <EditIcon fontSize="small" />
+                                  </IconButton>
+                                )}
+                                <Typography variant="body2" fontWeight="bold">
+                                  {score.evaluator?.fullName || 'Unknown Evaluator'}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                  {new Date(score.createdAt).toLocaleDateString()}
+                                </Typography>
+                                <Typography variant="h6" color="success.main" fontWeight="bold">
+                                  {score.adminScore !== null && score.adminScore !== undefined 
+                                    ? `${score.adminScore}/2 (Admin Override)`
+                                    : `${score.overallScore}/2`}
+                                </Typography>
+                                {(score.notes || score.notesOne) && (
+                                  <Typography variant="caption" sx={{ 
+                                    display: 'block', 
+                                    mt: 0.5,
+                                    fontStyle: 'italic'
+                                  }}>
+                                    {score.notes || score.notesOne}
+                                  </Typography>
+                                )}
+                                {score.adminNotes && (
+                                  <Typography variant="caption" sx={{ 
+                                    display: 'block', 
+                                    mt: 0.5,
+                                    fontStyle: 'italic',
+                                    color: 'primary.main',
+                                    fontWeight: 'bold'
+                                  }}>
+                                    Admin Notes: {score.adminNotes}
+                                  </Typography>
+                                )}
+                              </Box>
+                            ))}
+                          </Stack>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                            No video scores yet.
+                          </Typography>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  </Grid>
+                )}
+              </Box>
+            )}
+            
+            {/* Test For Note Section (Admin Only) */}
+            {appModal && isAdmin && (
+              <Box mt={3}>
+                <Divider sx={{ mb: 2 }} />
+                <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                  <Typography variant="h6">
+                    Test For Note (Admin)
+                  </Typography>
+                  {!isEditingTestFor && (
+                    <Button
+                      startIcon={<EditIcon />}
+                      variant="outlined"
+                      size="small"
+                      onClick={() => setIsEditingTestFor(true)}
+                    >
+                      {testForNote ? 'Edit' : 'Add Note'}
+                    </Button>
+                  )}
+                </Box>
+                
+                {isEditingTestFor ? (
+                  <Box sx={{ 
+                    padding: '16px', 
+                    backgroundColor: '#f9fafb', 
+                    borderRadius: '8px',
+                    border: '1px solid #e5e7eb'
+                  }}>
+                    <TextField
+                      fullWidth
+                      multiline
+                      rows={4}
+                      value={testForNote}
+                      onChange={(e) => setTestForNote(e.target.value)}
+                      placeholder="Enter what to test for in interviews (e.g., 'Test for leadership skills and problem-solving ability')"
+                      sx={{ mb: 2 }}
+                    />
+                    <Box display="flex" gap={1} justifyContent="flex-end">
+                      <Button
+                        onClick={() => {
+                          setIsEditingTestFor(false);
+                          setTestForNote(appModal?.testFor || '');
+                        }}
+                        disabled={savingTestFor}
+                        variant="outlined"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={handleSaveTestFor}
+                        disabled={savingTestFor}
+                        variant="contained"
+                      >
+                        {savingTestFor ? 'Saving...' : 'Save'}
+                      </Button>
+                    </Box>
+                  </Box>
+                ) : (
+                  <Box sx={{ 
+                    padding: '16px', 
+                    backgroundColor: testForNote ? '#eff6ff' : '#f9fafb', 
+                    borderRadius: '8px',
+                    border: `1px solid ${testForNote ? '#bfdbfe' : '#e5e7eb'}`,
+                    minHeight: '60px'
+                  }}>
+                    {testForNote ? (
+                      <Typography variant="body2" sx={{ 
+                        color: '#1e40af',
+                        whiteSpace: 'pre-wrap'
+                      }}>
+                        {testForNote}
+                      </Typography>
+                    ) : (
+                      <Typography variant="body2" sx={{ 
+                        color: '#6b7280',
+                        fontStyle: 'italic'
+                      }}>
+                        No test for note set. Click "Add Note" to add one.
+                      </Typography>
+                    )}
+                  </Box>
+                )}
+              </Box>
+            )}
+            
+            {/* Interview Evaluations Section */}
+            {appModal && (
+              <Box mt={3}>
+                <Divider sx={{ mb: 2 }} />
+                <Typography variant="h6" gutterBottom>
+                  Interview Evaluations
+                </Typography>
+                
+                {evaluationsLoading ? (
+                  <Box display="flex" justifyContent="center" alignItems="center" minHeight="100px">
+                    <CircularProgress />
+                  </Box>
+                ) : interviewEvaluations.length > 0 ? (
+                  <Stack spacing={2}>
+                    {interviewEvaluations.map((evaluation) => (
+                      <Card key={evaluation.id} variant="outlined">
+                        <CardContent>
+                          <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={2}>
+                            <Box>
+                              <Typography variant="subtitle1" fontWeight="bold">
+                                {evaluation.interview.title}
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                {evaluation.interview.interviewType.replace(/_/g, ' ')} • 
+                                Evaluated by {evaluation.evaluator.fullName}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {new Date(evaluation.createdAt).toLocaleDateString()}
+                              </Typography>
+                            </Box>
+                            {evaluation.decision && (
+                              <Chip 
+                                label={evaluation.decision.replace(/_/g, ' ')} 
+                                color={
+                                  evaluation.decision === 'YES' ? 'success' :
+                                  evaluation.decision === 'MAYBE_YES' ? 'success' :
+                                  evaluation.decision === 'UNSURE' ? 'warning' :
+                                  evaluation.decision === 'MAYBE_NO' ? 'error' :
+                                  'error'
+                                }
+                                variant="outlined"
+                              />
+                            )}
+                          </Box>
+                          
+                          {/* First Round Interview Scores */}
+                          {evaluation.interview.interviewType === 'ROUND_ONE' && (
+                            <Box mb={2}>
+                              <Typography variant="subtitle2" gutterBottom>Interview Scores:</Typography>
+                              <Grid container spacing={2}>
+                                <Grid item xs={6}>
+                                  <Box sx={{ backgroundColor: 'primary.50', p: 2, borderRadius: 1 }}>
+                                    <Typography variant="subtitle2" color="primary.main" gutterBottom>
+                                      Behavioral Assessment
+                                    </Typography>
+                                    <Typography variant="body2">
+                                      Leadership: {evaluation.behavioralLeadership || 'N/A'}/5
+                                    </Typography>
+                                    <Typography variant="body2">
+                                      Problem Solving: {evaluation.behavioralProblemSolving || 'N/A'}/5
+                                    </Typography>
+                                    <Typography variant="body2">
+                                      Interest: {evaluation.behavioralInterest || 'N/A'}/5
+                                    </Typography>
+                                    <Typography variant="subtitle2" sx={{ mt: 1, fontWeight: 'bold' }}>
+                                      Total: {evaluation.behavioralTotal || 0}/15
+                                    </Typography>
+                                  </Box>
+                                </Grid>
+                                <Grid item xs={6}>
+                                  <Box sx={{ backgroundColor: 'secondary.50', p: 2, borderRadius: 1 }}>
+                                    <Typography variant="subtitle2" color="secondary.main" gutterBottom>
+                                      Market Sizing Assessment
+                                    </Typography>
+                                    <Typography variant="body2">
+                                      Teamwork: {evaluation.marketSizingTeamwork || 'N/A'}/5
+                                    </Typography>
+                                    <Typography variant="body2">
+                                      Logic: {evaluation.marketSizingLogic || 'N/A'}/5
+                                    </Typography>
+                                    <Typography variant="body2">
+                                      Creativity: {evaluation.marketSizingCreativity || 'N/A'}/5
+                                    </Typography>
+                                    <Typography variant="subtitle2" sx={{ mt: 1, fontWeight: 'bold' }}>
+                                      Total: {evaluation.marketSizingTotal || 0}/15
+                                    </Typography>
+                                  </Box>
+                                </Grid>
+                              </Grid>
+                            </Box>
+                          )}
+
+                          {/* First Round Interview Notes */}
+                          {evaluation.interview.interviewType === 'ROUND_ONE' && (
+                            <>
+                              {evaluation.behavioralNotes && (
+                                <Box mb={2}>
+                                  <Typography variant="subtitle2" gutterBottom>Behavioral Notes:</Typography>
+                                  <Typography variant="body2" sx={{ 
+                                    backgroundColor: 'primary.50', 
+                                    p: 1, 
+                                    borderRadius: 1,
+                                    whiteSpace: 'pre-wrap'
+                                  }}>
+                                    {evaluation.behavioralNotes}
+                                  </Typography>
+                                </Box>
+                              )}
+                              {evaluation.marketSizingNotes && (
+                                <Box mb={2}>
+                                  <Typography variant="subtitle2" gutterBottom>Market Sizing Notes:</Typography>
+                                  <Typography variant="body2" sx={{ 
+                                    backgroundColor: 'secondary.50', 
+                                    p: 1, 
+                                    borderRadius: 1,
+                                    whiteSpace: 'pre-wrap'
+                                  }}>
+                                    {evaluation.marketSizingNotes}
+                                  </Typography>
+                                </Box>
+                              )}
+                              {evaluation.additionalNotes && (
+                                <Box mb={2}>
+                                  <Typography variant="subtitle2" gutterBottom>Additional Notes:</Typography>
+                                  <Typography variant="body2" sx={{ 
+                                    backgroundColor: 'grey.50', 
+                                    p: 1, 
+                                    borderRadius: 1,
+                                    whiteSpace: 'pre-wrap'
+                                  }}>
+                                    {evaluation.additionalNotes}
+                                  </Typography>
+                                </Box>
+                              )}
+                            </>
+                          )}
+
+                          {/* Regular Interview Notes */}
+                          {evaluation.interview.interviewType !== 'ROUND_ONE' && evaluation.notes && (
+                            <Box mb={2}>
+                              <Typography variant="subtitle2" gutterBottom>Notes:</Typography>
+                              <Typography variant="body2" sx={{ 
+                                backgroundColor: 'grey.50', 
+                                p: 1, 
+                                borderRadius: 1,
+                                whiteSpace: 'pre-wrap'
+                              }}>
+                                {evaluation.notes}
+                              </Typography>
+                            </Box>
+                          )}
+                          
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </Stack>
+                ) : (
+                  <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                    No interview evaluations found for this application.
+                  </Typography>
+                )}
+              </Box>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setAppModalOpen(false)}>Close</Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Document Preview Modal */}
+        {docPreview.open && (
+          <DocumentPreviewModal
+            src={docPreview.src}
+            kind={docPreview.kind}
+            title={docPreview.title}
+            onClose={() => setDocPreview({ open: false, src: '', kind: 'pdf', title: '' })}
+          />
+        )}
+
+        {/* Push All Decisions Confirmation Dialog */}
+        <Dialog open={pushAllDialogOpen} onClose={() => {
+          setPushAllDialogOpen(false);
+          setPushAllPreview({ totalApproved: 0, invalidDecisions: 0, invalidDecisionCandidates: [] });
+        }} maxWidth="md" fullWidth>
+          <DialogTitle>Process All Decisions</DialogTitle>
+          <DialogContent>
+            <Stack spacing={2} sx={{ mt: 1 }}>
+              <Alert severity="info">
+                <Typography variant="subtitle2" gutterBottom>
+                  {currentTab === 0 ? '🔄 This will advance candidates to the next round (no emails sent)' : 
+                   currentTab === 1 ? '🔄 This will advance candidates to the next round (no emails sent)' :
+                   currentTab === 2 ? '🔄 This will advance candidates to the next round (no emails sent)' :
+                   '📧 This will send emails and advance candidates to the next round'}
+                </Typography>
+                <Typography variant="body2">
+                  {currentTab === 0 ? (
+                    <>
+                      • <strong>Yes</strong> decisions: Advance to Coffee Chats round (no email)<br/>
+                      • <strong>No</strong> decisions: Mark as rejected (no email)<br/>
+                      • This action cannot be easily undone
+                    </>
+                  ) : (
+                    <>
+                      • <strong>Yes</strong> decisions: Acceptance emails + advance to next round<br/>
+                      • <strong>No</strong> decisions: Rejection emails + mark as rejected<br/>
+                      • This action cannot be easily undone
+                    </>
+                  )}
+                </Typography>
+              </Alert>
+              
+              {/* Warning for invalid decisions */}
+              {pushAllPreview.invalidDecisions > 0 && (
+                <Alert severity="error">
+                  <Typography variant="subtitle2" gutterBottom>
+                    ⚠️ Warning: {pushAllPreview.invalidDecisions} application(s) have no decision or decisions other than "Yes" or "No"
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 2 }}>
+                    All applications must have a clear "Yes" or "No" decision before proceeding. 
+                    "Yes" decisions will advance to the next round with acceptance emails, "No" decisions will receive rejection emails.
+                  </Typography>
+                  
+                  {/* List of candidates with invalid decisions */}
+                  <Stack spacing={1}>
+                    {pushAllPreview.invalidDecisionCandidates?.map((candidate) => {
+                      const currentDecision = candidate.approved;
+                      let decisionStatus = 'No decision';
+                      let decisionType = 'none';
+                      
+                      if (currentDecision === true) {
+                        decisionStatus = 'Yes';
+                        decisionType = 'yes';
+                      } else if (currentDecision === false) {
+                        decisionStatus = 'No';
+                        decisionType = 'no';
+                      } else if (currentDecision === null) {
+                        // Check if there's a comment indicating an intermediate decision
+                        const latestComment = candidate.comments?.[0]?.content || '';
+                        if (latestComment.includes('Maybe - Yes')) {
+                          decisionStatus = 'Maybe - Yes (needs final decision)';
+                          decisionType = 'intermediate';
+                        } else if (latestComment.includes('Maybe - No')) {
+                          decisionStatus = 'Maybe - No (needs final decision)';
+                          decisionType = 'intermediate';
+                        } else {
+                          decisionStatus = 'No decision';
+                          decisionType = 'none';
+                        }
+                      }
+                      
+                      return (
+                        <Box key={candidate.id} sx={{ p: 1, border: '1px solid', borderColor: 'error.main', borderRadius: 1, bgcolor: 'error.light' }}>
+                          <Typography variant="body2" fontWeight="bold" gutterBottom>
+                            {candidate.firstName} {candidate.lastName} - {candidate.email}
+                          </Typography>
+                          <Typography variant="caption" display="block" sx={{ mb: 1 }}>
+                            Current decision: <strong>{decisionStatus}</strong>
+                          </Typography>
+                          <Stack direction="row" spacing={1}>
+                            <Button
+                              size="small"
+                              variant="contained"
+                              color="success"
+                              onClick={() => fixInvalidDecision(candidate.id, 'yes')}
+                              sx={{ textTransform: 'none' }}
+                            >
+                              Set to Yes
+                            </Button>
+                            <Button
+                              size="small"
+                              variant="contained"
+                              color="error"
+                              onClick={() => fixInvalidDecision(candidate.id, 'no')}
+                              sx={{ textTransform: 'none' }}
+                            >
+                              Set to No
+                            </Button>
+                          </Stack>
+                        </Box>
+                      );
+                    })}
+                  </Stack>
+                </Alert>
+              )}
+              
+              <Typography variant="body2">
+                {currentTab === 1 ? (
+                  // Coffee Chats: count only phase 2 applications with yes/no decisions
+                  (() => {
+                    const coffeeApps = (adminApplications || []).filter(app => String(app.currentRound) === '2');
+                    const toProcess = coffeeApps.filter(app => {
+                      const localDecision = inlineDecisions[app.id];
+                      const dbDecision = app.approved === true ? 'yes' : app.approved === false ? 'no' : '';
+                      const decision = localDecision || dbDecision;
+                      return decision === 'yes' || decision === 'no';
+                    });
+                    return (<span>Applications to process: <strong>{toProcess.length}</strong></span>);
+                  })()
+                ) : currentTab === 2 ? (
+                  // First Round: count only phase 3 applications with yes/no decisions
+                  (() => {
+                    const firstRoundApps = (adminApplications || []).filter(app => String(app.currentRound) === '3');
+                    const toProcess = firstRoundApps.filter(app => {
+                      const localDecision = inlineDecisions[app.id];
+                      const dbDecision = app.approved === true ? 'yes' : app.approved === false ? 'no' : '';
+                      const decision = localDecision || dbDecision;
+                      return decision === 'yes' || decision === 'no';
+                    });
+                    return (<span>Applications to process: <strong>{toProcess.length}</strong></span>);
+                  })()
+                ) : currentTab === 3 ? (
+                  // Final Round: count only phase 4 applications with yes/no decisions
+                  (() => {
+                    const finalRoundApps = (adminApplications || []).filter(app => String(app.currentRound) === '4');
+                    const toProcess = finalRoundApps.filter(app => {
+                      const localDecision = inlineDecisions[app.id];
+                      const dbDecision = app.approved === true ? 'yes' : app.approved === false ? 'no' : '';
+                      const decision = localDecision || dbDecision;
+                      return decision === 'yes' || decision === 'no';
+                    });
+                    return (<span>Applications to process: <strong>{toProcess.length}</strong></span>);
+                  })()
+                ) : (
+                  <span>Candidates to process: <strong>{candidates.filter(c => inlineDecisions[c.id] === 'yes' || inlineDecisions[c.id] === 'no').length}</strong></span>
+                )}
+              </Typography>
+              <TextField
+                label="Type PROCESS to confirm"
+                value={pushAllConfirmText}
+                onChange={(e) => setPushAllConfirmText(e.target.value)}
+                placeholder="PROCESS"
+                fullWidth
+              />
+              <FormControlLabel
+                control={<Checkbox checked={pushAllAcknowledge} onChange={(e) => setPushAllAcknowledge(e.target.checked)} />}
+                label={currentTab === 0 ? "I understand this will advance candidates to the next round (no emails will be sent)" : "I understand this will send emails and advance candidates to the next round"}
+              />
+            </Stack>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setPushAllDialogOpen(false)} disabled={pushAllLoading}>Cancel</Button>
+            <Button 
+              onClick={confirmPushAll}
+              variant="contained"
+              color="error"
+              disabled={pushAllLoading || pushAllConfirmText !== 'PROCESS' || !pushAllAcknowledge || pushAllPreview.invalidDecisions > 0}
+            >
+              {pushAllLoading ? 'Processing…' : 'Process All Decisions'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Decision Dialog */}
+        <Dialog open={decisionDialogOpen} onClose={() => setDecisionDialogOpen(false)} maxWidth="md" fullWidth>
+          <DialogTitle>
+            Make Decision - {selectedCandidate && `${selectedCandidate.firstName} ${selectedCandidate.lastName}`}
+          </DialogTitle>
+          <DialogContent>
+            <Grid container spacing={2} sx={{ mt: 1 }}>
+              <Grid item xs={12}>
+                <Typography variant="subtitle2" gutterBottom>
+                  Current Round: {currentDecision.round === 1 ? 'Resume Review' : 
+                                 currentDecision.round === 2 ? 'Coffee Chats' : 
+                                 currentDecision.round === 3 ? 'First Round Interviews' : 
+                                 currentDecision.round === 4 ? 'Final Decision' : 
+                                 `Round ${currentDecision.round}`}
+                </Typography>
+              </Grid>
+              <Grid item xs={12}>
+                <FormControl fullWidth>
+                  <InputLabel>Decision</InputLabel>
+                  <Select
+                    value={currentDecision.decision}
+                    onChange={(e) => setCurrentDecision({ ...currentDecision, decision: e.target.value })}
+                    label="Decision"
+                  >
+                    {decisionOptions.map((option) => (
+                      <MenuItem key={option.value} value={option.value}>
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          {option.icon}
+                          <Typography>{option.label}</Typography>
+                        </Stack>
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={4}
+                  label="Notes"
+                  value={currentDecision.notes}
+                  onChange={(e) => setCurrentDecision({ ...currentDecision, notes: e.target.value })}
+                  placeholder="Add any notes about this decision..."
+                />
+              </Grid>
+            </Grid>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setDecisionDialogOpen(false)}>Cancel</Button>
+            <Button 
+              onClick={handleDecisionSubmit}
+              variant="contained"
+              disabled={!currentDecision.decision}
+            >
+              Submit Decision
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Final Decision Dialog */}
+        <Dialog open={finalDecisionDialogOpen} onClose={() => setFinalDecisionDialogOpen(false)} maxWidth="md" fullWidth>
+          <DialogTitle>
+            Final Decision - {selectedCandidate && `${selectedCandidate.firstName} ${selectedCandidate.lastName}`}
+          </DialogTitle>
+          <DialogContent>
+            <Grid container spacing={2} sx={{ mt: 1 }}>
+              <Grid item xs={12}>
+                <FormControl fullWidth>
+                  <InputLabel>Final Decision</InputLabel>
+                  <Select
+                    value={finalDecision.decision}
+                    onChange={(e) => setFinalDecision({ ...finalDecision, decision: e.target.value })}
+                    label="Final Decision"
+                  >
+                    <MenuItem value="ACCEPT">Accept</MenuItem>
+                    <MenuItem value="REJECT">Reject</MenuItem>
+                    <MenuItem value="WAITLIST">Waitlist</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={4}
+                  label="Feedback"
+                  value={finalDecision.feedback}
+                  onChange={(e) => setFinalDecision({ ...finalDecision, feedback: e.target.value })}
+                  placeholder="Provide feedback for the candidate..."
+                />
+              </Grid>
+            </Grid>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setFinalDecisionDialogOpen(false)}>Cancel</Button>
+            <Button 
+              onClick={handleFinalDecisionSubmit}
+              variant="contained"
+              disabled={!finalDecision.decision}
+            >
+              Submit Final Decision
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Final Round Interview Notes Modal */}
+        <Dialog open={finalRoundNotesModalOpen} onClose={() => setFinalRoundNotesModalOpen(false)} maxWidth="lg" fullWidth>
+          <DialogTitle>
+            Final Round Interview Notes
+            {selectedCandidateForNotes && (
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                Application ID: {selectedCandidateForNotes}
+              </Typography>
+            )}
+          </DialogTitle>
+          <DialogContent>
+            {finalRoundNotesLoading ? (
+              <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
+                <CircularProgress />
+                <Typography variant="body2" sx={{ ml: 2 }}>Loading interview notes...</Typography>
+              </Box>
+            ) : finalRoundInterviewNotes.length === 0 ? (
+              <Box textAlign="center" py={4}>
+                <Typography variant="body1" color="text.secondary">
+                  No final round interview evaluations found for this candidate.
+                </Typography>
+              </Box>
+            ) : (
+              <Box>
+                <Typography variant="h6" gutterBottom>
+                  Interview Evaluations ({finalRoundInterviewNotes.length})
+                </Typography>
+                <Stack spacing={3}>
+                  {finalRoundInterviewNotes.map((evaluation, index) => (
+                    <Card key={evaluation.id || index} variant="outlined">
+                      <CardContent>
+                        <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={2}>
+                          <Typography variant="subtitle1" fontWeight="bold">
+                            Interviewer: {evaluation.evaluator?.fullName || 'Unknown'}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {evaluation.createdAt ? new Date(evaluation.createdAt).toLocaleDateString() : 'Date unknown'}
+                          </Typography>
+                        </Box>
+                        
+                        {/* Behavioral Notes */}
+                        {evaluation.behavioralNotes && Object.keys(evaluation.behavioralNotes).length > 0 && (
+                          <Box mb={2}>
+                            <Typography variant="subtitle2" fontWeight="bold" gutterBottom color="primary">
+                              Behavioral Assessment Notes
+                            </Typography>
+                            {Object.entries(evaluation.behavioralNotes).map(([questionId, notes]) => (
+                              notes && (
+                                <Box key={questionId} mb={1} p={2} bgcolor="grey.50" borderRadius={1}>
+                                  <Typography variant="caption" color="text.secondary" display="block" sx={{ fontWeight: 'medium' }}>
+                                    Question {Object.keys(evaluation.behavioralNotes).indexOf(questionId) + 1}
+                                  </Typography>
+                                  <Typography variant="body2">{notes}</Typography>
+                                </Box>
+                              )
+                            ))}
+                          </Box>
+                        )}
+                        
+                        {/* Casing Notes */}
+                        {evaluation.casingNotes && Object.keys(evaluation.casingNotes).length > 0 && (
+                          <Box mb={2}>
+                            <Typography variant="subtitle2" fontWeight="bold" gutterBottom color="primary">
+                              Case Interview Notes
+                            </Typography>
+                            {Object.entries(evaluation.casingNotes).map(([section, notes]) => (
+                              notes && (
+                                <Box key={section} mb={1} p={2} bgcolor="grey.50" borderRadius={1}>
+                                  <Typography variant="caption" color="text.secondary" display="block" sx={{ textTransform: 'capitalize' }}>
+                                    {section.replace(/([A-Z])/g, ' $1').trim()}
+                                  </Typography>
+                                  <Typography variant="body2">{notes}</Typography>
+                                </Box>
+                              )
+                            ))}
+                          </Box>
+                        )}
+                        
+                        {/* Candidate Details Confirmation */}
+                        {evaluation.candidateDetails && (
+                          <Box mb={2}>
+                            <Typography variant="subtitle2" fontWeight="bold" gutterBottom color="primary">
+                              Candidate Details Confirmation
+                            </Typography>
+                            <Box display="flex" flexWrap="wrap" gap={1}>
+                              {Object.entries(evaluation.candidateDetails).map(([detail, confirmed]) => (
+                                confirmed && (
+                                  <Chip 
+                                    key={detail} 
+                                    label={detail.replace(/([A-Z])/g, ' $1').trim()} 
+                                    size="small" 
+                                    color="success" 
+                                    variant="outlined"
+                                  />
+                                )
+                              ))}
+                            </Box>
+                          </Box>
+                        )}
+                        
+                        {/* Final Decision */}
+                        {evaluation.finalDecision && (
+                          <Box>
+                            <Typography variant="subtitle2" fontWeight="bold" gutterBottom color="primary">
+                              Final Decision
+                            </Typography>
+                            <Chip 
+                              label={evaluation.finalDecision} 
+                              color={evaluation.finalDecision === 'YES' ? 'success' : 
+                                     evaluation.finalDecision === 'MAYBE_YES' ? 'warning' :
+                                     evaluation.finalDecision === 'MAYBE_NO' ? 'warning' : 'error'} 
+                              variant="filled"
+                            />
+                          </Box>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </Stack>
+              </Box>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setFinalRoundNotesModalOpen(false)}>Close</Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Edit Score Modal */}
+        <Dialog open={editScoreModalOpen} onClose={() => setEditScoreModalOpen(false)} maxWidth="sm" fullWidth>
+          <DialogTitle>
+            Edit {editingScoreType === 'resume' ? 'Resume' : editingScoreType === 'coverLetter' ? 'Cover Letter' : 'Video'} Score
+          </DialogTitle>
+          <DialogContent>
+            <Grid container spacing={2} sx={{ mt: 1 }}>
+              <Grid item xs={12}>
+                <Typography variant="body2" color="text.secondary" gutterBottom>
+                  Evaluator: {editingScore?.evaluator?.fullName || 'Unknown'}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Date: {editingScore?.createdAt ? new Date(editingScore.createdAt).toLocaleDateString() : 'N/A'}
+                </Typography>
+              </Grid>
+              
+              {editingScoreType === 'resume' && (
+                <>
+                  <Grid item xs={6}>
+                    <TextField
+                      fullWidth
+                      label="Score One (Content/Relevance/Impact)"
+                      type="number"
+                      inputProps={{ min: 0, max: 10 }}
+                      value={editScoreForm.scoreOne}
+                      onChange={(e) => setEditScoreForm({ ...editScoreForm, scoreOne: e.target.value })}
+                    />
+                  </Grid>
+                  <Grid item xs={6}>
+                    <TextField
+                      fullWidth
+                      label="Score Two (Structure/Formatting)"
+                      type="number"
+                      inputProps={{ min: 0, max: 3 }}
+                      value={editScoreForm.scoreTwo}
+                      onChange={(e) => setEditScoreForm({ ...editScoreForm, scoreTwo: e.target.value })}
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="Overall Score (0-13)"
+                      type="number"
+                      inputProps={{ min: 0, max: 13, step: 0.1 }}
+                      value={editScoreForm.overallScore}
+                      onChange={(e) => setEditScoreForm({ ...editScoreForm, overallScore: e.target.value })}
+                      helperText="Leave empty to auto-calculate from Score One + Score Two"
+                    />
+                  </Grid>
+                </>
+              )}
+              
+              {editingScoreType === 'coverLetter' && (
+                <>
+                  <Grid item xs={4}>
+                    <TextField
+                      fullWidth
+                      label="Score One"
+                      type="number"
+                      inputProps={{ min: 0, max: 3 }}
+                      value={editScoreForm.scoreOne}
+                      onChange={(e) => setEditScoreForm({ ...editScoreForm, scoreOne: e.target.value })}
+                    />
+                  </Grid>
+                  <Grid item xs={4}>
+                    <TextField
+                      fullWidth
+                      label="Score Two"
+                      type="number"
+                      inputProps={{ min: 0, max: 3 }}
+                      value={editScoreForm.scoreTwo}
+                      onChange={(e) => setEditScoreForm({ ...editScoreForm, scoreTwo: e.target.value })}
+                    />
+                  </Grid>
+                  <Grid item xs={4}>
+                    <TextField
+                      fullWidth
+                      label="Score Three"
+                      type="number"
+                      inputProps={{ min: 0, max: 3 }}
+                      value={editScoreForm.scoreThree}
+                      onChange={(e) => setEditScoreForm({ ...editScoreForm, scoreThree: e.target.value })}
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="Overall Score (0-3)"
+                      type="number"
+                      inputProps={{ min: 0, max: 3, step: 0.1 }}
+                      value={editScoreForm.overallScore}
+                      onChange={(e) => setEditScoreForm({ ...editScoreForm, overallScore: e.target.value })}
+                      helperText="Leave empty to auto-calculate from average of scores"
+                    />
+                  </Grid>
+                </>
+              )}
+              
+              {editingScoreType === 'video' && (
+                <>
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="Score One (0-2)"
+                      type="number"
+                      inputProps={{ min: 0, max: 2 }}
+                      value={editScoreForm.scoreOne}
+                      onChange={(e) => setEditScoreForm({ ...editScoreForm, scoreOne: e.target.value })}
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="Overall Score (0-2)"
+                      type="number"
+                      inputProps={{ min: 0, max: 2, step: 0.1 }}
+                      value={editScoreForm.overallScore}
+                      onChange={(e) => setEditScoreForm({ ...editScoreForm, overallScore: e.target.value })}
+                      helperText="Leave empty to use Score One"
+                    />
+                  </Grid>
+                </>
+              )}
+              
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={3}
+                  label="Notes"
+                  value={editScoreForm.notes}
+                  onChange={(e) => setEditScoreForm({ ...editScoreForm, notes: e.target.value })}
+                />
+              </Grid>
+              
+              <Grid item xs={12}>
+                <Divider sx={{ my: 1 }} />
+                <Typography variant="subtitle2" gutterBottom>
+                  Admin Override (Optional)
+                </Typography>
+              </Grid>
+              
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Admin Score Override"
+                  type="number"
+                  inputProps={{ 
+                    min: 0, 
+                    max: editingScoreType === 'resume' ? 13 : editingScoreType === 'coverLetter' ? 3 : 2,
+                    step: 0.1 
+                  }}
+                  value={editScoreForm.adminScore}
+                  onChange={(e) => setEditScoreForm({ ...editScoreForm, adminScore: e.target.value })}
+                  helperText="Override the overall score with an admin score"
+                />
+              </Grid>
+              
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={3}
+                  label="Admin Notes"
+                  value={editScoreForm.adminNotes}
+                  onChange={(e) => setEditScoreForm({ ...editScoreForm, adminNotes: e.target.value })}
+                  placeholder="Add admin notes about this score..."
+                />
+              </Grid>
+            </Grid>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setEditScoreModalOpen(false)} disabled={savingScore}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSaveScore}
+              variant="contained"
+              disabled={savingScore}
+            >
+              {savingScore ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Snackbar */}
+        <Snackbar
+          open={snackbar.open}
+          autoHideDuration={6000}
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+        >
+          <Alert 
+            onClose={() => setSnackbar({ ...snackbar, open: false })} 
+            severity={snackbar.severity}
+          >
+            {snackbar.message}
+          </Alert>
+        </Snackbar>
+      </Box>
+    </ThemeProvider>
+    </AccessControl>
   );
 }
