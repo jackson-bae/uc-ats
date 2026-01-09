@@ -330,7 +330,8 @@ export default function AssignedInterviews() {
       // Check if this is a final round interview
       const interview = interviews.find(i => i.id === selectedInterviewForStart);
       const isFinalRound = interview?.interviewType === 'FINAL_ROUND' || interview?.interviewType === 'ROUND_TWO';
-      const maxGroups = isFinalRound ? 1 : 3;
+      const isRoundOne = interview?.interviewType === 'ROUND_ONE';
+      const maxGroups = isFinalRound ? 1 : (isRoundOne ? 3 : 3);
       
       let newGroups;
       if (prev.includes(groupId)) {
@@ -383,8 +384,8 @@ export default function AssignedInterviews() {
     
     const interview = interviews.find(i => i.id === selectedInterviewForStart);
     
-    // Check if this is a final round interview that needs behavioral questions configuration
-    if ((interview?.interviewType === 'ROUND_TWO' || interview?.interviewType === 'FINAL_ROUND') && !showBehavioralQuestionsConfig) {
+    // Check if this is a round that needs behavioral questions configuration
+    if ((interview?.interviewType === 'ROUND_TWO' || interview?.interviewType === 'FINAL_ROUND' || interview?.interviewType === 'ROUND_ONE') && !showBehavioralQuestionsConfig) {
       setShowBehavioralQuestionsConfig(true);
       return;
     }
@@ -593,11 +594,19 @@ export default function AssignedInterviews() {
       });
     });
     
+    const userId = String(currentUser.id);
     const userGroup = data.memberGroups.find(group => {
-      const isInGroup = group.memberIds?.includes(currentUser.id);
+      if (!group.memberIds || !Array.isArray(group.memberIds)) {
+        return false;
+      }
+      // Check both string and number comparisons
+      const isInGroup = group.memberIds.some(id => 
+        String(id) === userId || id === currentUser.id
+      );
       console.log(`Checking group "${group.name}":`, {
         groupMemberIds: group.memberIds,
         currentUserId: currentUser.id,
+        userIdString: userId,
         isInGroup: isInGroup
       });
       return isInGroup;
@@ -639,7 +648,7 @@ export default function AssignedInterviews() {
               {showBehavioralQuestionsConfig ? (
                 <div className="behavioral-questions-config">
                   <div className="config-instruction">
-                    <p>Configure the behavioral questions for this final round interview. These questions will be used for all candidates in the selected groups.</p>
+                    <p>Configure the behavioral questions for this interview. These questions will be used for all candidates in the selected groups.</p>
                     {behavioralQuestionsConfig.length > 0 && (
                       <p className="existing-questions-note">
                         <strong>Existing questions:</strong> {behavioralQuestionsConfig.length} question(s) already configured. You can edit them below or add new ones.
@@ -695,9 +704,15 @@ export default function AssignedInterviews() {
                       const groupAssignments = data.groupAssignments || {};
                       
                       // Find all member groups that include the current user
-                      const userMemberGroups = data.memberGroups?.filter(memberGroup => 
-                        memberGroup.memberIds?.includes(currentUser.id)
-                      ) || [];
+                      const userId = String(currentUser.id);
+                      const userMemberGroups = data.memberGroups?.filter(memberGroup => {
+                        if (!memberGroup.memberIds || !Array.isArray(memberGroup.memberIds)) {
+                          return false;
+                        }
+                        return memberGroup.memberIds.some(id => 
+                          String(id) === userId || id === currentUser.id
+                        );
+                      }) || [];
                       
                       // Check if this application group is assigned to any of the user's member groups
                       return userMemberGroups.some(memberGroup => 
@@ -730,7 +745,8 @@ export default function AssignedInterviews() {
                           filteredGroups.map(group => {
                             const isSelected = selectedGroups.includes(group.id);
                             const isFinalRound = interview?.interviewType === 'FINAL_ROUND' || interview?.interviewType === 'ROUND_TWO';
-                            const maxGroups = isFinalRound ? 1 : 3;
+                            const isRoundOne = interview?.interviewType === 'ROUND_ONE';
+                            const maxGroups = isFinalRound ? 1 : (isRoundOne ? 3 : 3);
                             const isDisabled = !isSelected && selectedGroups.length >= maxGroups;
                             
                             return (
@@ -796,16 +812,42 @@ export default function AssignedInterviews() {
 
       {/* Main Content - Interview Cards Grid */}
       <div className="interviews-grid">
-        {interviews.length === 0 ? (
-          <div className="no-interviews-card">
-            <div className="no-interviews-icon">
-              <CalendarIcon className="empty-icon" />
+        {(() => {
+          // Filter interviews to only show those where the user is assigned to a member group
+          const assignedInterviews = currentUser ? interviews.filter(interview => {
+            const data = interviewData[interview.id] || {};
+            const memberGroups = data.memberGroups || [];
+            
+            // Check if the current user is in any member group for this interview
+            // Handle both string and number ID types
+            const userId = String(currentUser.id);
+            const userInGroup = memberGroups.some(memberGroup => {
+              if (!memberGroup.memberIds || !Array.isArray(memberGroup.memberIds)) {
+                return false;
+              }
+              // Check both string and number comparisons
+              return memberGroup.memberIds.some(id => 
+                String(id) === userId || id === currentUser.id
+              );
+            });
+            
+            if (!userInGroup) {
+              console.log(`User ${currentUser.id} not found in any member group for interview ${interview.id}`);
+            }
+            
+            return userInGroup;
+          }) : [];
+          
+          return assignedInterviews.length === 0 ? (
+            <div className="no-interviews-card">
+              <div className="no-interviews-icon">
+                <CalendarIcon className="empty-icon" />
+              </div>
+              <h2>No Interviews Assigned</h2>
+              <p>You don't have any interviews assigned at this time</p>
             </div>
-            <h2>No Interviews Assigned</h2>
-            <p>You don't have any interviews assigned at this time</p>
-          </div>
-        ) : (
-          interviews.map((interview) => {
+          ) : (
+            assignedInterviews.map((interview) => {
             const startDate = new Date(interview.startDate);
             const endDate = new Date(interview.endDate);
             const isSelected = interview.id === selectedInterviewId;
@@ -1116,9 +1158,15 @@ export default function AssignedInterviews() {
                               const groupAssignments = currentInterviewData?.groupAssignments || {};
                               
                               // Find all member groups that include the current user
-                              const userMemberGroups = currentInterviewData?.memberGroups?.filter(memberGroup => 
-                                memberGroup.memberIds?.includes(currentUser.id)
-                              ) || [];
+                              const userId = String(currentUser.id);
+                              const userMemberGroups = currentInterviewData?.memberGroups?.filter(memberGroup => {
+                                if (!memberGroup.memberIds || !Array.isArray(memberGroup.memberIds)) {
+                                  return false;
+                                }
+                                return memberGroup.memberIds.some(id => 
+                                  String(id) === userId || id === currentUser.id
+                                );
+                              }) || [];
                               
                               // Check if this application group is assigned to any of the user's member groups
                               return userMemberGroups.some(memberGroup => 
@@ -1176,7 +1224,8 @@ export default function AssignedInterviews() {
               </div>
             );
           })
-        )}
+          );
+        })()}
       </div>
 
       {/* Edit Evaluation Modal */}

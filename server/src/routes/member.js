@@ -1216,7 +1216,12 @@ router.get('/evaluations', requireAuth, async (req, res) => {
           } catch (e) {
             parsed.behavioralNotes = {};
           }
+        } else {
+          // If it's a string but not JSON, convert to empty object
+          parsed.behavioralNotes = {};
         }
+      } else if (!parsed.behavioralNotes) {
+        parsed.behavioralNotes = {};
       }
       
       if (parsed.casingNotes && typeof parsed.casingNotes === 'string') {
@@ -1314,7 +1319,7 @@ router.post('/evaluations', requireAuth, async (req, res) => {
         marketSizingLogic,
         marketSizingCreativity,
         marketSizingTotal,
-        behavioralNotes,
+        behavioralNotes: behavioralNotes ? JSON.stringify(behavioralNotes) : null,
         marketSizingNotes,
         additionalNotes,
         updatedAt: new Date()
