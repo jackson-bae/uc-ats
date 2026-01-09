@@ -1046,21 +1046,36 @@ router.get('/:id/events', requireAuth, async (req, res) => {
     );
 
     // Add "Get to Know UC" meeting attendance as a special event
-    const meetingAttendance = await prisma.meetingSignup.findFirst({
-      where: { 
-        studentId: application.candidate?.studentId || application.studentId,
-        attended: true
-      },
-      include: {
-        slot: {
-          include: {
-            member: {
-              select: { fullName: true }
+    // Only include meetings that fall within the current recruiting cycle's date range
+    const cycle = await prisma.recruitingCycle.findUnique({
+      where: { id: application.cycleId },
+      select: { startDate: true, endDate: true }
+    });
+
+    let meetingAttendance = null;
+    if (cycle && cycle.startDate && cycle.endDate) {
+      meetingAttendance = await prisma.meetingSignup.findFirst({
+        where: {
+          studentId: application.candidate?.studentId || application.studentId,
+          attended: true,
+          slot: {
+            startTime: {
+              gte: cycle.startDate,
+              lte: cycle.endDate
+            }
+          }
+        },
+        include: {
+          slot: {
+            include: {
+              member: {
+                select: { fullName: true }
+              }
             }
           }
         }
-      }
-    });
+      });
+    }
 
     if (meetingAttendance) {
       eventsWithStatus.push({

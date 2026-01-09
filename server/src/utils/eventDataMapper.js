@@ -77,6 +77,8 @@ function findMappingByPatterns(fieldPatterns, questionTitle) {
   if (!questionTitle) return null;
   
   const title = questionTitle.toLowerCase().trim();
+  console.log(`Question Title for pattern matching: "${title}"`);
+  console.log('Available field patterns:', JSON.stringify(fieldPatterns, null, 2));
   
   // Check each field pattern configuration
   for (const [fieldKey, fieldConfig] of Object.entries(fieldPatterns)) {
