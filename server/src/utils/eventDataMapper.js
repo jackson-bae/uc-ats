@@ -59,6 +59,19 @@ export function transformEventFormResponse(formResponse, configType, eventId) {
     console.log(`Split fullName "${dbRecord.fullName}" into firstName: "${dbRecord.firstName}", lastName: "${dbRecord.lastName}"`);
     delete dbRecord.fullName; // Remove fullName since we've split it
   }
+  
+  // Also handle case where firstName contains a full name (spaces) but lastName is missing
+  // This can happen if a single "Full Name" question was incorrectly mapped to firstName
+  if (dbRecord.firstName && !dbRecord.lastName && dbRecord.firstName.includes(' ')) {
+    const nameParts = dbRecord.firstName.trim().split(/\s+/);
+    if (nameParts.length >= 2) {
+      const originalFirstName = dbRecord.firstName;
+      dbRecord.firstName = nameParts[0];
+      dbRecord.lastName = nameParts.slice(1).join(' ');
+      console.log(`Split firstName "${originalFirstName}" (which contained full name) into firstName: "${dbRecord.firstName}", lastName: "${dbRecord.lastName}"`);
+    }
+  }
+  
   // If firstName/lastName exist but fullName doesn't, that's fine - no action needed
   // If neither firstName nor lastName exist, fall back to dynamic mapping later
 
@@ -193,30 +206,37 @@ export function createDynamicEventMapping(formResponse, eventId, configType) {
 
   // Process collected name values to find first and last names
   if (nameValues.length > 0) {
-    // Sort name values by length (shorter names are more likely to be first names)
-    const sortedNames = nameValues.sort((a, b) => a.length - b.length);
+    // First, check if any name value contains spaces (likely a full name field)
+    const fullNameValue = nameValues.find(name => name.includes(' ') && name.trim().split(/\s+/).length >= 2);
     
-    // Assign first name (shortest name that looks like a first name)
-    if (!mappedData.firstName && sortedNames.length > 0) {
-      mappedData.firstName = sortedNames[0];
-      console.log(`Found first name: ${sortedNames[0]}`);
-    }
-    
-    // Assign last name (second shortest name, or longest if only one name provided)
-    if (!mappedData.lastName && sortedNames.length > 1) {
-      mappedData.lastName = sortedNames[1];
-      console.log(`Found last name: ${sortedNames[1]}`);
-    } else if (!mappedData.lastName && sortedNames.length === 1) {
-      // If only one name is provided, try to split it
-      const nameParts = sortedNames[0].split(/\s+/);
-      if (nameParts.length > 1) {
+    if (fullNameValue) {
+      // If we found a full name, split it first
+      const nameParts = fullNameValue.trim().split(/\s+/);
+      if (nameParts.length >= 2) {
         mappedData.firstName = nameParts[0];
         mappedData.lastName = nameParts.slice(1).join(' ');
-        console.log(`Split single name into first: ${nameParts[0]}, last: ${nameParts.slice(1).join(' ')}`);
-      } else {
-        // Single name - use it as first name and set last name to empty or a default
+        console.log(`Split full name "${fullNameValue}" into firstName: "${mappedData.firstName}", lastName: "${mappedData.lastName}"`);
+      }
+    } else {
+      // No full name found - we likely have separate first and last name fields
+      // Sort name values by length (shorter names are more likely to be first names)
+      const sortedNames = nameValues.sort((a, b) => a.length - b.length);
+      
+      // Assign first name (shortest name that looks like a first name)
+      if (!mappedData.firstName && sortedNames.length > 0) {
+        mappedData.firstName = sortedNames[0];
+        console.log(`Found first name: ${sortedNames[0]}`);
+      }
+      
+      // Assign last name (second shortest name if multiple names exist)
+      if (!mappedData.lastName && sortedNames.length > 1) {
+        mappedData.lastName = sortedNames[1];
+        console.log(`Found last name: ${sortedNames[1]}`);
+      } else if (!mappedData.lastName && sortedNames.length === 1) {
+        // Only one name value and it doesn't contain spaces
+        // Use it as first name and set last name to empty
         mappedData.lastName = '';
-        console.log(`Only one name found, setting last name to empty`);
+        console.log(`Only one single-word name found, setting last name to empty`);
       }
     }
   }

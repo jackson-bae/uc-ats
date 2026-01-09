@@ -1612,7 +1612,20 @@ router.get('/events/:id/attendance', async (req, res) => {
 // Get all interviews
 router.get('/interviews', async (req, res) => {
   try {
+    // Get the active cycle first
+    const activeCycle = await prisma.recruitingCycle.findFirst({ 
+      where: { isActive: true } 
+    });
+    
+    if (!activeCycle) {
+      return res.json([]);
+    }
+
+    // Get all interviews for the active cycle
     const interviews = await prisma.interview.findMany({
+      where: {
+        cycleId: activeCycle.id
+      },
       include: {
         cycle: true
       },
@@ -3665,7 +3678,7 @@ router.post('/interviews/:id/evaluations', async (req, res) => {
         marketSizingLogic,
         marketSizingCreativity,
         marketSizingTotal,
-        behavioralNotes,
+        behavioralNotes: behavioralNotes ? JSON.stringify(behavioralNotes) : null,
         marketSizingNotes,
         additionalNotes,
         updatedAt: new Date()

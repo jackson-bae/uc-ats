@@ -375,8 +375,8 @@ export default function AdminAssignedInterviews() {
     
     const interview = interviews.find(i => i.id === selectedInterviewForStart);
     
-    // Check if this is a final round interview that needs behavioral questions configuration
-    if ((interview?.interviewType === 'ROUND_TWO' || interview?.interviewType === 'FINAL_ROUND') && !showBehavioralQuestionsConfig) {
+    // Check if this is a round that needs behavioral questions configuration
+    if ((interview?.interviewType === 'ROUND_TWO' || interview?.interviewType === 'FINAL_ROUND' || interview?.interviewType === 'ROUND_ONE') && !showBehavioralQuestionsConfig) {
       setShowBehavioralQuestionsConfig(true);
       return;
     }

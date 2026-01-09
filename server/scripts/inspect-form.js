@@ -77,6 +77,11 @@ function detectFieldMapping(title) {
     return { field: 'email', type: 'string', required: true, validation: 'email' };
   }
 
+  // Full name (check before first/last name)
+  if (lowerTitle.match(/full\s*name|^name$|your\s*name|first\s*(&|and)\s*last/i)) {
+    return { field: 'fullName', type: 'string', required: true };
+  }
+
   // First name
   if (lowerTitle.match(/first\s*name|given\s*name|firstname/i)) {
     return { field: 'firstName', type: 'string', required: true };
