@@ -43,14 +43,15 @@ import {
   Autocomplete,
   Alert
 } from '@mui/material';
-import { 
-  PlusIcon, 
-  UserPlusIcon, 
+import {
+  PlusIcon,
+  UserPlusIcon,
   TrashIcon,
   ChevronDownIcon,
   ChevronRightIcon,
   ArrowPathIcon,
-  ArrowTopRightOnSquareIcon
+  ArrowTopRightOnSquareIcon,
+  PencilIcon
 } from '@heroicons/react/24/outline';
 import apiClient from '../utils/api';
 import AccessControl from '../components/AccessControl';
@@ -192,6 +193,8 @@ export default function ReviewTeams() {
   const [newTeamDialogOpen, setNewTeamDialogOpen] = useState(false);
   const [addCandidateDialogOpen, setAddCandidateDialogOpen] = useState(false);
   const [addMemberDialogOpen, setAddMemberDialogOpen] = useState(false);
+  const [renameDialogOpen, setRenameDialogOpen] = useState(false);
+  const [renameTeamData, setRenameTeamData] = useState({ teamId: null, name: '' });
   const [selectedTeam, setSelectedTeam] = useState(null);
   const [newTeamData, setNewTeamData] = useState({ 
     name: '', 
@@ -305,6 +308,39 @@ export default function ReviewTeams() {
   const handleAddMember = (teamId) => {
     setSelectedTeam(teamId);
     setAddMemberDialogOpen(true);
+  };
+
+  const handleOpenRenameDialog = (team) => {
+    setRenameTeamData({ teamId: team.id, name: team.name });
+    setRenameDialogOpen(true);
+  };
+
+  const handleRenameTeam = async () => {
+    if (!renameTeamData.name.trim()) {
+      setError('Team name is required');
+      return;
+    }
+
+    try {
+      await apiClient.put(`/review-teams/${renameTeamData.teamId}/rename`, {
+        name: renameTeamData.name
+      });
+
+      // Update the teams state with the new name
+      setTeams(teams.map(team =>
+        team.id === renameTeamData.teamId
+          ? { ...team, name: renameTeamData.name }
+          : team
+      ));
+
+      setSuccess('Team renamed successfully!');
+      setTimeout(() => setSuccess(''), 3000);
+      setRenameDialogOpen(false);
+      setRenameTeamData({ teamId: null, name: '' });
+    } catch (err) {
+      console.error('Error renaming team:', err);
+      setError('Failed to rename team');
+    }
   };
 
   const handleAddMemberToTeam = async (memberId) => {
@@ -697,8 +733,25 @@ export default function ReviewTeams() {
                 )}
               </IconButton>
               <Typography variant="h5" sx={{ fontWeight: 700, color: 'primary.main' }}>
-                {team.name}: {team.code}
+                {team.name}
               </Typography>
+              <IconButton
+                size="small"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleOpenRenameDialog(team);
+                }}
+                sx={{
+                  color: 'text.secondary',
+                  '&:hover': {
+                    color: 'primary.main',
+                    backgroundColor: 'rgba(4, 39, 66, 0.04)'
+                  }
+                }}
+                title="Rename team"
+              >
+                <PencilIcon style={{ width: '1rem', height: '1rem' }} />
+              </IconButton>
             </Stack>
             <Chip
               label={`${team.applications?.length || 0} applications`}
@@ -812,52 +865,37 @@ export default function ReviewTeams() {
                 </Typography>
                 <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                   {team.members.map((member) => (
-                    <Box key={member.id} sx={{ position: 'relative' }}>
-                      <Avatar
-                        sx={{ 
-                          width: 40, 
-                          height: 40, 
-                          bgcolor: 'primary.main',
-                          fontSize: '0.875rem'
-                        }}
-                      >
-                        {member.avatar ? (
-                          <img src={member.avatar} alt={member.name} />
-                        ) : (
-                          member.name.split(' ').map(n => n[0]).join('')
-                        )}
-                      </Avatar>
-                      {editMode && (
-                        <IconButton
-                          size="small"
-                          onClick={() => handleRemoveMemberFromTeam(team.id, member.id)}
+                    <Chip
+                      key={member.id}
+                      label={member.name}
+                      avatar={
+                        <Avatar
                           sx={{
-                            position: 'absolute',
-                            top: -8,
-                            right: -8,
-                            width: 20,
-                            height: 20,
-                            backgroundColor: 'error.main',
-                            color: 'error.contrastText',
-                            '&:hover': {
-                              backgroundColor: 'error.dark'
-                            },
+                            bgcolor: 'primary.main',
+                            color: 'white',
                             fontSize: '0.75rem'
                           }}
-                          title="Remove team member"
+                          src={member.avatar}
                         >
-                          <TrashIcon style={{ width: '0.75rem', height: '0.75rem' }} />
-                        </IconButton>
-                      )}
-                    </Box>
+                          {!member.avatar && member.name.split(' ').map(n => n[0]).join('')}
+                        </Avatar>
+                      }
+                      onDelete={editMode ? () => handleRemoveMemberFromTeam(team.id, member.id) : undefined}
+                      sx={{
+                        backgroundColor: 'rgba(4, 39, 66, 0.08)',
+                        '& .MuiChip-label': {
+                          fontWeight: 500
+                        }
+                      }}
+                    />
                   ))}
                   <IconButton
                     size="small"
                     onClick={() => handleAddMember(team.id)}
                     disabled={team.members && team.members.length >= 3}
                     sx={{
-                      width: 40,
-                      height: 40,
+                      width: 32,
+                      height: 32,
                       border: '1px dashed',
                       borderColor: team.members && team.members.length >= 3 ? 'grey.300' : 'divider',
                       color: team.members && team.members.length >= 3 ? 'grey.400' : 'text.secondary',
@@ -869,7 +907,7 @@ export default function ReviewTeams() {
                     }}
                     title={team.members && team.members.length >= 3 ? 'Team is full (max 3 members)' : 'Add team member'}
                   >
-                    <UserPlusIcon style={{ width: '1.25rem', height: '1.25rem' }} />
+                    <UserPlusIcon style={{ width: '1rem', height: '1rem' }} />
                   </IconButton>
                 </Stack>
               </Box>
@@ -1255,6 +1293,37 @@ export default function ReviewTeams() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setAddCandidateDialogOpen(false)}>Cancel</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Rename Team Dialog */}
+      <Dialog open={renameDialogOpen} onClose={() => setRenameDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: 600 }}>Rename Team</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            label="Team Name"
+            fullWidth
+            variant="outlined"
+            value={renameTeamData.name}
+            onChange={(e) => setRenameTeamData({ ...renameTeamData, name: e.target.value })}
+            sx={{ mt: 2 }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                handleRenameTeam();
+              }
+            }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRenameDialogOpen(false)}>Cancel</Button>
+          <Button
+            onClick={handleRenameTeam}
+            variant="contained"
+            disabled={!renameTeamData.name.trim()}
+          >
+            Save
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>

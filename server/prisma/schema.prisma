@@ -172,6 +172,7 @@ model Evaluation {
 
 model Groups {
   id                 String             @id @default(uuid())
+  name               String?
   memberOne          String?
   memberTwo          String?
   memberThree        String?

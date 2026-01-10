@@ -67,12 +67,30 @@
 /* Table styling */
 .MuiTableContainer-root {
   border-radius: 8px !important;
-  overflow: hidden !important;
+  overflow-x: auto !important;
+  overflow-y: visible !important;
 }
 
 .MuiTable-root {
   border-collapse: separate !important;
   border-spacing: 0 !important;
+  table-layout: fixed !important;
+  min-width: 900px !important;
+}
+
+/* Staging table column widths */
+.staging-page .MuiTableCell-root:nth-child(1) { width: 220px !important; } /* Candidate */
+.staging-page .MuiTableCell-root:nth-child(2) { width: 100px !important; } /* Score */
+.staging-page .MuiTableCell-root:nth-child(3) { width: 150px !important; } /* Grading */
+.staging-page .MuiTableCell-root:nth-child(4) { width: 180px !important; } /* Attendance */
+.staging-page .MuiTableCell-root:nth-child(5) { width: 140px !important; } /* Decision */
+.staging-page .MuiTableCell-root:nth-child(6) { width: 110px !important; } /* Actions */
+
+.staging-page .MuiTableCell-root {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  vertical-align: top !important;
+  padding: 12px 8px !important;
 }
 
 .MuiTableRow-root:hover {

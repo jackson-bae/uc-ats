@@ -265,41 +265,75 @@ router.get('/', async (req, res) => {
 
     // Get all grades
     const allGrades = await prisma.grade.findMany();
-    
+
+    // Get counts of past applications by candidateId (primary) and studentId (fallback)
+    const candidateIds = [...new Set(applications.map(app => app.candidateId).filter(Boolean))];
+    const studentIds = [...new Set(applications.map(app => app.studentId).filter(Boolean))];
+
+    // Count by candidateId first (this is the proper relation)
+    const pastAppCountsByCandidateId = await prisma.application.groupBy({
+      by: ['candidateId'],
+      where: {
+        candidateId: { in: candidateIds },
+        cycleId: { not: activeCycle.id }
+      },
+      _count: { id: true }
+    });
+    const pastAppCountMapByCandidateId = new Map(pastAppCountsByCandidateId.map(p => [p.candidateId, p._count.id]));
+
+    // Also count by studentId as fallback for applications without candidateId
+    const pastAppCountsByStudentId = await prisma.application.groupBy({
+      by: ['studentId'],
+      where: {
+        studentId: { in: studentIds },
+        cycleId: { not: activeCycle.id }
+      },
+      _count: { id: true }
+    });
+    const pastAppCountMapByStudentId = new Map(pastAppCountsByStudentId.map(p => [p.studentId, p._count.id]));
+
     // Calculate average grades for each application
     const applicationsWithAverages = await Promise.all(applications.map(async (application) => {
       // Find grades for this application
       const appGrades = allGrades.filter(grade => grade.applicant === application.id);
-      
+
       // Filter out null grades and convert string grades to numbers
       const resumeGrades = appGrades
         .filter(g => g.resume !== null && g.resume !== undefined)
         .map(g => parseFloat(g.resume));
-        
+
       const videoGrades = appGrades
         .filter(g => g.video !== null && g.video !== undefined)
         .map(g => parseFloat(g.video));
-        
+
       const coverLetterGrades = appGrades
         .filter(g => g.cover_letter !== null && g.cover_letter !== undefined)
         .map(g => parseFloat(g.cover_letter));
-      
+
       // Calculate averages
-      const avgResume = resumeGrades.length > 0 ? 
+      const avgResume = resumeGrades.length > 0 ?
         (resumeGrades.reduce((a, b) => a + b, 0) / resumeGrades.length).toFixed(1) : null;
-        
-      const avgVideo = videoGrades.length > 0 ? 
+
+      const avgVideo = videoGrades.length > 0 ?
         (videoGrades.reduce((a, b) => a + b, 0) / videoGrades.length).toFixed(1) : null;
-        
-      const avgCoverLetter = coverLetterGrades.length > 0 ? 
+
+      const avgCoverLetter = coverLetterGrades.length > 0 ?
         (coverLetterGrades.reduce((a, b) => a + b, 0) / coverLetterGrades.length).toFixed(1) : null;
-      
+
       // Calculate overall average if at least one grade exists
       const allGradeValues = [...resumeGrades, ...videoGrades, ...coverLetterGrades];
-      const overallAverage = allGradeValues.length > 0 ? 
+      const overallAverage = allGradeValues.length > 0 ?
         (allGradeValues.reduce((a, b) => a + b, 0) / allGradeValues.length).toFixed(1) : null;
-      
-      // Return application with average grades
+
+      // Get past application count - prefer candidateId (proper relation), fallback to studentId
+      let pastApplicationCount = 0;
+      if (application.candidateId && pastAppCountMapByCandidateId.has(application.candidateId)) {
+        pastApplicationCount = pastAppCountMapByCandidateId.get(application.candidateId);
+      } else if (application.studentId && pastAppCountMapByStudentId.has(application.studentId)) {
+        pastApplicationCount = pastAppCountMapByStudentId.get(application.studentId);
+      }
+
+      // Return application with average grades and returning applicant info
       return {
         ...application,
         averageGrades: {
@@ -307,10 +341,12 @@ router.get('/', async (req, res) => {
           video: avgVideo,
           cover_letter: avgCoverLetter,
           overall: overallAverage
-        }
+        },
+        pastApplicationCount,
+        isReturningApplicant: pastApplicationCount > 0
       };
     }));
-    
+
     res.json(applicationsWithAverages);
   } catch (error) {
     console.error('Error fetching applications:', error);
@@ -610,10 +646,10 @@ router.get('/:id', async (req, res) => {
     const { id } = req.params;
     const application = await prisma.application.findUnique({
       where: { id },
-      include: { 
-        comments: { 
-          orderBy: { createdAt: 'desc' }, 
-          include: { user: { select: { id: true, email: true, fullName: true } } } 
+      include: {
+        comments: {
+          orderBy: { createdAt: 'desc' },
+          include: { user: { select: { id: true, email: true, fullName: true } } }
         },
         candidate: {
           select: {
@@ -623,15 +659,63 @@ router.get('/:id', async (req, res) => {
             lastName: true,
             email: true
           }
+        },
+        cycle: {
+          select: {
+            id: true,
+            name: true
+          }
         }
       }
     });
-    
+
     if (!application) {
       return res.status(404).json({ error: 'Application not found' });
     }
-    
-    res.json(application);
+
+    // Fetch past applications for this applicant (excluding current application)
+    // Prefer candidateId (proper relation) with fallback to studentId
+    let pastApplications = [];
+    if (application.candidateId) {
+      // Use candidateId - this is the proper relation
+      pastApplications = await prisma.application.findMany({
+        where: {
+          candidateId: application.candidateId,
+          id: { not: id }
+        },
+        include: {
+          cycle: {
+            select: {
+              id: true,
+              name: true
+            }
+          }
+        },
+        orderBy: { submittedAt: 'desc' }
+      });
+    } else if (application.studentId) {
+      // Fallback to studentId if no candidateId
+      pastApplications = await prisma.application.findMany({
+        where: {
+          studentId: application.studentId,
+          id: { not: id }
+        },
+        include: {
+          cycle: {
+            select: {
+              id: true,
+              name: true
+            }
+          }
+        },
+        orderBy: { submittedAt: 'desc' }
+      });
+    }
+
+    res.json({
+      ...application,
+      pastApplications
+    });
   } catch (error) {
     console.error('Error fetching application:', error);
     console.error('Error details:', error.message, error.stack);
@@ -884,18 +968,34 @@ router.get('/:id/grades/average', requireAuth, async (req, res) => {
     let overallAverage = allGradeValues.length > 0 ? 
       (allGradeValues.reduce((a, b) => a + b, 0) / allGradeValues.length) : 0;
 
-    // Get application for candidate ID
+    // Get application for candidate ID and cycle dates
     const application = await prisma.application.findUnique({
       where: { id: applicationId },
-      select: { candidateId: true, studentId: true }
+      select: {
+        candidateId: true,
+        studentId: true,
+        cycleId: true,
+        cycle: {
+          select: {
+            startDate: true,
+            endDate: true
+          }
+        }
+      }
     });
 
     let eventPointsContribution = 0;
     
     if (application && application.candidateId) {
       // Calculate event points contribution (raw points, not scaled)
+      // Only include events from the current cycle
       const eventAttendance = await prisma.eventAttendance.findMany({
-        where: { candidateId: application.candidateId },
+        where: {
+          candidateId: application.candidateId,
+          event: {
+            cycleId: application.cycleId
+          }
+        },
         include: { event: true }
       });
 
@@ -907,15 +1007,29 @@ router.get('/:id/grades/average', requireAuth, async (req, res) => {
       overallAverage += eventPointsContribution;
 
       // Add meeting attendance bonus (1 point for attending "Get to Know UC")
-      const meetingAttendance = await prisma.meetingSignup.findFirst({
-        where: { 
-          studentId: application.studentId,
-          attended: true
-        }
-      });
+      // Only count meetings within the current cycle's date range
+      // If the cycle has no start date, we cannot determine which meetings belong to this cycle,
+      // so we don't count any GTKUC attendance to avoid crediting old meetings
+      const cycleStartDate = application.cycle?.startDate ? new Date(application.cycle.startDate) : null;
+      const cycleEndDate = application.cycle?.endDate ? new Date(application.cycle.endDate) : null;
 
-      if (meetingAttendance) {
-        overallAverage += 1;
+      if (cycleStartDate) {
+        const meetingAttendance = await prisma.meetingSignup.findFirst({
+          where: {
+            studentId: application.studentId,
+            attended: true,
+            slot: {
+              startTime: {
+                gte: cycleStartDate,
+                ...(cycleEndDate && { lte: cycleEndDate })
+              }
+            }
+          }
+        });
+
+        if (meetingAttendance) {
+          overallAverage += 1;
+        }
       }
     }
 
@@ -985,7 +1099,9 @@ router.get('/:id/events', requireAuth, async (req, res) => {
         cycle: {
           select: {
             id: true,
-            isActive: true
+            isActive: true,
+            startDate: true,
+            endDate: true
           }
         }
       }
@@ -1046,35 +1162,49 @@ router.get('/:id/events', requireAuth, async (req, res) => {
     );
 
     // Add "Get to Know UC" meeting attendance as a special event
-    const meetingAttendance = await prisma.meetingSignup.findFirst({
-      where: { 
-        studentId: application.candidate?.studentId || application.studentId,
-        attended: true
-      },
-      include: {
-        slot: {
-          include: {
-            member: {
-              select: { fullName: true }
+    // Only count meetings within the current cycle's date range
+    // If the cycle has no start date, we cannot determine which meetings belong to this cycle,
+    // so we don't count any GTKUC attendance to avoid crediting old meetings
+    const cycleStartDate = application.cycle?.startDate ? new Date(application.cycle.startDate) : null;
+    const cycleEndDate = application.cycle?.endDate ? new Date(application.cycle.endDate) : null;
+
+    if (cycleStartDate) {
+      const meetingAttendance = await prisma.meetingSignup.findFirst({
+        where: {
+          studentId: application.candidate?.studentId || application.studentId,
+          attended: true,
+          slot: {
+            startTime: {
+              gte: cycleStartDate,
+              ...(cycleEndDate && { lte: cycleEndDate })
+            }
+          }
+        },
+        include: {
+          slot: {
+            include: {
+              member: {
+                select: { fullName: true }
+              }
             }
           }
         }
-      }
-    });
-
-    if (meetingAttendance) {
-      eventsWithStatus.push({
-        id: 'meeting-' + meetingAttendance.id,
-        eventName: 'Get to Know UC',
-        eventStartDate: meetingAttendance.slot.startTime,
-        eventEndDate: meetingAttendance.slot.endTime,
-        eventLocation: meetingAttendance.slot.location,
-        rsvpStatus: 'RSVPed',
-        attendanceStatus: 'Attended',
-        points: 1,
-        isMeeting: true,
-        memberName: meetingAttendance.slot.member.fullName
       });
+
+      if (meetingAttendance) {
+        eventsWithStatus.push({
+          id: 'meeting-' + meetingAttendance.id,
+          eventName: 'Get to Know UC',
+          eventStartDate: meetingAttendance.slot.startTime,
+          eventEndDate: meetingAttendance.slot.endTime,
+          eventLocation: meetingAttendance.slot.location,
+          rsvpStatus: 'RSVPed',
+          attendanceStatus: 'Attended',
+          points: 1,
+          isMeeting: true,
+          memberName: meetingAttendance.slot.member.fullName
+        });
+      }
     }
 
     const totalPoints = eventsWithStatus.reduce((sum, event) => sum + event.points, 0);
