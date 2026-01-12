@@ -9,36 +9,36 @@ datasource db {
 }
 
 model User {
-  id                   String                @id @default(uuid())
-  email                String                @unique
-  password             String
-  fullName             String
-  graduationClass      String?
-  role                 UserRole              @default(USER)
-  createdAt            DateTime              @default(now())
-  resetToken           String?
-  resetTokenExpiry     DateTime?
-  profileImage         String?
-  studentId            String?            @unique
-  comments             Comment[]
-  coverLetterScores    CoverLetterScore[]
-  evaluations          Evaluation[]
-  memberOneGroups      Groups[]              @relation("GroupMemberOne")
-  memberThreeGroups    Groups[]              @relation("GroupMemberThree")
-  memberTwoGroups      Groups[]              @relation("GroupMemberTwo")
-  completedActionItems InterviewActionItem[] @relation("InterviewActionItemCompletion")
-  interviewAssignments InterviewAssignment[] @relation("InterviewAssignment")
-  interviewEvaluations InterviewEvaluation[] @relation("InterviewEvaluator")
-  firstRoundEvaluations FirstRoundInterviewEvaluation[] @relation("FirstRoundEvaluator")
-  interviewResources   InterviewResource[]
-  createdInterviews    Interview[]           @relation("InterviewCreator")
+  id                         String                          @id @default(uuid())
+  email                      String                          @unique
+  password                   String
+  fullName                   String
+  graduationClass            String?
+  role                       UserRole                        @default(USER)
+  createdAt                  DateTime                        @default(now())
+  resetToken                 String?
+  resetTokenExpiry           DateTime?
+  profileImage               String?
+  studentId                  String?                         @unique
   createdBehavioralQuestions BehavioralQuestion[]
-  resumeScores         ResumeScore[]
-  videoScores          VideoScore[]
-  flaggedDocuments     FlaggedDocument[]     @relation("DocumentFlagger")
-  resolvedDocuments    FlaggedDocument[]     @relation("DocumentResolver")
-  meetingSlots         MeetingSlot[]
-  memberEventRsvp      MemberEventRsvp[]
+  comments                   Comment[]
+  coverLetterScores          CoverLetterScore[]
+  evaluations                Evaluation[]
+  firstRoundEvaluations      FirstRoundInterviewEvaluation[] @relation("FirstRoundEvaluator")
+  flaggedDocuments           FlaggedDocument[]               @relation("DocumentFlagger")
+  resolvedDocuments          FlaggedDocument[]               @relation("DocumentResolver")
+  memberOneGroups            Groups[]                        @relation("GroupMemberOne")
+  memberThreeGroups          Groups[]                        @relation("GroupMemberThree")
+  memberTwoGroups            Groups[]                        @relation("GroupMemberTwo")
+  completedActionItems       InterviewActionItem[]           @relation("InterviewActionItemCompletion")
+  interviewAssignments       InterviewAssignment[]           @relation("InterviewAssignment")
+  interviewEvaluations       InterviewEvaluation[]           @relation("InterviewEvaluator")
+  interviewResources         InterviewResource[]
+  createdInterviews          Interview[]                     @relation("InterviewCreator")
+  meetingSlots               MeetingSlot[]
+  memberEventRsvp            MemberEventRsvp[]
+  resumeScores               ResumeScore[]
+  videoScores                VideoScore[]
 
   @@map("users")
 }
@@ -68,63 +68,63 @@ model Candidate {
 }
 
 model Application {
-  id                   String                @id @default(uuid())
-  status               ApplicationStatus     @default(SUBMITTED)
-  responseID           String                @unique
-  submittedAt          DateTime              @default(now())
-  email                String
-  firstName            String
-  lastName             String
-  studentId            String
-  phoneNumber          String
-  graduationYear       String
-  isTransferStudent    Boolean
-  priorCollegeYears    String?
-  cumulativeGpa        Decimal               @db.Decimal(3, 2)
-  majorGpa             Decimal?              @db.Decimal(3, 2)
-  major1               String
-  major2               String?
-  gender               String?
-  isFirstGeneration    Boolean
-  resumeUrl            String
-  blindResumeUrl       String?
-  headshotUrl          String
-  coverLetterUrl       String?
-  videoUrl             String?
-  rawResponses         Json
-  approved             Boolean?
-  currentRound         String?
-  cycleId              String?
-  candidateId          String?
-  testFor              String?              // Admin note for what to test for in interviews
-  candidate            Candidate?            @relation(fields: [candidateId], references: [id])
-  cycle                RecruitingCycle?      @relation(fields: [cycleId], references: [id])
-  comments             Comment[]
-  interviewEvaluations InterviewEvaluation[]
+  id                    String                          @id @default(uuid())
+  status                ApplicationStatus               @default(SUBMITTED)
+  responseID            String                          @unique
+  submittedAt           DateTime                        @default(now())
+  email                 String
+  firstName             String
+  lastName              String
+  studentId             String
+  phoneNumber           String
+  graduationYear        String
+  isTransferStudent     Boolean
+  priorCollegeYears     String?
+  cumulativeGpa         Decimal                         @db.Decimal(3, 2)
+  majorGpa              Decimal?                        @db.Decimal(3, 2)
+  major1                String
+  major2                String?
+  gender                String?
+  isFirstGeneration     Boolean
+  resumeUrl             String
+  blindResumeUrl        String?
+  headshotUrl           String
+  coverLetterUrl        String?
+  videoUrl              String?
+  rawResponses          Json
+  approved              Boolean?
+  currentRound          String?
+  cycleId               String?
+  candidateId           String?
+  testFor               String?
+  candidate             Candidate?                      @relation(fields: [candidateId], references: [id])
+  cycle                 RecruitingCycle?                @relation(fields: [cycleId], references: [id])
+  comments              Comment[]
   firstRoundEvaluations FirstRoundInterviewEvaluation[]
-  flaggedDocuments     FlaggedDocument[]
+  flaggedDocuments      FlaggedDocument[]
+  interviewEvaluations  InterviewEvaluation[]
 
   @@map("applications")
 }
 
 model RecruitingCycle {
-  id                String            @id @default(uuid())
-  name              String
-  isActive          Boolean           @default(false)
-  startDate         DateTime?
-  endDate           DateTime?
-  createdAt         DateTime          @default(now())
-  formUrl           String?
-  resumeDeadline    String?
+  id                  String             @id @default(uuid())
+  name                String
+  isActive            Boolean            @default(false)
+  startDate           DateTime?
+  endDate             DateTime?
+  createdAt           DateTime           @default(now())
+  formUrl             String?
+  resumeDeadline      String?
   coverLetterDeadline String?
-  videoDeadline     String?
-  applications      Application[]
-  events            Events[]
-  groups            Groups[]
-  interviews        Interview[]
-  resumeScores      ResumeScore[]
-  coverLetterScores CoverLetterScore[]
-  videoScores       VideoScore[]
+  videoDeadline       String?
+  applications        Application[]
+  coverLetterScores   CoverLetterScore[]
+  events              Events[]
+  groups              Groups[]
+  interviews          Interview[]
+  resumeScores        ResumeScore[]
+  videoScores         VideoScore[]
 
   @@map("recruiting_cycles")
 }
@@ -172,13 +172,13 @@ model Evaluation {
 
 model Groups {
   id                 String             @id @default(uuid())
-  name               String?
   memberOne          String?
   memberTwo          String?
   memberThree        String?
   avgScore           Decimal?           @db.Decimal(5, 2)
   cycleId            String
   createdAt          DateTime           @default(now())
+  name               String?
   assignedCandidates Candidate[]
   coverLetterScores  CoverLetterScore[]
   cycle              RecruitingCycle    @relation(fields: [cycleId], references: [id])
@@ -233,7 +233,7 @@ model CoverLetterScore {
   createdAt       DateTime         @default(now())
   cycleId         String?
   assignedGroup   Groups?          @relation(fields: [assignedGroupId], references: [id])
-  candidate       Candidate       @relation(fields: [candidateId], references: [id])
+  candidate       Candidate        @relation(fields: [candidateId], references: [id])
   cycle           RecruitingCycle? @relation(fields: [cycleId], references: [id])
   evaluator       User?            @relation(fields: [evaluatorId], references: [id])
 
@@ -258,9 +258,9 @@ model VideoScore {
   createdAt       DateTime         @default(now())
   cycleId         String?
   assignedGroup   Groups?          @relation(fields: [assignedGroupId], references: [id])
-  candidate       Candidate       @relation(fields: [candidateId], references: [id])
+  candidate       Candidate        @relation(fields: [candidateId], references: [id])
   cycle           RecruitingCycle? @relation(fields: [cycleId], references: [id])
-  evaluator       User?           @relation(fields: [evaluatorId], references: [id])
+  evaluator       User?            @relation(fields: [evaluatorId], references: [id])
 
   @@map("video_scores")
 }
@@ -279,8 +279,8 @@ model Events {
   showToCandidates Boolean           @default(false)
   eventAttendance  EventAttendance[]
   eventRsvp        EventRsvp[]
-  memberEventRsvp  MemberEventRsvp[]
   cycle            RecruitingCycle   @relation(fields: [cycleId], references: [id])
+  memberEventRsvp  MemberEventRsvp[]
 
   @@map("events")
 }
@@ -310,13 +310,13 @@ model EventAttendance {
 }
 
 model MemberEventRsvp {
-  id          String    @id @default(uuid())
-  responseId  String    @unique
-  eventId     String
-  memberId    String
-  createdAt   DateTime  @default(now())
-  member      User      @relation(fields: [memberId], references: [id])
-  event       Events    @relation(fields: [eventId], references: [id])
+  id         String   @id @default(uuid())
+  responseId String   @unique
+  eventId    String
+  memberId   String
+  createdAt  DateTime @default(now())
+  event      Events   @relation(fields: [eventId], references: [id])
+  member     User     @relation(fields: [memberId], references: [id])
 
   @@map("member_event_rsvp")
 }
@@ -394,30 +394,30 @@ model InterviewResource {
 }
 
 model Interview {
-  id                 String                @id @default(uuid())
-  title              String
-  description        String?
-  interviewType      InterviewType
-  startDate          DateTime
-  endDate            DateTime
-  deliberationsStart DateTime?
-  deliberationsEnd   DateTime?
-  location           String
-  dresscode          String?
-  maxCandidates      Int?
-  currentCandidates  Int                   @default(0)
-  status             InterviewStatus       @default(UPCOMING)
-  cycleId            String
-  createdBy          String
-  createdAt          DateTime              @default(now())
-  updatedAt          DateTime              @updatedAt
-  actionItems        InterviewActionItem[]
-  assignments        InterviewAssignment[]
-  evaluations        InterviewEvaluation[]
+  id                    String                          @id @default(uuid())
+  title                 String
+  description           String?
+  interviewType         InterviewType
+  startDate             DateTime
+  endDate               DateTime
+  deliberationsStart    DateTime?
+  deliberationsEnd      DateTime?
+  location              String
+  dresscode             String?
+  maxCandidates         Int?
+  currentCandidates     Int                             @default(0)
+  status                InterviewStatus                 @default(UPCOMING)
+  cycleId               String
+  createdBy             String
+  createdAt             DateTime                        @default(now())
+  updatedAt             DateTime                        @updatedAt
+  behavioralQuestions   BehavioralQuestion[]
   firstRoundEvaluations FirstRoundInterviewEvaluation[]
-  behavioralQuestions BehavioralQuestion[]
-  creator            User                  @relation("InterviewCreator", fields: [createdBy], references: [id])
-  cycle              RecruitingCycle       @relation(fields: [cycleId], references: [id])
+  actionItems           InterviewActionItem[]
+  assignments           InterviewAssignment[]
+  evaluations           InterviewEvaluation[]
+  creator               User                            @relation("InterviewCreator", fields: [createdBy], references: [id])
+  cycle                 RecruitingCycle                 @relation(fields: [cycleId], references: [id])
 
   @@map("interviews")
 }
@@ -454,59 +454,49 @@ model InterviewActionItem {
 }
 
 model InterviewEvaluation {
-  id            String                 @id @default(uuid())
-  interviewId   String
-  applicationId String
-  evaluatorId   String
-  notes         String?
-  decision      InterviewDecision?
-  behavioralNotes String?              // JSON string for behavioral interview notes
-  casingNotes     String?              // JSON string for case interview notes  
-  candidateDetails String?             // JSON string for candidate details confirmation
-  createdAt     DateTime               @default(now())
-  updatedAt     DateTime               @updatedAt
-  application   Application            @relation(fields: [applicationId], references: [id])
-  evaluator     User                   @relation("InterviewEvaluator", fields: [evaluatorId], references: [id])
-  interview     Interview              @relation(fields: [interviewId], references: [id])
-  rubricScores  InterviewRubricScore[]
+  id               String                 @id @default(uuid())
+  interviewId      String
+  applicationId    String
+  evaluatorId      String
+  notes            String?
+  decision         InterviewDecision?
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+  behavioralNotes  String?
+  casingNotes      String?
+  candidateDetails String?
+  application      Application            @relation(fields: [applicationId], references: [id])
+  evaluator        User                   @relation("InterviewEvaluator", fields: [evaluatorId], references: [id])
+  interview        Interview              @relation(fields: [interviewId], references: [id])
+  rubricScores     InterviewRubricScore[]
 
   @@unique([interviewId, applicationId, evaluatorId])
   @@map("interview_evaluations")
 }
 
-// First round interview evaluation model
 model FirstRoundInterviewEvaluation {
-  id            String            @id @default(uuid())
-  interviewId   String
-  applicationId String
-  evaluatorId   String
-  decision      InterviewDecision?
-  
-  // Behavioral Rubric Scores (1-5 each)
+  id                       String             @id @default(uuid())
+  interviewId              String
+  applicationId            String
+  evaluatorId              String
+  decision                 InterviewDecision?
   behavioralLeadership     Int?
   behavioralProblemSolving Int?
   behavioralInterest       Int?
-  behavioralTotal          Int? // Sum of the above three (1-15)
-  
-  // Market Sizing Rubric Scores (1-5 each)
+  behavioralTotal          Int?
   marketSizingTeamwork     Int?
   marketSizingLogic        Int?
   marketSizingCreativity   Int?
-  marketSizingTotal        Int? // Sum of the above three (1-15)
-  
-  // Notes sections
+  marketSizingTotal        Int?
   behavioralNotes          String?
   marketSizingNotes        String?
   additionalNotes          String?
-  
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
-  
-  // Relations
-  interview     Interview         @relation(fields: [interviewId], references: [id])
-  application   Application       @relation(fields: [applicationId], references: [id])
-  evaluator     User              @relation("FirstRoundEvaluator", fields: [evaluatorId], references: [id])
-  
+  createdAt                DateTime           @default(now())
+  updatedAt                DateTime           @updatedAt
+  application              Application        @relation(fields: [applicationId], references: [id])
+  evaluator                User               @relation("FirstRoundEvaluator", fields: [evaluatorId], references: [id])
+  interview                Interview          @relation(fields: [interviewId], references: [id])
+
   @@unique([interviewId, applicationId, evaluatorId])
   @@map("first_round_interview_evaluations")
 }
@@ -523,6 +513,73 @@ model InterviewRubricScore {
 
   @@unique([evaluationId, category])
   @@map("interview_rubric_scores")
+}
+
+model FlaggedDocument {
+  id            String      @id @default(uuid())
+  applicationId String
+  documentType  String
+  flaggedBy     String
+  reason        String
+  message       String?
+  isResolved    Boolean     @default(false)
+  resolvedBy    String?
+  resolvedAt    DateTime?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  application   Application @relation(fields: [applicationId], references: [id])
+  flagger       User        @relation("DocumentFlagger", fields: [flaggedBy], references: [id])
+  resolver      User?       @relation("DocumentResolver", fields: [resolvedBy], references: [id])
+
+  @@map("flagged_documents")
+}
+
+model MeetingSlot {
+  id        String          @id @default(uuid())
+  memberId  String
+  location  String
+  startTime DateTime
+  endTime   DateTime?
+  capacity  Int             @default(2)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  signups   MeetingSignup[]
+  member    User            @relation(fields: [memberId], references: [id])
+
+  @@map("meeting_slots")
+}
+
+model MeetingSignup {
+  id        String      @id @default(uuid())
+  slotId    String
+  fullName  String
+  email     String
+  studentId String?
+  attended  Boolean     @default(false)
+  createdAt DateTime    @default(now())
+  slot      MeetingSlot @relation(fields: [slotId], references: [id])
+
+  @@unique([slotId, email])
+  @@map("meeting_signups")
+}
+
+model BehavioralQuestion {
+  id           String    @id @default(uuid())
+  interviewId  String
+  groupId      String
+  questionText String
+  order        Int       @default(0)
+  createdBy    String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  creator      User      @relation(fields: [createdBy], references: [id])
+  interview    Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+
+  @@index([interviewId, groupId])
+  @@index([interviewId])
+  @@index([groupId])
+  @@index([createdBy])
+  @@map("behavioral_questions")
 }
 
 enum UserRole {
@@ -568,74 +625,4 @@ enum InterviewDecision {
   UNSURE
   MAYBE_NO
   NO
-}
-
-model FlaggedDocument {
-  id            String   @id @default(uuid())
-  applicationId String
-  documentType  String   // 'resume', 'coverLetter', 'video'
-  flaggedBy     String
-  reason        String
-  message       String?
-  isResolved    Boolean  @default(false)
-  resolvedBy    String?
-  resolvedAt    DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  
-  application   Application @relation(fields: [applicationId], references: [id])
-  flagger       User        @relation("DocumentFlagger", fields: [flaggedBy], references: [id])
-  resolver      User?       @relation("DocumentResolver", fields: [resolvedBy], references: [id])
-
-  @@map("flagged_documents")
-}
-
-// Meeting slots for members to host 1:2 meetings (capacity defaults to 2)
-model MeetingSlot {
-  id        String          @id @default(uuid())
-  memberId  String
-  location  String
-  startTime DateTime
-  endTime   DateTime?
-  capacity  Int             @default(2)
-  createdAt DateTime        @default(now())
-  updatedAt DateTime        @updatedAt
-  member    User            @relation(fields: [memberId], references: [id])
-  signups   MeetingSignup[]
-
-  @@map("meeting_slots")
-}
-
-// Public signups for meeting slots; not all signups are existing users/candidates
-model MeetingSignup {
-  id        String      @id @default(uuid())
-  slotId    String
-  fullName  String
-  email     String
-  studentId String?
-  attended  Boolean     @default(false)
-  createdAt DateTime    @default(now())
-  slot      MeetingSlot @relation(fields: [slotId], references: [id])
-
-  @@unique([slotId, email])
-  @@map("meeting_signups")
-}
-
-model BehavioralQuestion {
-  id           String   @id @default(uuid())
-  interviewId  String
-  groupId      String   // This can be either a real group ID or application group ID
-  questionText String
-  order        Int      @default(0)
-  createdBy    String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  interview    Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
-  creator      User     @relation(fields: [createdBy], references: [id])
-
-  @@index([interviewId, groupId])
-  @@index([interviewId])
-  @@index([groupId])
-  @@index([createdBy])
-  @@map("behavioral_questions")
 }
