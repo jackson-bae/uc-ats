@@ -1275,7 +1275,15 @@ router.get('/profile', async (req, res) => {
 // Get all events
 router.get('/events', async (req, res) => {
   try {
+    // Get the active cycle to filter events
+    const activeCycle = await prisma.recruitingCycle.findFirst({
+      where: { isActive: true },
+      select: { id: true }
+    });
+
+    // Only return events from the active cycle (or empty if no active cycle)
     const events = await prisma.events.findMany({
+      where: activeCycle ? { cycleId: activeCycle.id } : { cycleId: 'none' },
       orderBy: { eventStartDate: 'desc' },
       include: {
         cycle: {
@@ -2410,7 +2418,9 @@ router.get('/applications', async (req, res) => {
           candidateId: {
             in: applications.map(app => app.candidateId)
           },
-          cycleId: activeCycle.id
+          cycle: {
+            id: activeCycle.id
+          }
         },
         select: {
           candidateId: true,
@@ -2429,7 +2439,9 @@ router.get('/applications', async (req, res) => {
           candidateId: {
             in: applications.map(app => app.candidateId)
           },
-          cycleId: activeCycle.id
+          cycle: {
+            id: activeCycle.id
+          }
         },
         select: {
           candidateId: true,
@@ -2677,7 +2689,10 @@ router.get('/staging/candidates', async (req, res) => {
     const usePagination = page && limit;
     const skip = usePagination ? (page - 1) * limit : 0;
 
-    const active = await prisma.recruitingCycle.findFirst({ where: { isActive: true } });
+    const active = await prisma.recruitingCycle.findFirst({
+      where: { isActive: true },
+      select: { id: true, startDate: true, endDate: true }
+    });
     console.log('Active cycle:', active ? active.id : 'No active cycle found');
     if (!active) {
       return usePagination ? res.json({ candidates: [], total: 0, page, totalPages: 0, hasNextPage: false, hasPrevPage: false }) : res.json([]);
@@ -2761,18 +2776,42 @@ router.get('/staging/candidates', async (req, res) => {
     console.log('Video scores fetched:', allVideoScores.length);
     
     const allEventAttendance = await prisma.eventAttendance.findMany({
-      where: { candidateId: { in: candidateIds } },
-      select: { candidateId: true, event: { select: { eventName: true } } }
+      where: {
+        candidateId: { in: candidateIds },
+        event: {
+          cycleId: active.id  // Only include attendance for events in the current cycle
+        }
+      },
+      select: { candidateId: true, eventId: true, event: { select: { id: true, eventName: true, cycleId: true } } }
     });
     console.log('Event attendance fetched:', allEventAttendance.length);
+    // Debug: log unique events being counted
+    const uniqueEvents = [...new Set(allEventAttendance.map(att => `${att.event.eventName} (cycleId: ${att.event.cycleId}, eventId: ${att.eventId})`))];
+    console.log('Unique events in attendance:', uniqueEvents);
     
-    const allMeetingAttendance = await prisma.meetingSignup.findMany({
-      where: { 
-        studentId: { in: studentIds },
-        attended: true
-      },
-      select: { studentId: true }
-    });
+    // Only count meetings within the current cycle's date range
+    // If the cycle has no start date, we cannot determine which meetings belong to this cycle,
+    // so we don't count any GTKUC attendance to avoid crediting old meetings
+    const cycleStartDate = active.startDate ? new Date(active.startDate) : null;
+    const cycleEndDate = active.endDate ? new Date(active.endDate) : null;
+
+    let allMeetingAttendance = [];
+    if (cycleStartDate) {
+      // Only query for meetings if we have at least a start date to filter by
+      allMeetingAttendance = await prisma.meetingSignup.findMany({
+        where: {
+          studentId: { in: studentIds },
+          attended: true,
+          slot: {
+            startTime: {
+              gte: cycleStartDate,
+              ...(cycleEndDate && { lte: cycleEndDate })
+            }
+          }
+        },
+        select: { studentId: true }
+      });
+    }
     console.log('Meeting attendance fetched:', allMeetingAttendance.length);
     
     const allReviewTeams = await prisma.groups.findMany({
@@ -2822,9 +2861,24 @@ router.get('/staging/candidates', async (req, res) => {
       videoScoresMap.get(score.candidateId).push(scoreToUse);
     });
 
+    // Use a Set to track unique eventIds per candidate to prevent duplicate counting
+    const eventAttendanceByCandidate = new Map();
+    allEventAttendance.forEach(att => {
+      if (!eventAttendanceByCandidate.has(att.candidateId)) {
+        eventAttendanceByCandidate.set(att.candidateId, new Set());
+      }
+      // Only add if we haven't seen this eventId for this candidate
+      eventAttendanceByCandidate.get(att.candidateId).add(att.eventId);
+    });
+
+    // Now build the eventAttendanceMap with unique events only
     allEventAttendance.forEach(att => {
       if (!eventAttendanceMap.has(att.candidateId)) eventAttendanceMap.set(att.candidateId, []);
-      eventAttendanceMap.get(att.candidateId).push(att.event.eventName);
+      const events = eventAttendanceMap.get(att.candidateId);
+      // Only add event name if we haven't added this eventId yet
+      if (!events.some(e => e.eventId === att.eventId)) {
+        events.push({ eventId: att.eventId, eventName: att.event.eventName });
+      }
     });
 
     allReviewTeams.forEach(team => {
@@ -2869,22 +2923,30 @@ router.get('/staging/candidates', async (req, res) => {
       if (avgCoverLetter > 0) overallScore += avgCoverLetter;
       if (avgVideo > 0) overallScore += avgVideo;
 
-      // Add event points (1 point per attended event)
+      // Add participation points (events + GTKUC meeting, capped at 3 total)
       const attendedEvents = eventAttendanceMap.get(app.candidateId) || [];
-      const totalEventPoints = attendedEvents.length * 1;
-      overallScore += totalEventPoints;
+      let participationCount = attendedEvents.length;
 
-      // Add meeting attendance bonus (1 point for attending "Get to Know UC")
+      // GTKUC meeting counts as a participation point
       if (meetingAttendanceSet.has(app.studentId)) {
-        overallScore += 1;
+        participationCount += 1;
       }
+
+      // Cap at 3 points max (even if they attended all 4: info, womens, case, GTKUC)
+      const totalParticipationPoints = Math.min(participationCount, 3);
+      overallScore += totalParticipationPoints;
 
 
       // Build attendance object from pre-fetched data
       const attendance = {};
-      attendedEvents.forEach(eventName => {
-        attendance[eventName] = true;
+      attendedEvents.forEach(event => {
+        attendance[event.eventName] = true;
       });
+
+      // Add GTKUC attendance if candidate attended a meeting this cycle
+      if (meetingAttendanceSet.has(app.studentId)) {
+        attendance['GTKUC'] = true;
+      }
 
       // Use the actual currentRound from the database, fallback to status-based calculation
       let currentRound = app.currentRound ? parseInt(app.currentRound) : 1; // Default to Resume Review

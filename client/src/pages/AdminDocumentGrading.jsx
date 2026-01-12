@@ -406,16 +406,18 @@ export default function AdminDocumentGrading() {
     setGradingModalOpen(true);
   };
 
-  const handleCloseGradingModal = () => {
+  const handleCloseGradingModal = (shouldRefresh = false) => {
     // Store current scroll position before closing modal
     scrollPositionRef.current = window.scrollY || window.pageYOffset || document.documentElement.scrollTop;
     setGradingModalOpen(false);
     setSelectedApplication(null);
-    // Refresh applications to update grading status
-    if (gradeOnlyAssigned) {
-      fetchMemberApplications();
-    } else {
-      fetchAllApplications();
+    // Only refresh applications if a grade was saved
+    if (shouldRefresh) {
+      if (gradeOnlyAssigned) {
+        fetchMemberApplications();
+      } else {
+        fetchAllApplications();
+      }
     }
   };
 

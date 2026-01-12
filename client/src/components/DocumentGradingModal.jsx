@@ -285,10 +285,10 @@ const DocumentGradingModal = ({ open, onClose, application, documentType }) => {
 
       await apiClient.post(config.apiEndpoint, scoreData);
       setSuccess(true);
-      
+
       // Close modal after a short delay
       setTimeout(() => {
-        onClose();
+        onClose(true); // Pass true to indicate data was saved and refresh is needed
         setSuccess(false);
         // Reset form
         setScoreOne('');
@@ -405,7 +405,7 @@ const DocumentGradingModal = ({ open, onClose, application, documentType }) => {
   return (
     <Dialog
       open={open}
-      onClose={onClose}
+      onClose={() => onClose(false)}
       maxWidth="xl"
       fullWidth
       PaperProps={{
@@ -432,7 +432,7 @@ const DocumentGradingModal = ({ open, onClose, application, documentType }) => {
           </Typography>
         </Box>
         <Button
-          onClick={onClose}
+          onClick={() => onClose(false)}
           startIcon={<CloseIcon />}
           variant="outlined"
           size="small"

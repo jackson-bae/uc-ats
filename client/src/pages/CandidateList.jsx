@@ -17,8 +17,10 @@ export default function CandidateList() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState({
     group: '',
-    createdDate: ''
+    createdDate: '',
+    cycle: ''
   });
+  const [cycles, setCycles] = useState([]);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingCandidate, setEditingCandidate] = useState(null);
   const [deletingCandidate, setDeletingCandidate] = useState(null);
@@ -28,13 +30,18 @@ export default function CandidateList() {
   useEffect(() => {
     const fetchCandidates = async () => {
       if (!user?.id) return;
-      
+
       try {
-        // Use member endpoint to get all candidates, not just assigned ones
-        const data = await apiClient.get('/member/all-candidates');
-        console.log('Fetched all candidates data:', data);
-        console.log('Number of candidates:', data?.length || 0);
-        setCandidates(data);
+        // Fetch candidates and cycles in parallel
+        const [candidatesData, cyclesData] = await Promise.all([
+          apiClient.get('/member/all-candidates'),
+          apiClient.get('/admin/cycles')
+        ]);
+        console.log('Fetched all candidates data:', candidatesData);
+        console.log('Number of candidates:', candidatesData?.length || 0);
+        setCandidates(candidatesData);
+        setCycles(cyclesData || []);
+        const data = candidatesData;
         
         // Preload all profile images from applications in the background if they exist
         const imageUrls = data
@@ -78,9 +85,13 @@ export default function CandidateList() {
                          candidateEmail.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          (candidate.studentId || '').toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesGroup = !filters.group || 
+    const matchesGroup = !filters.group ||
       (filters.group === 'applied' && candidate.applications && candidate.applications.length > 0) ||
       (filters.group === 'not_applied' && (!candidate.applications || candidate.applications.length === 0));
+
+    const matchesCycle = !filters.cycle ||
+      candidate.applications?.some(app => app.cycleId === filters.cycle || app.cycle?.id === filters.cycle);
+
     const matchesDate = !filters.createdDate || (() => {
       const candidateDate = new Date(candidate.createdAt || latestApp?.submittedAt);
       const now = new Date();
@@ -100,7 +111,7 @@ export default function CandidateList() {
       }
     })();
     
-    return matchesSearch && matchesGroup && matchesDate;
+    return matchesSearch && matchesGroup && matchesCycle && matchesDate;
   });
 
   const getInitials = (name) => {
@@ -231,7 +242,7 @@ export default function CandidateList() {
           <option value="not_applied">Application: Not Applied</option>
         </select>
         
-        <select 
+        <select
           className="filter-select"
           value={filters.createdDate}
           onChange={(e) => handleFilterChange('createdDate', e.target.value)}
@@ -240,6 +251,19 @@ export default function CandidateList() {
           <option value="today">Date Added: Today</option>
           <option value="week">Date Added: This Week</option>
           <option value="month">Date Added: This Month</option>
+        </select>
+
+        <select
+          className="filter-select"
+          value={filters.cycle}
+          onChange={(e) => handleFilterChange('cycle', e.target.value)}
+        >
+          <option value="">Cycle: All</option>
+          {cycles.map(cycle => (
+            <option key={cycle.id} value={cycle.id}>
+              Cycle: {cycle.name}{cycle.isActive ? ' (Active)' : ''}
+            </option>
+          ))}
         </select>
       </div>
 

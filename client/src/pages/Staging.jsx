@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -305,9 +306,18 @@ const AttendanceDisplay = ({ attendance, events }) => {
   };
 
   const attendedEventsList = events.filter(event => getAttendanceStatus(event));
-  const attendedEventsCount = attendedEventsList.length;
 
-  if (attendedEventsCount === 0) {
+  // Check if candidate attended GTKUC (Get to Know UC meeting)
+  const hasGTKUC = attendance && attendance['GTKUC'];
+
+  // Create a combined list including GTKUC if attended
+  const allAttendedItems = [
+    ...attendedEventsList,
+    ...(hasGTKUC ? [{ id: 'gtkuc', eventName: 'GTKUC' }] : [])
+  ];
+  const totalAttendedCount = allAttendedItems.length;
+
+  if (totalAttendedCount === 0) {
     return (
       <Box display="flex" alignItems="center" justifyContent="center" minHeight="60px">
         <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
@@ -317,52 +327,52 @@ const AttendanceDisplay = ({ attendance, events }) => {
     );
   }
 
+  const maxVisibleEvents = 2;
+  const visibleEvents = allAttendedItems.slice(0, maxVisibleEvents);
+  const hiddenCount = totalAttendedCount - maxVisibleEvents;
+
+  const tooltipContent = allAttendedItems.map(e => e.eventName || e.name || e.id).join('\n');
+
   return (
-    <Stack spacing={0.5}>
-      <Box display="flex" alignItems="center" gap={1} sx={{ mb: 0.5 }}>
-        <Typography 
-          variant="caption" 
-          color="success.main"
-          sx={{ 
-            fontWeight: 600, 
-            fontSize: '0.75rem'
-          }}
-        >
-          {attendedEventsCount} event{attendedEventsCount !== 1 ? 's' : ''} attended
-        </Typography>
-      </Box>
-      
-      {attendedEventsList.map((event) => {
-        const eventName = event.eventName || event.name || event.id;
-        
-        return (
-          <Box key={event.id || event.name} display="flex" alignItems="center" gap={0.5}>
-            <Checkbox
-              checked={true}
-              disabled
-              size="small"
-              sx={{ padding: 0.5 }}
-              icon={<CancelIcon fontSize="small" />}
-              checkedIcon={<CheckCircleIcon fontSize="small" />}
-            />
-            <Typography 
-              variant="caption" 
-              color="success.main"
-              sx={{ 
-                fontSize: '0.7rem',
-                fontWeight: 500,
-                maxWidth: '120px',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap'
-              }}
-            >
-              {eventName}
-            </Typography>
-          </Box>
-        );
-      })}
-    </Stack>
+    <Tooltip title={tooltipContent} arrow placement="top">
+      <Stack spacing={0.25} sx={{ maxWidth: '100%', overflow: 'hidden' }}>
+        <Chip
+          label={`${totalAttendedCount} event${totalAttendedCount !== 1 ? 's' : ''}`}
+          color="success"
+          size="small"
+          sx={{ fontSize: '0.7rem', height: 20 }}
+        />
+
+        {visibleEvents.map((event) => {
+          const eventName = event.eventName || event.name || event.id;
+
+          return (
+            <Box key={event.id || event.name} display="flex" alignItems="center" gap={0.25}>
+              <CheckCircleIcon sx={{ fontSize: 14, color: 'success.main' }} />
+              <Typography
+                variant="caption"
+                color="success.main"
+                sx={{
+                  fontSize: '0.65rem',
+                  fontWeight: 500,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                {eventName}
+              </Typography>
+            </Box>
+          );
+        })}
+
+        {hiddenCount > 0 && (
+          <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.6rem' }}>
+            +{hiddenCount} more
+          </Typography>
+        )}
+      </Stack>
+    </Tooltip>
   );
 };
 
@@ -426,6 +436,7 @@ ${hasVideo ? (hasVideoScore ? '✓ Video Scored' : '⏳ Video Pending') : '✗ N
 };
 
 export default function Staging() {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const isAdmin = user?.role === 'ADMIN';
   
@@ -1501,15 +1512,15 @@ export default function Staging() {
           <Card>
             <CardContent>
               <TableContainer component={Paper}>
-                <Table stickyHeader>
+                <Table stickyHeader sx={{ tableLayout: 'fixed', minWidth: 900 }}>
                   <TableHead>
                     <TableRow>
-                      <TableCell>Candidate</TableCell>
-                      <TableCell>Score</TableCell>
-                      <TableCell>Grading</TableCell>
-                      <TableCell>Attendance</TableCell>
-                      <TableCell>Decision</TableCell>
-                      <TableCell>Actions</TableCell>
+                      <TableCell sx={{ width: 220 }}>Candidate</TableCell>
+                      <TableCell sx={{ width: 100 }}>Score</TableCell>
+                      <TableCell sx={{ width: 150 }}>Grading</TableCell>
+                      <TableCell sx={{ width: 180 }}>Attendance</TableCell>
+                      <TableCell sx={{ width: 140 }}>Decision</TableCell>
+                      <TableCell sx={{ width: 110 }}>Actions</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -1520,18 +1531,35 @@ export default function Staging() {
                       return (
                         <TableRow key={candidate.id} hover>
                           <TableCell>
-                            <Box display="flex" alignItems="center" gap={2}>
+                            <Box display="flex" alignItems="center" gap={1} sx={{ overflow: 'hidden' }}>
                               <AuthenticatedImage
                                 src={candidate.headshotUrl}
                                 alt={`${candidate.firstName} ${candidate.lastName}`}
-                                style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover' }}
+                                style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
                                 fallback={<PersonIcon />}
                               />
-                              <Box>
-                                <Typography variant="body2" fontWeight="bold">
+                              <Box sx={{ overflow: 'hidden', minWidth: 0 }}>
+                                <Typography
+                                  variant="body2"
+                                  fontWeight="bold"
+                                  sx={{
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap'
+                                  }}
+                                >
                                   {candidate.firstName} {candidate.lastName}
                                 </Typography>
-                                <Typography variant="caption" color="text.secondary">
+                                <Typography
+                                  variant="caption"
+                                  color="text.secondary"
+                                  sx={{
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                    display: 'block'
+                                  }}
+                                >
                                   {candidate.email}
                                 </Typography>
                               </Box>
@@ -1609,8 +1637,179 @@ export default function Staging() {
             </CardContent>
           </Card>
 
-          {/* All dialogs and modals remain unchanged – omitted here for brevity but kept in full file */}
-          {/* ... (Application Modal, Document Preview, Push All Dialog, Decision Dialogs, Edit Score Modal, etc.) ... */}
+          {/* Candidate Details Modal */}
+          <Dialog
+            open={appModalOpen}
+            onClose={() => {
+              setAppModalOpen(false);
+              setAppModal(null);
+            }}
+            maxWidth="md"
+            fullWidth
+          >
+            <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Box display="flex" alignItems="center" gap={2}>
+                {appModal && (
+                  <>
+                    <AuthenticatedImage
+                      src={appModal.headshotUrl}
+                      alt={`${appModal.firstName} ${appModal.lastName}`}
+                      style={{ width: 50, height: 50, borderRadius: '50%', objectFit: 'cover' }}
+                      fallback={<PersonIcon sx={{ fontSize: 50 }} />}
+                    />
+                    <Box>
+                      <Typography variant="h6">
+                        {appModal.firstName} {appModal.lastName}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {appModal.email}
+                      </Typography>
+                    </Box>
+                  </>
+                )}
+              </Box>
+              <IconButton onClick={() => { setAppModalOpen(false); setAppModal(null); }}>
+                <ClearIcon />
+              </IconButton>
+            </DialogTitle>
+            <DialogContent dividers>
+              {appModal && (
+                <Grid container spacing={3}>
+                  {/* Basic Info */}
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                      Basic Information
+                    </Typography>
+                    <Box component="table" sx={{ width: '100%', borderCollapse: 'collapse', '& td': { py: 0.5, verticalAlign: 'top' }, '& td:first-of-type': { width: 100, color: 'text.secondary', fontSize: '0.875rem' } }}>
+                      <tbody>
+                        <tr>
+                          <td>Major</td>
+                          <td><Typography variant="body2">{appModal.major || 'N/A'}</Typography></td>
+                        </tr>
+                        <tr>
+                          <td>Class</td>
+                          <td><Typography variant="body2">{appModal.graduationYear || 'N/A'}</Typography></td>
+                        </tr>
+                        <tr>
+                          <td>GPA</td>
+                          <td><Typography variant="body2">{appModal.cumulativeGpa?.toFixed(2) || 'N/A'} (Major: {appModal.majorGpa?.toFixed(2) || 'N/A'})</Typography></td>
+                        </tr>
+                        {appModal.phoneNumber && (
+                          <tr>
+                            <td>Phone</td>
+                            <td><Typography variant="body2">{appModal.phoneNumber}</Typography></td>
+                          </tr>
+                        )}
+                        <tr>
+                          <td>Gender</td>
+                          <td><Typography variant="body2">{appModal.gender || 'Not specified'}</Typography></td>
+                        </tr>
+                        {(appModal.isTransferStudent || appModal.isFirstGeneration) && (
+                          <tr>
+                            <td>Tags</td>
+                            <td>
+                              <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                                {appModal.isTransferStudent && <Chip label="Transfer" size="small" sx={{ height: 20, fontSize: '0.7rem' }} />}
+                                {appModal.isFirstGeneration && <Chip label="First Gen" size="small" sx={{ height: 20, fontSize: '0.7rem' }} />}
+                              </Box>
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </Box>
+                  </Grid>
+
+                  {/* Scores */}
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                      Scores
+                    </Typography>
+                    <Stack spacing={1.5}>
+                      <Box display="flex" justifyContent="space-between" alignItems="center">
+                        <Typography variant="body2">Resume</Typography>
+                        <ScoreDisplay score={appModal.scores?.resume || 0} />
+                      </Box>
+                      <Box display="flex" justifyContent="space-between" alignItems="center">
+                        <Typography variant="body2">Cover Letter</Typography>
+                        <ScoreDisplay score={appModal.scores?.coverLetter || 0} />
+                      </Box>
+                      <Box display="flex" justifyContent="space-between" alignItems="center">
+                        <Typography variant="body2">Video</Typography>
+                        <ScoreDisplay score={appModal.scores?.video || 0} />
+                      </Box>
+                      <Divider />
+                      <Box display="flex" justifyContent="space-between" alignItems="center">
+                        <Typography variant="body2" fontWeight="bold">Overall</Typography>
+                        <Typography variant="body1" fontWeight="bold" color="primary">
+                          {appModal.scores?.overall?.toFixed(1) || '0.0'}
+                        </Typography>
+                      </Box>
+                    </Stack>
+                  </Grid>
+
+                  {/* Status & Review Team */}
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                      Status
+                    </Typography>
+                    <Stack spacing={1}>
+                      <Box display="flex" alignItems="center" gap={1}>
+                        <StatusChip status={appModal.status} />
+                        <Chip
+                          label={`Round ${appModal.currentRound}`}
+                          size="small"
+                          variant="outlined"
+                        />
+                      </Box>
+                      {appModal.reviewTeam && (
+                        <Typography variant="body2">
+                          Review Team: {appModal.reviewTeam.name}
+                        </Typography>
+                      )}
+                      {appModal.submittedAt && (
+                        <Typography variant="caption" color="text.secondary">
+                          Submitted: {new Date(appModal.submittedAt).toLocaleDateString()}
+                        </Typography>
+                      )}
+                    </Stack>
+                  </Grid>
+
+                  {/* Attendance & Referral */}
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                      Attendance & Referral
+                    </Typography>
+                    <Stack spacing={1}>
+                      <AttendanceDisplay attendance={appModal.attendance} events={events} />
+                      {appModal.hasReferral && (
+                        <Chip
+                          label="Has Referral"
+                          color="info"
+                          size="small"
+                          icon={<PersonIcon />}
+                        />
+                      )}
+                    </Stack>
+                  </Grid>
+                </Grid>
+              )}
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => { setAppModalOpen(false); setAppModal(null); }}>
+                Close
+              </Button>
+              <Button
+                variant="contained"
+                onClick={() => {
+                  if (appModal?.id) {
+                    navigate(`/application/${appModal.id}`);
+                  }
+                }}
+              >
+                View Full Application
+              </Button>
+            </DialogActions>
+          </Dialog>
 
           <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={() => setSnackbar({ ...snackbar, open: false })}>
             <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity}>

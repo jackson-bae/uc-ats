@@ -290,6 +290,11 @@ export default function ApplicationList() {
                     </div>
                   </div>
                   <div className="candidate-status">
+                    {applicant.isReturningApplicant && (
+                      <span className="returning-badge" title={`Applied ${applicant.pastApplicationCount} time${applicant.pastApplicationCount > 1 ? 's' : ''} before`}>
+                        Returning
+                      </span>
+                    )}
                     <span className={`status-badge ${formatStatus(applicant.status)}`}>
                       {applicant.status.replace('_', ' ')}
                     </span>

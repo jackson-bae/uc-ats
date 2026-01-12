@@ -71,28 +71,24 @@ export default function MemberMeetingSlots() {
   };
 
   const filterSlotsByCycle = (slotsToFilter, cycle) => {
-    // If no active cycle, return empty array to only show spots from current cycle
+    // If no active cycle, return empty array to only show slots from current cycle
     if (!cycle) return [];
-    
-    // If cycle has date range, filter slots by date
-    if (cycle.startDate || cycle.endDate) {
+
+    // Filter slots by creation date - include slots created up to 1 month before cycle starts
+    if (cycle.startDate) {
+      const cycleStartDate = new Date(cycle.startDate);
+      cycleStartDate.setHours(0, 0, 0, 0);
+      // Allow slots created up to 1 month before the cycle starts
+      cycleStartDate.setMonth(cycleStartDate.getMonth() - 1);
+
       return slotsToFilter.filter(slot => {
-        const slotDate = new Date(slot.startTime);
-        const startDate = cycle.startDate ? new Date(cycle.startDate) : null;
-        const endDate = cycle.endDate ? new Date(cycle.endDate) : null;
-        
-        // If cycle has start date, slot must be on or after start date
-        if (startDate && slotDate < startDate) return false;
-        
-        // If cycle has end date, slot must be on or before end date
-        if (endDate && slotDate > endDate) return false;
-        
-        return true;
+        const slotCreatedAt = new Date(slot.createdAt);
+        return slotCreatedAt >= cycleStartDate;
       });
     }
-    
-    // If no date range, return empty array to hide old cycle slots
-    return [];
+
+    // If no start date on cycle, return all slots (fallback)
+    return slotsToFilter;
   };
 
   const load = async () => {

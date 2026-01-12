@@ -261,7 +261,7 @@ router.get('/', requireAuth, async (req, res) => {
 
       return {
         id: group.id,
-        name: `Team ${group.id.slice(-4)}`,
+        name: group.name || `Team ${group.id.slice(-4)}`,
         code: group.id.slice(-8),
         members: members.map(member => ({
           id: member.id,
@@ -295,7 +295,7 @@ router.get('/', requireAuth, async (req, res) => {
 // Create a new group
 router.post('/', requireAuth, async (req, res) => {
   try {
-    const { memberOne, memberTwo, memberThree, cycleId } = req.body;
+    const { name, memberOne, memberTwo, memberThree, cycleId } = req.body;
 
     // Validate that cycleId is provided
     if (!cycleId) {
@@ -313,6 +313,7 @@ router.post('/', requireAuth, async (req, res) => {
 
     const group = await prisma.groups.create({
       data: {
+        name: name?.trim() || null,
         memberOne,
         memberTwo,
         memberThree,
@@ -357,7 +358,7 @@ router.post('/', requireAuth, async (req, res) => {
 
     const transformedGroup = {
       id: group.id,
-      name: `Team ${group.id.slice(-4)}`,
+      name: group.name || `Team ${group.id.slice(-4)}`,
       code: group.id.slice(-8),
       members: members.map(member => ({
         id: member.id,
@@ -365,7 +366,7 @@ router.post('/', requireAuth, async (req, res) => {
         email: member.email,
         avatar: null
       })),
-      candidates: [],
+      applications: [],
       cycleId: group.cycleId,
       cycleName: group.cycle?.name
     };
@@ -473,6 +474,32 @@ router.delete('/:groupId/remove-application/:applicationId', requireAuth, async 
   } catch (error) {
     console.error('Error removing application from group:', error);
     res.status(500).json({ error: 'Failed to remove application from group' });
+  }
+});
+
+// Rename a group
+router.put('/:groupId/rename', requireAuth, async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const { name } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Team name is required' });
+    }
+
+    const updatedGroup = await prisma.groups.update({
+      where: { id: groupId },
+      data: { name: name.trim() },
+      select: {
+        id: true,
+        name: true
+      }
+    });
+
+    res.json(updatedGroup);
+  } catch (error) {
+    console.error('Error renaming group:', error);
+    res.status(500).json({ error: 'Failed to rename group' });
   }
 });
 

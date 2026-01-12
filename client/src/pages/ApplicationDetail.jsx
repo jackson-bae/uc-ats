@@ -76,6 +76,10 @@ export default function ApplicationDetail() {
   const [isEditingTestFor, setIsEditingTestFor] = useState(false);
   const [savingTestFor, setSavingTestFor] = useState(false);
 
+  // Past applications modal
+  const [pastApplicationModalOpen, setPastApplicationModalOpen] = useState(false);
+  const [selectedPastApplication, setSelectedPastApplication] = useState(null);
+
 
   // Function to fetch and store average grades for the current application
   const logAverageGrades = async () => {
@@ -593,6 +597,93 @@ export default function ApplicationDetail() {
               </div>
             </div>
           </div>
+
+          {/* Past Applications Section - only show if there are past applications */}
+          {application.pastApplications && application.pastApplications.length > 0 && (
+            <div className="info-section" style={{
+              backgroundColor: '#eff6ff',
+              border: '1px solid #bfdbfe',
+              borderRadius: '8px',
+              padding: '1rem'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0.75rem' }}>
+                <span style={{
+                  backgroundColor: '#1e40af',
+                  color: 'white',
+                  padding: '2px 8px',
+                  borderRadius: '9999px',
+                  fontSize: '0.75rem',
+                  fontWeight: '600'
+                }}>
+                  Returning Applicant
+                </span>
+                <h2 className="section-title" style={{ margin: 0 }}>Past Applications</h2>
+              </div>
+              <p style={{ color: '#1e40af', fontSize: '0.875rem', marginBottom: '0.75rem' }}>
+                This applicant has applied {application.pastApplications.length} time{application.pastApplications.length > 1 ? 's' : ''} before.
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {application.pastApplications.map((pastApp) => (
+                  <div
+                    key={pastApp.id}
+                    onClick={() => {
+                      setSelectedPastApplication(pastApp);
+                      setPastApplicationModalOpen(true);
+                    }}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '12px',
+                      backgroundColor: 'white',
+                      border: '1px solid #93c5fd',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#f0f9ff';
+                      e.currentTarget.style.transform = 'translateX(4px)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'white';
+                      e.currentTarget.style.transform = 'translateX(0)';
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontWeight: '600', color: '#1e40af' }}>
+                        {pastApp.cycle?.name || 'Unknown Cycle'}
+                      </div>
+                      <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                        Submitted: {new Date(pastApp.submittedAt).toLocaleDateString()}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <span style={{
+                        padding: '4px 10px',
+                        borderRadius: '9999px',
+                        fontSize: '0.75rem',
+                        fontWeight: '500',
+                        backgroundColor:
+                          pastApp.status === 'ACCEPTED' ? '#dcfce7' :
+                          pastApp.status === 'REJECTED' ? '#fee2e2' :
+                          pastApp.status === 'WAITLISTED' ? '#fef3c7' :
+                          '#e0e7ff',
+                        color:
+                          pastApp.status === 'ACCEPTED' ? '#166534' :
+                          pastApp.status === 'REJECTED' ? '#991b1b' :
+                          pastApp.status === 'WAITLISTED' ? '#92400e' :
+                          '#3730a3'
+                      }}>
+                        {pastApp.status.replace('_', ' ')}
+                      </span>
+                      <span style={{ color: '#3b82f6', fontSize: '1.25rem' }}>→</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Academic Information */}
           <div className="info-section">
@@ -2380,6 +2471,270 @@ export default function ApplicationDetail() {
                 }}
               >
                 {savingScore ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Past Application Detail Modal */}
+      {pastApplicationModalOpen && selectedPastApplication && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}
+          onClick={() => setPastApplicationModalOpen(false)}
+        >
+          <div
+            style={{
+              backgroundColor: '#fff',
+              borderRadius: '12px',
+              padding: '24px',
+              maxWidth: '700px',
+              width: '90%',
+              maxHeight: '85vh',
+              overflow: 'auto'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '600' }}>
+                  Past Application Details
+                </h3>
+                <p style={{ margin: '4px 0 0 0', fontSize: '0.875rem', color: '#6b7280' }}>
+                  {selectedPastApplication.cycle?.name || 'Unknown Cycle'}
+                </p>
+              </div>
+              <button
+                onClick={() => setPastApplicationModalOpen(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '1.5rem',
+                  cursor: 'pointer',
+                  color: '#6b7280'
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Status Badge */}
+            <div style={{ marginBottom: '20px' }}>
+              <span style={{
+                padding: '6px 12px',
+                borderRadius: '9999px',
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                backgroundColor:
+                  selectedPastApplication.status === 'ACCEPTED' ? '#dcfce7' :
+                  selectedPastApplication.status === 'REJECTED' ? '#fee2e2' :
+                  selectedPastApplication.status === 'WAITLISTED' ? '#fef3c7' :
+                  '#e0e7ff',
+                color:
+                  selectedPastApplication.status === 'ACCEPTED' ? '#166534' :
+                  selectedPastApplication.status === 'REJECTED' ? '#991b1b' :
+                  selectedPastApplication.status === 'WAITLISTED' ? '#92400e' :
+                  '#3730a3'
+              }}>
+                {selectedPastApplication.status.replace('_', ' ')}
+              </span>
+            </div>
+
+            {/* Basic Info */}
+            <div style={{ marginBottom: '20px' }}>
+              <h4 style={{ margin: '0 0 12px 0', fontSize: '1rem', fontWeight: '600', color: '#374151' }}>
+                Application Info
+              </h4>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div style={{ padding: '12px', backgroundColor: '#f9fafb', borderRadius: '6px' }}>
+                  <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '4px' }}>Submitted</div>
+                  <div style={{ fontWeight: '500', color: '#374151' }}>
+                    {new Date(selectedPastApplication.submittedAt).toLocaleDateString()}
+                  </div>
+                </div>
+                <div style={{ padding: '12px', backgroundColor: '#f9fafb', borderRadius: '6px' }}>
+                  <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '4px' }}>Email</div>
+                  <div style={{ fontWeight: '500', color: '#374151' }}>{selectedPastApplication.email}</div>
+                </div>
+                <div style={{ padding: '12px', backgroundColor: '#f9fafb', borderRadius: '6px' }}>
+                  <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '4px' }}>Graduation Year</div>
+                  <div style={{ fontWeight: '500', color: '#374151' }}>{selectedPastApplication.graduationYear}</div>
+                </div>
+                <div style={{ padding: '12px', backgroundColor: '#f9fafb', borderRadius: '6px' }}>
+                  <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '4px' }}>Major</div>
+                  <div style={{ fontWeight: '500', color: '#374151' }}>
+                    {selectedPastApplication.major1}
+                    {selectedPastApplication.major2 && `, ${selectedPastApplication.major2}`}
+                  </div>
+                </div>
+                <div style={{ padding: '12px', backgroundColor: '#f9fafb', borderRadius: '6px' }}>
+                  <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '4px' }}>Cumulative GPA</div>
+                  <div style={{ fontWeight: '500', color: '#374151' }}>{selectedPastApplication.cumulativeGpa}</div>
+                </div>
+                <div style={{ padding: '12px', backgroundColor: '#f9fafb', borderRadius: '6px' }}>
+                  <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '4px' }}>Major GPA</div>
+                  <div style={{ fontWeight: '500', color: '#374151' }}>
+                    {selectedPastApplication.majorGpa || 'Not provided'}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Documents Section */}
+            <div style={{ marginBottom: '20px' }}>
+              <h4 style={{ margin: '0 0 12px 0', fontSize: '1rem', fontWeight: '600', color: '#374151' }}>
+                Documents
+              </h4>
+              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                {selectedPastApplication.resumeUrl && (
+                  <button
+                    onClick={() => {
+                      setPastApplicationModalOpen(false);
+                      setPreview({
+                        open: true,
+                        src: selectedPastApplication.resumeUrl,
+                        kind: 'pdf',
+                        title: `${selectedPastApplication.firstName} ${selectedPastApplication.lastName} – Resume (${selectedPastApplication.cycle?.name || 'Past'})`
+                      });
+                    }}
+                    style={{
+                      padding: '10px 16px',
+                      backgroundColor: '#eff6ff',
+                      color: '#1e40af',
+                      border: '1px solid #bfdbfe',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontWeight: '500',
+                      fontSize: '0.875rem'
+                    }}
+                  >
+                    View Resume
+                  </button>
+                )}
+                {selectedPastApplication.coverLetterUrl && (
+                  <button
+                    onClick={() => {
+                      setPastApplicationModalOpen(false);
+                      setPreview({
+                        open: true,
+                        src: selectedPastApplication.coverLetterUrl,
+                        kind: 'pdf',
+                        title: `${selectedPastApplication.firstName} ${selectedPastApplication.lastName} – Cover Letter (${selectedPastApplication.cycle?.name || 'Past'})`
+                      });
+                    }}
+                    style={{
+                      padding: '10px 16px',
+                      backgroundColor: '#eff6ff',
+                      color: '#1e40af',
+                      border: '1px solid #bfdbfe',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontWeight: '500',
+                      fontSize: '0.875rem'
+                    }}
+                  >
+                    View Cover Letter
+                  </button>
+                )}
+                {selectedPastApplication.videoUrl && (
+                  <button
+                    onClick={() => {
+                      setPastApplicationModalOpen(false);
+                      setPreview({
+                        open: true,
+                        src: selectedPastApplication.videoUrl,
+                        kind: 'video',
+                        title: `${selectedPastApplication.firstName} ${selectedPastApplication.lastName} – Video (${selectedPastApplication.cycle?.name || 'Past'})`
+                      });
+                    }}
+                    style={{
+                      padding: '10px 16px',
+                      backgroundColor: '#f0fdf4',
+                      color: '#166534',
+                      border: '1px solid #bbf7d0',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontWeight: '500',
+                      fontSize: '0.875rem'
+                    }}
+                  >
+                    View Video
+                  </button>
+                )}
+                {!selectedPastApplication.resumeUrl && !selectedPastApplication.coverLetterUrl && !selectedPastApplication.videoUrl && (
+                  <p style={{ color: '#6b7280', fontStyle: 'italic', margin: 0 }}>No documents available</p>
+                )}
+              </div>
+            </div>
+
+            {/* Additional Info */}
+            <div style={{ marginBottom: '20px' }}>
+              <h4 style={{ margin: '0 0 12px 0', fontSize: '1rem', fontWeight: '600', color: '#374151' }}>
+                Additional Details
+              </h4>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div style={{ padding: '12px', backgroundColor: '#f9fafb', borderRadius: '6px' }}>
+                  <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '4px' }}>Transfer Student</div>
+                  <div style={{ fontWeight: '500', color: '#374151' }}>
+                    {selectedPastApplication.isTransferStudent ? 'Yes' : 'No'}
+                  </div>
+                </div>
+                <div style={{ padding: '12px', backgroundColor: '#f9fafb', borderRadius: '6px' }}>
+                  <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '4px' }}>First Generation</div>
+                  <div style={{ fontWeight: '500', color: '#374151' }}>
+                    {selectedPastApplication.isFirstGeneration ? 'Yes' : 'No'}
+                  </div>
+                </div>
+                {selectedPastApplication.gender && (
+                  <div style={{ padding: '12px', backgroundColor: '#f9fafb', borderRadius: '6px' }}>
+                    <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '4px' }}>Gender</div>
+                    <div style={{ fontWeight: '500', color: '#374151' }}>{selectedPastApplication.gender}</div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '24px', paddingTop: '16px', borderTop: '1px solid #e5e7eb' }}>
+              <button
+                onClick={() => setPastApplicationModalOpen(false)}
+                style={{
+                  padding: '10px 20px',
+                  backgroundColor: '#f3f4f6',
+                  color: '#374151',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontWeight: '500',
+                  fontSize: '0.875rem'
+                }}
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  window.open(`/application/${selectedPastApplication.id}`, '_blank');
+                }}
+                style={{
+                  padding: '10px 20px',
+                  backgroundColor: '#2563eb',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontWeight: '500',
+                  fontSize: '0.875rem'
+                }}
+              >
+                Open Full Application
               </button>
             </div>
           </div>
