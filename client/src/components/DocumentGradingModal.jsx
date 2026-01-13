@@ -214,6 +214,14 @@ const DocumentGradingModal = ({ open, onClose, application, documentType }) => {
   // Load existing score when modal opens
   useEffect(() => {
     if (open && application?.candidateId) {
+      // Immediately reset form state before fetching
+      setExistingScore(null);
+      setScoreOne('');
+      setScoreTwo('');
+      setScoreThree('');
+      setNotes('');
+      setError(null);
+      setSuccess(false);
       loadExistingScore();
     }
   }, [open, application?.candidateId, documentType]);
@@ -226,8 +234,18 @@ const DocumentGradingModal = ({ open, onClose, application, documentType }) => {
       setPreviewUrl(null);
       if (!open || !application?.[config.urlField]) return;
 
+      // Normalize URL: strip any localhost or production prefixes to make it relative
+      let fileUrl = application[config.urlField];
+      const prefixesToStrip = ['http://localhost:3001', 'http://localhost:5173', 'https://uconsultingats.com', 'https://www.uconsultingats.com'];
+      for (const prefix of prefixesToStrip) {
+        if (fileUrl.startsWith(prefix)) {
+          fileUrl = fileUrl.replace(prefix, '');
+          break;
+        }
+      }
+
       try {
-        const resp = await fetch(application[config.urlField], {
+        const resp = await fetch(fileUrl, {
           headers: {
             Authorization: `Bearer ${token || apiClient.token || localStorage.getItem('token')}`,
           },

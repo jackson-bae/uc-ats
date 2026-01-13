@@ -9,7 +9,8 @@
       "Bash(npx prisma db push:*)",
       "Bash(npx prisma generate:*)",
       "Bash(npx prisma:*)",
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "Bash(node scripts/fix-file-urls.js:*)"
     ]
   }
 }

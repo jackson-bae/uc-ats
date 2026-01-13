@@ -92,30 +92,30 @@ function generateFileUrl(fileData, fileType) {
   }
   
   const fileId = fileData.fileId;
-  
-  // Use the base URL from config
-  const baseUrl = config.baseUrl;
-  
+
+  // Store relative URLs to avoid localhost/production URL mismatch issues
+  // The frontend will resolve these relative to the current origin
+
   // Prefer actual MIME type when present
   const actualMimeType = fileData.mimeType;
 
   if (actualMimeType && actualMimeType.startsWith('image/')) {
-    return `${baseUrl}/api/files/${fileId}/image`;
+    return `/api/files/${fileId}/image`;
   }
   if (actualMimeType === 'application/pdf') {
-    return `${baseUrl}/api/files/${fileId}/pdf`;
+    return `/api/files/${fileId}/pdf`;
   }
   if (actualMimeType && actualMimeType.startsWith('video/')) {
     // For now route videos through pdf endpoint; client will download/open externally
-    return `${baseUrl}/api/files/${fileId}/pdf`;
+    return `/api/files/${fileId}/pdf`;
   }
 
   // Fallback to configured file type
   if (fileType === 'image') {
-    return `${baseUrl}/api/files/${fileId}/image`;
+    return `/api/files/${fileId}/image`;
   }
   // default to pdf
-  return `${baseUrl}/api/files/${fileId}/pdf`;
+  return `/api/files/${fileId}/pdf`;
 }
 
 //Get all file upload question IDs

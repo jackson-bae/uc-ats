@@ -109,6 +109,20 @@ export default async function syncFormResponses() {
           }
         });
 
+        // Sanitize any file URLs to ensure they are relative (prevent localhost URLs in production)
+        const urlFields = ['resumeUrl', 'coverLetterUrl', 'videoUrl', 'headshotUrl'];
+        const urlPrefixesToStrip = ['http://localhost:3001', 'http://localhost:5173', 'https://uconsultingats.com', 'https://www.uconsultingats.com'];
+        urlFields.forEach(field => {
+          if (dataToCreate[field]) {
+            for (const prefix of urlPrefixesToStrip) {
+              if (dataToCreate[field].startsWith(prefix)) {
+                dataToCreate[field] = dataToCreate[field].replace(prefix, '');
+                break;
+              }
+            }
+          }
+        });
+
         // Ensure we do not duplicate by responseID (already filtered), but also guard
         // against the same candidate submitting twice by cycle with the same responseID
         await prisma.application.create({ data: dataToCreate });
