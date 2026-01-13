@@ -1590,6 +1590,13 @@ export default function Staging() {
         const diff = getAttendanceCount(a) - getAttendanceCount(b);
         return multiplier * diff;
       }
+      case 'referral': {
+        // desc = referred first (default), asc = non-referred first
+        const aRef = a.hasReferral ? 1 : 0;
+        const bRef = b.hasReferral ? 1 : 0;
+        const diff = aRef - bRef;
+        return multiplier * diff;
+      }
       default: {
         const diff = (a.scores?.overall || 0) - (b.scores?.overall || 0);
         return multiplier * diff;
@@ -1773,7 +1780,7 @@ export default function Staging() {
                     color="primary"
                     sx={{ ml: 1 }}
                   />
-                  {(filters.decision !== 'all' || filters.graduationYear !== 'all' || filters.gender !== 'all' || filters.attendance !== 'all' || filters.search !== '') && (
+                  {(filters.decision !== 'all' || filters.graduationYear !== 'all' || filters.gender !== 'all' || filters.attendance !== 'all' || filters.referral !== 'all' || filters.search !== '') && (
                     <Button
                       size="small"
                       startIcon={<ClearIcon />}
@@ -1783,6 +1790,7 @@ export default function Staging() {
                         graduationYear: 'all',
                         gender: 'all',
                         attendance: 'all',
+                        referral: 'all',
                         search: ''
                       })}
                       sx={{ ml: 'auto' }}
@@ -1879,6 +1887,22 @@ export default function Staging() {
                       </Select>
                     </FormControl>
                   </Grid>
+
+                  {/* Referral Filter */}
+                  <Grid item xs={6} md={2}>
+                    <FormControl size="small" fullWidth>
+                      <InputLabel>Referral</InputLabel>
+                      <Select
+                        value={filters.referral}
+                        label="Referral"
+                        onChange={(e) => setFilters({ ...filters, referral: e.target.value })}
+                      >
+                        <MenuItem value="all">All</MenuItem>
+                        <MenuItem value="yes">Has Referral</MenuItem>
+                        <MenuItem value="no">No Referral</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
                 </Grid>
 
                 {/* Sorting Row */}
@@ -1893,7 +1917,8 @@ export default function Staging() {
                       { field: 'name', label: 'Name' },
                       { field: 'graduationYear', label: 'Grad Year' },
                       { field: 'decision', label: 'Decision' },
-                      { field: 'attendance', label: 'Attendance' }
+                      { field: 'attendance', label: 'Attendance' },
+                      { field: 'referral', label: 'Referral' }
                     ].map(({ field, label }) => (
                       <Chip
                         key={field}
