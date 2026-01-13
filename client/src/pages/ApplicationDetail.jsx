@@ -8,8 +8,9 @@ import AccessControl from '../components/AccessControl';
 import { useAuth } from '../context/AuthContext';
 import '../styles/ApplicationDetail.css';
 
-export default function ApplicationDetail() {
-  const { id } = useParams();
+export default function ApplicationDetail({ applicationId: propApplicationId, embedded = false }) {
+  const { id: paramId } = useParams();
+  const id = propApplicationId || paramId;
   const navigate = useNavigate();
   const [application, setApplication] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -198,8 +199,9 @@ export default function ApplicationDetail() {
     if (videoScores.length > 0) overallTotal += videoAvg;
     if (coverLetterScores.length > 0) overallTotal += coverLetterAvg;
     
-    // Add event points directly (raw points, not scaled)
-    const eventPointsContribution = eventData.totalPoints || 0;
+    // Add event points directly (raw points, not scaled), capped at 3
+    const rawEventPoints = eventData.totalPoints || 0;
+    const eventPointsContribution = Math.min(rawEventPoints, 3);
     overallTotal += eventPointsContribution;
     
     const result = {
@@ -390,26 +392,18 @@ export default function ApplicationDetail() {
         setApplication(appData);
         setCurrentUserId(userData.userId);
         setTestForNote(appData.testFor || '');
-        
-        // Log average grades
-        await logAverageGrades();
 
-        // Load comments
-        await fetchComments();
-        
-        // Load document scores
-        await fetchResumeScores(appData.candidateId, appData.cycleId);
-        await fetchCoverLetterScores(appData.candidateId, appData.cycleId);
-        await fetchVideoScores(appData.candidateId, appData.cycleId);
-        
-        // Load event data
-        await fetchEventData();
-        
-        // Load interview evaluations
-        await fetchInterviewEvaluations();
-        
-        // Load referral data
-        await fetchReferral();
+        // Load all secondary data concurrently
+        await Promise.all([
+          logAverageGrades(),
+          fetchComments(),
+          fetchResumeScores(appData.candidateId, appData.cycleId),
+          fetchCoverLetterScores(appData.candidateId, appData.cycleId),
+          fetchVideoScores(appData.candidateId, appData.cycleId),
+          fetchEventData(),
+          fetchInterviewEvaluations(),
+          fetchReferral()
+        ]);
         
       } catch (err) {
         console.error('Error loading data:', err);
@@ -443,10 +437,12 @@ export default function ApplicationDetail() {
     return (
       <div className="application-detail">
         <div style={{ color: 'red', marginBottom: '1rem' }}>Error: {error}</div>
-        <Link to="/application-list" className="back-link">
-          <ArrowLeftIcon className="back-icon" />
-          Back to Applications
-        </Link>
+        {!embedded && (
+          <Link to="/application-list" className="back-link">
+            <ArrowLeftIcon className="back-icon" />
+            Back to Applications
+          </Link>
+        )}
       </div>
     );
   }
@@ -455,10 +451,12 @@ export default function ApplicationDetail() {
     return (
       <div className="application-detail">
         <div style={{ marginBottom: '1rem' }}>Application not found</div>
-        <Link to="/application-list" className="back-link">
-          <ArrowLeftIcon className="back-icon" />
-          Back to Applications
-        </Link>
+        {!embedded && (
+          <Link to="/application-list" className="back-link">
+            <ArrowLeftIcon className="back-icon" />
+            Back to Applications
+          </Link>
+        )}
       </div>
     );
   }
@@ -469,10 +467,12 @@ export default function ApplicationDetail() {
       {/* Header with back button and status */}
       <div className="detail-header">
         <div className="header-left">
-          <Link to="/application-list" className="back-link">
-            <ArrowLeftIcon className="back-icon" />
-            Back to Applications
-          </Link>
+          {!embedded && (
+            <Link to="/application-list" className="back-link">
+              <ArrowLeftIcon className="back-icon" />
+              Back to Applications
+            </Link>
+          )}
           <div className="name-and-status">
             <div>
               <div className="candidate-header">
@@ -529,19 +529,24 @@ export default function ApplicationDetail() {
                       <div className="average-grade">
                         <span className="average-grade-label">Event Points</span>
                         <div>
-                          <span className="average-grade-value">{eventData.totalPoints}</span>
-                          <span className="average-grade-total">pts</span>
+                          <span className="average-grade-value">{Math.min(eventData.totalPoints, 3)}</span>
+                          <span className="average-grade-total">/ 3</span>
                         </div>
                         <div className="average-grade-count">
                           {eventData.events.filter(e => e.rsvpStatus === 'RSVPed' || e.attendanceStatus === 'Attended').filter(e => e.attendanceStatus === 'Attended').length} attended of {eventData.events.filter(e => e.rsvpStatus === 'RSVPed' || e.attendanceStatus === 'Attended').length} relevant
                         </div>
+                        {eventData.totalPoints > 3 && (
+                          <div className="average-grade-count" style={{ color: '#9ca3af', fontSize: '0.7rem' }}>
+                            ({eventData.totalPoints} raw, capped)
+                          </div>
+                        )}
                       </div>
                       
                       <div className="average-grade" style={{ backgroundColor: '#f0f9ff', borderColor: '#bae6fd' }}>
                         <span className="average-grade-label">Overall</span>
                         <div>
                           <span className="average-grade-value" style={{ color: '#0369a1' }}>{calculatedAverages.total.toFixed(1)}</span>
-                          <span className="average-grade-total">/ 18</span>
+                          <span className="average-grade-total">/ 21</span>
                         </div>
                         {calculatedAverages.count > 0 && (
                           <div className="average-grade-count">
@@ -890,6 +895,17 @@ export default function ApplicationDetail() {
           {/* Event Attendance */}
           <div className="info-section">
             <h2 className="section-title">Event Attendance</h2>
+            <div style={{
+              backgroundColor: '#f0f9ff',
+              border: '1px solid #bae6fd',
+              borderRadius: '6px',
+              padding: '12px',
+              marginBottom: '16px',
+              fontSize: '0.875rem',
+              color: '#0369a1'
+            }}>
+              <strong>Note:</strong> Students can earn a maximum of 3 points total from events and GTKUC (Get To Know UC) meetings combined. Points beyond 3 are tracked but do not contribute to the overall score.
+            </div>
             {eventLoading ? (
               <div className="empty-state">Loading event data...</div>
             ) : eventData.events.length === 0 ? (
@@ -897,13 +913,18 @@ export default function ApplicationDetail() {
             ) : (
               <div>
                 <div className="event-summary">
-                  <div style={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
-                    alignItems: 'center' 
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
                   }}>
                     <span style={{ fontWeight: '600', color: '#0369a1' }}>
-                      Total Event Points: {eventData.totalPoints}
+                      Total Event Points: {Math.min(eventData.totalPoints, 3)} / 3
+                      {eventData.totalPoints > 3 && (
+                        <span style={{ fontWeight: '400', color: '#6b7280', marginLeft: '8px' }}>
+                          ({eventData.totalPoints} earned, capped at 3)
+                        </span>
+                      )}
                     </span>
                     <span style={{ fontSize: '0.875rem', color: '#0369a1' }}>
                       {eventData.events.filter(e => e.rsvpStatus === 'RSVPed' || e.attendanceStatus === 'Attended').filter(e => e.attendanceStatus === 'Attended').length} attended of {eventData.events.filter(e => e.rsvpStatus === 'RSVPed' || e.attendanceStatus === 'Attended').length} relevant events

@@ -79,6 +79,7 @@ import AuthenticatedImage from '../components/AuthenticatedImage';
 import DocumentPreviewModal from '../components/DocumentPreviewModal';
 import AccessControl from '../components/AccessControl';
 import { useAuth } from '../context/AuthContext';
+import ApplicationDetail from './ApplicationDetail';
 
 // API functions for staging
 const stagingAPI = {
@@ -1602,10 +1603,13 @@ export default function Staging() {
                             </FormControl>
                           </TableCell>
                           <TableCell>
-                            <Button size="small" onClick={() => {
-                              setAppModal(candidate);
-                              setAppModalOpen(true);
-                            }}>
+                            <Button
+                              size="small"
+                              onClick={() => {
+                                setAppModal(candidate);
+                                setAppModalOpen(true);
+                              }}
+                            >
                               View Details
                             </Button>
                           </TableCell>
@@ -1637,178 +1641,47 @@ export default function Staging() {
             </CardContent>
           </Card>
 
-          {/* Candidate Details Modal */}
+          {/* Candidate Details Modal - Popup with Embedded Application Detail */}
           <Dialog
             open={appModalOpen}
             onClose={() => {
               setAppModalOpen(false);
               setAppModal(null);
             }}
-            maxWidth="md"
+            maxWidth="xl"
             fullWidth
+            sx={{
+              '& .MuiDialog-paper': {
+                bgcolor: '#f5f5f5',
+                height: '90vh',
+                maxHeight: '90vh'
+              }
+            }}
           >
-            <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <DialogTitle sx={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              bgcolor: 'white',
+              borderBottom: '1px solid #e0e0e0',
+              py: 1
+            }}>
               <Box display="flex" alignItems="center" gap={2}>
                 {appModal && (
-                  <>
-                    <AuthenticatedImage
-                      src={appModal.headshotUrl}
-                      alt={`${appModal.firstName} ${appModal.lastName}`}
-                      style={{ width: 50, height: 50, borderRadius: '50%', objectFit: 'cover' }}
-                      fallback={<PersonIcon sx={{ fontSize: 50 }} />}
-                    />
-                    <Box>
-                      <Typography variant="h6">
-                        {appModal.firstName} {appModal.lastName}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        {appModal.email}
-                      </Typography>
-                    </Box>
-                  </>
+                  <Typography variant="h6">
+                    {appModal.firstName} {appModal.lastName} - Application Details
+                  </Typography>
                 )}
               </Box>
               <IconButton onClick={() => { setAppModalOpen(false); setAppModal(null); }}>
                 <ClearIcon />
               </IconButton>
             </DialogTitle>
-            <DialogContent dividers>
+            <DialogContent sx={{ p: 0, overflow: 'auto' }}>
               {appModal && (
-                <Grid container spacing={3}>
-                  {/* Basic Info */}
-                  <Grid item xs={12} md={6}>
-                    <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                      Basic Information
-                    </Typography>
-                    <Box component="table" sx={{ width: '100%', borderCollapse: 'collapse', '& td': { py: 0.5, verticalAlign: 'top' }, '& td:first-of-type': { width: 100, color: 'text.secondary', fontSize: '0.875rem' } }}>
-                      <tbody>
-                        <tr>
-                          <td>Major</td>
-                          <td><Typography variant="body2">{appModal.major || 'N/A'}</Typography></td>
-                        </tr>
-                        <tr>
-                          <td>Class</td>
-                          <td><Typography variant="body2">{appModal.graduationYear || 'N/A'}</Typography></td>
-                        </tr>
-                        <tr>
-                          <td>GPA</td>
-                          <td><Typography variant="body2">{appModal.cumulativeGpa?.toFixed(2) || 'N/A'} (Major: {appModal.majorGpa?.toFixed(2) || 'N/A'})</Typography></td>
-                        </tr>
-                        {appModal.phoneNumber && (
-                          <tr>
-                            <td>Phone</td>
-                            <td><Typography variant="body2">{appModal.phoneNumber}</Typography></td>
-                          </tr>
-                        )}
-                        <tr>
-                          <td>Gender</td>
-                          <td><Typography variant="body2">{appModal.gender || 'Not specified'}</Typography></td>
-                        </tr>
-                        {(appModal.isTransferStudent || appModal.isFirstGeneration) && (
-                          <tr>
-                            <td>Tags</td>
-                            <td>
-                              <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                                {appModal.isTransferStudent && <Chip label="Transfer" size="small" sx={{ height: 20, fontSize: '0.7rem' }} />}
-                                {appModal.isFirstGeneration && <Chip label="First Gen" size="small" sx={{ height: 20, fontSize: '0.7rem' }} />}
-                              </Box>
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </Box>
-                  </Grid>
-
-                  {/* Scores */}
-                  <Grid item xs={12} md={6}>
-                    <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                      Scores
-                    </Typography>
-                    <Stack spacing={1.5}>
-                      <Box display="flex" justifyContent="space-between" alignItems="center">
-                        <Typography variant="body2">Resume</Typography>
-                        <ScoreDisplay score={appModal.scores?.resume || 0} />
-                      </Box>
-                      <Box display="flex" justifyContent="space-between" alignItems="center">
-                        <Typography variant="body2">Cover Letter</Typography>
-                        <ScoreDisplay score={appModal.scores?.coverLetter || 0} />
-                      </Box>
-                      <Box display="flex" justifyContent="space-between" alignItems="center">
-                        <Typography variant="body2">Video</Typography>
-                        <ScoreDisplay score={appModal.scores?.video || 0} />
-                      </Box>
-                      <Divider />
-                      <Box display="flex" justifyContent="space-between" alignItems="center">
-                        <Typography variant="body2" fontWeight="bold">Overall</Typography>
-                        <Typography variant="body1" fontWeight="bold" color="primary">
-                          {appModal.scores?.overall?.toFixed(1) || '0.0'}
-                        </Typography>
-                      </Box>
-                    </Stack>
-                  </Grid>
-
-                  {/* Status & Review Team */}
-                  <Grid item xs={12} md={6}>
-                    <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                      Status
-                    </Typography>
-                    <Stack spacing={1}>
-                      <Box display="flex" alignItems="center" gap={1}>
-                        <StatusChip status={appModal.status} />
-                        <Chip
-                          label={`Round ${appModal.currentRound}`}
-                          size="small"
-                          variant="outlined"
-                        />
-                      </Box>
-                      {appModal.reviewTeam && (
-                        <Typography variant="body2">
-                          Review Team: {appModal.reviewTeam.name}
-                        </Typography>
-                      )}
-                      {appModal.submittedAt && (
-                        <Typography variant="caption" color="text.secondary">
-                          Submitted: {new Date(appModal.submittedAt).toLocaleDateString()}
-                        </Typography>
-                      )}
-                    </Stack>
-                  </Grid>
-
-                  {/* Attendance & Referral */}
-                  <Grid item xs={12} md={6}>
-                    <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                      Attendance & Referral
-                    </Typography>
-                    <Stack spacing={1}>
-                      <AttendanceDisplay attendance={appModal.attendance} events={events} />
-                      {appModal.hasReferral && (
-                        <Chip
-                          label="Has Referral"
-                          color="info"
-                          size="small"
-                          icon={<PersonIcon />}
-                        />
-                      )}
-                    </Stack>
-                  </Grid>
-                </Grid>
+                <ApplicationDetail applicationId={appModal.id} embedded={true} />
               )}
             </DialogContent>
-            <DialogActions>
-              <Button onClick={() => { setAppModalOpen(false); setAppModal(null); }}>
-                Close
-              </Button>
-              <Button
-                variant="contained"
-                onClick={() => {
-                  if (appModal?.id) {
-                    navigate(`/application/${appModal.id}`);
-                  }
-                }}
-              >
-                View Full Application
-              </Button>
-            </DialogActions>
           </Dialog>
 
           <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={() => setSnackbar({ ...snackbar, open: false })}>

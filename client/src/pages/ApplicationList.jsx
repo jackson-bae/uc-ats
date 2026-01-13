@@ -20,7 +20,8 @@ export default function ApplicationList() {
     gender: '',
     firstGen: '',
     transfer: '',
-    decision: ''
+    decision: '',
+    returning: ''
   });
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -72,8 +73,11 @@ export default function ApplicationList() {
     const matchesFirstGen = !filters.firstGen || applicant.isFirstGeneration.toString() === filters.firstGen;
     const matchesTransfer = !filters.transfer || applicant.isTransferStudent.toString() === filters.transfer;
     const matchesDecision = !filters.decision || applicant.status === filters.decision;
+    const matchesReturning = !filters.returning ||
+      (filters.returning === 'true' && applicant.isReturningApplicant) ||
+      (filters.returning === 'false' && !applicant.isReturningApplicant);
 
-    return matchesSearch && matchesYear && matchesGender && matchesFirstGen && matchesTransfer && matchesDecision;
+    return matchesSearch && matchesYear && matchesGender && matchesFirstGen && matchesTransfer && matchesDecision && matchesReturning;
   });
 
   const getInitials = (firstName, lastName) => {
@@ -234,7 +238,7 @@ export default function ApplicationList() {
           <option value="false">Transfer: No</option>
         </select>
         
-        <select 
+        <select
           className="filter-select"
           value={filters.decision}
           onChange={(e) => handleFilterChange('decision', e.target.value)}
@@ -245,6 +249,16 @@ export default function ApplicationList() {
           <option value="ACCEPTED">Status: Accepted</option>
           <option value="REJECTED">Status: Rejected</option>
           <option value="WAITLISTED">Status: Waitlisted</option>
+        </select>
+
+        <select
+          className="filter-select"
+          value={filters.returning}
+          onChange={(e) => handleFilterChange('returning', e.target.value)}
+        >
+          <option value="">Returning: All</option>
+          <option value="true">Returning: Yes</option>
+          <option value="false">Returning: No</option>
         </select>
       </div>
 
