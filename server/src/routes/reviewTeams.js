@@ -1,6 +1,6 @@
 import express from 'express';
 import prisma from '../prismaClient.js';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth, requireAdminOrMember } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -1304,7 +1304,7 @@ router.get('/resume-score/:candidateId', requireAuth, async (req, res) => {
 });
 
 // Get all resume scores for a candidate
-router.get('/resume-scores/:candidateId', requireAuth, async (req, res) => {
+router.get('/resume-scores/:candidateId', requireAuth, requireAdminOrMember, async (req, res) => {
   try {
     const { candidateId } = req.params;
     const { cycleId } = req.query;
@@ -1453,7 +1453,7 @@ router.get('/cover-letter-score/:candidateId', requireAuth, async (req, res) => 
 });
 
 // Get all cover letter scores for a candidate
-router.get('/cover-letter-scores/:candidateId', requireAuth, async (req, res) => {
+router.get('/cover-letter-scores/:candidateId', requireAuth, requireAdminOrMember, async (req, res) => {
   try {
     const { candidateId } = req.params;
     const { cycleId } = req.query;
@@ -1601,7 +1601,7 @@ router.get('/video-score/:candidateId', requireAuth, async (req, res) => {
 });
 
 // Get all video scores for a candidate
-router.get('/video-scores/:candidateId', requireAuth, async (req, res) => {
+router.get('/video-scores/:candidateId', requireAuth, requireAdminOrMember, async (req, res) => {
   try {
     const { candidateId } = req.params;
     const { cycleId } = req.query;

@@ -76,4 +76,12 @@ export const requireAdmin = async (req, res, next) => {
     return res.status(403).json({ error: 'Admin access required' });
   }
   next();
+};
+
+// Middleware to require admin or member role (exclude USER/candidates)
+export const requireAdminOrMember = async (req, res, next) => {
+  if (req.user?.role !== 'ADMIN' && req.user?.role !== 'MEMBER') {
+    return res.status(403).json({ error: 'Admin or member access required' });
+  }
+  next();
 }; 
