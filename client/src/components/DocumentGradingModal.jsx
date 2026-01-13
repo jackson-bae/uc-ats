@@ -38,6 +38,7 @@ const DocumentGradingModal = ({ open, onClose, application, documentType }) => {
   const [existingScore, setExistingScore] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [previewError, setPreviewError] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   // Resizable columns state
   const [leftWidth, setLeftWidth] = useState(documentType === 'video' ? 50 : 83.3);
@@ -232,7 +233,10 @@ const DocumentGradingModal = ({ open, onClose, application, documentType }) => {
     const loadPreview = async () => {
       setPreviewError(null);
       setPreviewUrl(null);
+      setPreviewLoading(false);
       if (!open || !application?.[config.urlField]) return;
+
+      setPreviewLoading(true);
 
       // Normalize URL: strip any localhost or production prefixes to make it relative
       let fileUrl = application[config.urlField];
@@ -260,6 +264,8 @@ const DocumentGradingModal = ({ open, onClose, application, documentType }) => {
       } catch (e) {
         console.error(`Failed to load ${documentType} preview:`, e);
         setPreviewError(e.message || `Failed to load ${documentType} preview`);
+      } finally {
+        setPreviewLoading(false);
       }
     };
 
@@ -492,7 +498,14 @@ const DocumentGradingModal = ({ open, onClose, application, documentType }) => {
                 <Box sx={{ ml: 1 }}>{config.previewTitle}</Box>
               </Typography>
               
-              {previewUrl ? (
+              {previewLoading ? (
+                <Paper sx={{ p: 2, textAlign: 'center', height: 'calc(100% - 60px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
+                  <CircularProgress size={48} sx={{ mb: 2 }} />
+                  <Typography color="text.secondary">
+                    Loading {documentType}...
+                  </Typography>
+                </Paper>
+              ) : previewUrl ? (
                 <Box sx={{ height: 'calc(100% - 60px)', flex: 1 }}>
                   {documentType === 'video' ? (
                     <video
