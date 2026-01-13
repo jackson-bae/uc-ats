@@ -825,23 +825,62 @@ router.post('/auto-distribute', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'No teams found for the active cycle' });
     }
 
-    // Get all available applications (not assigned to any group)
-    const availableApplications = await prisma.application.findMany({
+    // Get all candidates with applications in the active cycle
+    // Include their assigned group info to check if it's in the active cycle
+    const allCandidatesWithApplications = await prisma.candidate.findMany({
       where: {
-        cycleId: activeCycle.id,
-        candidate: {
-          assignedGroupId: null
+        applications: {
+          some: {
+            cycleId: activeCycle.id
+          }
         }
       },
       include: {
-        candidate: {
-          select: { id: true }
+        applications: {
+          where: {
+            cycleId: activeCycle.id
+          },
+          orderBy: {
+            submittedAt: 'desc'
+          },
+          take: 1 // Only get the latest application
+        },
+        assignedGroup: {
+          select: {
+            id: true,
+            cycleId: true
+          }
         }
-      },
-      orderBy: {
-        submittedAt: 'asc' // Distribute oldest applications first
       }
     });
+    
+    console.log(`Found ${allCandidatesWithApplications.length} candidates with applications in active cycle`);
+    
+    // Filter to get only unassigned candidates OR candidates assigned to groups not in active cycle
+    const unassignedCandidates = allCandidatesWithApplications.filter(candidate => {
+      // If not assigned, include them
+      if (!candidate.assignedGroupId) {
+        return true;
+      }
+      // If assigned to a group, check if that group is in the active cycle
+      if (candidate.assignedGroup) {
+        // If the assigned group's cycleId doesn't match active cycle, include them (needs reassignment)
+        return candidate.assignedGroup.cycleId !== activeCycle.id;
+      }
+      // If assignedGroupId is set but the group doesn't exist (orphaned reference), include them
+      return true;
+    });
+    
+    console.log(`Found ${unassignedCandidates.length} unassigned candidates for active cycle`);
+
+    // Extract the latest application for each candidate
+    const availableApplications = unassignedCandidates
+      .map(candidate => ({
+        application: candidate.applications[0],
+        candidateId: candidate.id
+      }))
+      .filter(item => item.application) // Remove any candidates without applications
+      .sort((a, b) => new Date(a.application.submittedAt) - new Date(b.application.submittedAt)); // Sort by oldest first
 
     if (availableApplications.length === 0) {
       return res.json({ message: 'No applications available to distribute' });
@@ -852,12 +891,12 @@ router.post('/auto-distribute', requireAuth, async (req, res) => {
     let currentTeamIndex = 0;
 
     for (let i = 0; i < availableApplications.length; i++) {
-      const application = availableApplications[i];
+      const { candidateId } = availableApplications[i];
       const teamId = teams[currentTeamIndex].id;
 
       // Assign the candidate to the team
       await prisma.candidate.update({
-        where: { id: application.candidate.id },
+        where: { id: candidateId },
         data: { assignedGroupId: teamId }
       });
 

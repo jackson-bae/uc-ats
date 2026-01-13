@@ -648,7 +648,7 @@ export default function ReviewTeams() {
             variant="contained"
             startIcon={<UserPlusIcon style={{ width: '1.25rem', height: '1.25rem' }} />}
             onClick={handleAutoDistribute}
-            disabled={loading || teams.length === 0 || availableApplications.length === 0}
+            disabled={loading || teams.length === 0}
             sx={{
               backgroundColor: 'secondary.main',
               color: 'secondary.contrastText',
