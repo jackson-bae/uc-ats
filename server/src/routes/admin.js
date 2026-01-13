@@ -4580,10 +4580,24 @@ router.get('/flagged-documents', async (req, res) => {
   try {
     const { resolved } = req.query;
     
+    // Get the active cycle first
+    const activeCycle = await prisma.recruitingCycle.findFirst({ 
+      where: { isActive: true } 
+    });
+    
+    if (!activeCycle) {
+      return res.json([]);
+    }
+    
     let whereClause = {};
     if (resolved !== undefined) {
       whereClause.isResolved = resolved === 'true';
     }
+    
+    // Filter by active cycle through the application relationship
+    whereClause.application = {
+      cycleId: activeCycle.id
+    };
 
     const flaggedDocuments = await prisma.flaggedDocument.findMany({
       where: whereClause,
