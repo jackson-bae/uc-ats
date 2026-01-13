@@ -224,16 +224,17 @@ export default function ReviewTeams() {
     // Handle both old (candidates) and new (applications) data structures
     const applications = team.applications || team.candidates || [];
     if (applications.length === 0) return { resume: 0, coverLetter: 0, video: 0 };
-    
+
+    // Calculate average progress across all applications
     const totalApplications = applications.length;
-    const resumeCompleted = applications.filter(a => a.resumeProgress === 100).length;
-    const coverLetterCompleted = applications.filter(a => a.coverLetterProgress === 100).length;
-    const videoCompleted = applications.filter(a => a.videoProgress === 100).length;
-    
+    const resumeTotal = applications.reduce((sum, a) => sum + (a.resumeProgress || 0), 0);
+    const coverLetterTotal = applications.reduce((sum, a) => sum + (a.coverLetterProgress || 0), 0);
+    const videoTotal = applications.reduce((sum, a) => sum + (a.videoProgress || 0), 0);
+
     return {
-      resume: Math.round((resumeCompleted / totalApplications) * 100),
-      coverLetter: Math.round((coverLetterCompleted / totalApplications) * 100),
-      video: Math.round((videoCompleted / totalApplications) * 100)
+      resume: Math.round(resumeTotal / totalApplications),
+      coverLetter: Math.round(coverLetterTotal / totalApplications),
+      video: Math.round(videoTotal / totalApplications)
     };
   };
 
