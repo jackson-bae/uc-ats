@@ -211,7 +211,7 @@ model ResumeScore {
   cycle           RecruitingCycle? @relation(fields: [cycleId], references: [id])
   evaluator       User             @relation(fields: [evaluatorId], references: [id])
 
-  @@unique([candidateId, evaluatorId])
+  @@unique([candidateId, evaluatorId, cycleId])
   @@map("resume_scores")
 }
 
@@ -237,6 +237,7 @@ model CoverLetterScore {
   cycle           RecruitingCycle? @relation(fields: [cycleId], references: [id])
   evaluator       User?            @relation(fields: [evaluatorId], references: [id])
 
+  @@unique([candidateId, evaluatorId, cycleId])
   @@map("cover_letter_scores")
 }
 
@@ -262,6 +263,7 @@ model VideoScore {
   cycle           RecruitingCycle? @relation(fields: [cycleId], references: [id])
   evaluator       User?            @relation(fields: [evaluatorId], references: [id])
 
+  @@unique([candidateId, evaluatorId, cycleId])
   @@map("video_scores")
 }
 

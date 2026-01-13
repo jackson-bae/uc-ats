@@ -261,6 +261,13 @@ const DocumentGradingModal = ({ open, onClose, application, documentType }) => {
         setScoreTwo(response.scoreTwo || '');
         setScoreThree(response.scoreThree || '');
         setNotes(response.notes || '');
+      } else {
+        // Reset form state when no existing score is found
+        setExistingScore(null);
+        setScoreOne('');
+        setScoreTwo('');
+        setScoreThree('');
+        setNotes('');
       }
     } catch (err) {
       console.error('Error loading existing score:', err);
