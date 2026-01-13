@@ -234,12 +234,19 @@ const DocumentGradingModal = ({ open, onClose, application, documentType }) => {
       setPreviewError(null);
       setPreviewUrl(null);
       setPreviewLoading(false);
-      if (!open || !application?.[config.urlField]) return;
+
+      // Determine the URL field based on document type
+      const urlField = documentType === 'resume' ? 'resumeUrl'
+        : documentType === 'coverLetter' ? 'coverLetterUrl'
+        : 'videoUrl';
+
+      const documentUrl = application?.[urlField];
+      if (!open || !documentUrl) return;
 
       setPreviewLoading(true);
 
       // Normalize URL: strip any localhost or production prefixes to make it relative
-      let fileUrl = application[config.urlField];
+      let fileUrl = documentUrl;
       const prefixesToStrip = ['http://localhost:3001', 'http://localhost:5173', 'https://uconsultingats.com', 'https://www.uconsultingats.com'];
       for (const prefix of prefixesToStrip) {
         if (fileUrl.startsWith(prefix)) {
@@ -273,7 +280,7 @@ const DocumentGradingModal = ({ open, onClose, application, documentType }) => {
     return () => {
       if (localUrl) URL.revokeObjectURL(localUrl);
     };
-  }, [open, application?.[config.urlField], token, documentType]);
+  }, [open, application?.resumeUrl, application?.coverLetterUrl, application?.videoUrl, token, documentType]);
 
   const loadExistingScore = async () => {
     try {
@@ -532,10 +539,21 @@ const DocumentGradingModal = ({ open, onClose, application, documentType }) => {
                   )}
                 </Box>
               ) : (
-                <Paper sx={{ p: 2, textAlign: 'center', height: 'calc(100% - 60px)', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
-                  <Typography color="text.secondary">
-                    {previewError || `No ${documentType} available for preview`}
+                <Paper sx={{ p: 2, textAlign: 'center', height: 'calc(100% - 60px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
+                  <Typography color="text.secondary" sx={{ mb: application?.[config.urlField] ? 2 : 0 }}>
+                    {previewError ? 'Failed to load preview' : `No ${documentType} available for preview`}
                   </Typography>
+                  {application?.[config.urlField] && (
+                    <Button
+                      variant="outlined"
+                      href={application[config.urlField]}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      startIcon={config.icon}
+                    >
+                      Open {documentType} in new tab
+                    </Button>
+                  )}
                 </Paper>
               )}
             </Box>

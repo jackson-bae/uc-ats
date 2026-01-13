@@ -4609,7 +4609,12 @@ router.get('/flagged-documents', async (req, res) => {
             lastName: true,
             email: true,
             major1: true,
-            graduationYear: true
+            graduationYear: true,
+            resumeUrl: true,
+            coverLetterUrl: true,
+            videoUrl: true,
+            candidateId: true,
+            cycleId: true
           }
         },
         flagger: {
