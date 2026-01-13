@@ -70,7 +70,10 @@ import {
   FilterList as FilterListIcon,
   Search as SearchIcon,
   Clear as ClearIcon,
-  Download as DownloadIcon
+  Download as DownloadIcon,
+  ArrowUpward as ArrowUpwardIcon,
+  ArrowDownward as ArrowDownwardIcon,
+  Sort as SortIcon
 } from '@mui/icons-material';
 import globalTheme from '../styles/globalTheme';
 import '../styles/Staging.css';
@@ -470,8 +473,11 @@ export default function Staging() {
     attendance: 'all',
     reviewTeam: 'all',
     referral: 'all',
+    graduationYear: 'all',
+    gender: 'all',
     search: ''
   });
+  const [sortConfig, setSortConfig] = useState({ field: 'score', direction: 'desc' });
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [pushAllDialogOpen, setPushAllDialogOpen] = useState(false);
   const [pushAllConfirmText, setPushAllConfirmText] = useState('');
@@ -1131,6 +1137,165 @@ export default function Staging() {
     setFinalDecisionDialogOpen(true);
   };
 
+  const openPushAll = async () => {
+    try {
+      const adminCandidates = await stagingAPI.fetchAdminCandidates();
+      const eligibleStatuses = ['SUBMITTED', 'UNDER_REVIEW', 'WAITLISTED'];
+      const totalApproved = adminCandidates.filter(c => c.approved === true && eligibleStatuses.includes(c.status)).length;
+
+      const invalidDecisions = adminCandidates.filter(c => {
+        const decision = c.approved;
+        return decision === null || (decision !== true && decision !== false);
+      });
+
+      setPushAllPreview({
+        totalApproved,
+        invalidDecisions: invalidDecisions.length,
+        invalidDecisionCandidates: invalidDecisions
+      });
+    } catch (e) {
+      console.error('Error preparing push-all preview:', e);
+      setPushAllPreview({ totalApproved: 0, invalidDecisions: 0, invalidDecisionCandidates: [] });
+    }
+    setPushAllConfirmText('');
+    setPushAllAcknowledge(false);
+    setPushAllDialogOpen(true);
+  };
+
+  const openPushAllCoffee = async () => {
+    try {
+      const adminCandidates = await stagingAPI.fetchAdminCandidates();
+      const coffeeCandidates = adminCandidates.filter(c => String(c.currentRound) === '2');
+
+      const invalidDecisions = coffeeCandidates.filter(c => {
+        const decision = c.approved;
+        return decision === null || (decision !== true && decision !== false);
+      });
+
+      setPushAllPreview({
+        totalApproved: coffeeCandidates.length,
+        invalidDecisions: invalidDecisions.length,
+        invalidDecisionCandidates: invalidDecisions
+      });
+    } catch (e) {
+      console.error('Error preparing coffee chat push-all preview:', e);
+      setPushAllPreview({ totalApproved: 0, invalidDecisions: 0, invalidDecisionCandidates: [] });
+    }
+    setPushAllConfirmText('');
+    setPushAllAcknowledge(false);
+    setPushAllDialogOpen(true);
+  };
+
+  const openPushAllFirstRound = async () => {
+    try {
+      const firstRoundApps = (adminApplications || []).filter(app => String(app.currentRound) === '3');
+
+      const invalidDecisions = firstRoundApps.filter(app => {
+        const decision = app.approved;
+        return decision === null || (decision !== true && decision !== false);
+      });
+
+      setPushAllPreview({
+        totalCandidates: firstRoundApps.length,
+        validDecisions: firstRoundApps.length - invalidDecisions.length,
+        invalidDecisions: invalidDecisions.length,
+        invalidDecisionCandidates: invalidDecisions
+      });
+
+      setPushAllConfirmText('');
+      setPushAllAcknowledge(false);
+      setPushAllDialogOpen(true);
+    } catch (error) {
+      console.error('Error preparing first round push all:', error);
+      setSnackbar({ open: true, message: 'Failed to prepare first round processing', severity: 'error' });
+    }
+  };
+
+  const openPushAllFinal = async () => {
+    try {
+      const adminCandidates = await stagingAPI.fetchAdminCandidates();
+      const finalCandidates = adminCandidates.filter(c => String(c.currentRound) === '4');
+
+      const invalidDecisions = finalCandidates.filter(c => {
+        const decision = c.approved;
+        return decision === null || (decision !== true && decision !== false);
+      });
+
+      setPushAllPreview({
+        totalApproved: finalCandidates.length,
+        invalidDecisions: invalidDecisions.length,
+        invalidDecisionCandidates: invalidDecisions
+      });
+    } catch (e) {
+      console.error('Error preparing final round push-all preview:', e);
+      setPushAllPreview({ totalApproved: 0, invalidDecisions: 0, invalidDecisionCandidates: [] });
+    }
+    setPushAllConfirmText('');
+    setPushAllAcknowledge(false);
+    setPushAllDialogOpen(true);
+  };
+
+  const confirmPushAll = async () => {
+    try {
+      setPushAllLoading(true);
+
+      let result;
+      if (currentTab === 1) {
+        result = await stagingAPI.processCoffeeDecisions();
+      } else if (currentTab === 2) {
+        result = await stagingAPI.processFirstRoundDecisions();
+      } else if (currentTab === 3) {
+        result = await stagingAPI.processFinalDecisions();
+      } else {
+        result = await stagingAPI.processDecisions();
+      }
+
+      setPushAllDialogOpen(false);
+
+      const { summary } = result;
+      if (summary) {
+        const emailMessage = currentTab === 0 ? 'No emails sent (resume review round)' :
+                           currentTab === 1 ? 'No emails sent (coffee chat round)' :
+                           currentTab === 2 ? 'No emails sent (first round)' :
+                           `${summary.emailsSent} emails sent`;
+        setSnackbar({
+          open: true,
+          message: `Successfully processed ${summary.totalApplications} candidates: ${summary.accepted} accepted, ${summary.rejected} rejected. ${emailMessage}.`,
+          severity: 'success'
+        });
+      } else {
+        setSnackbar({ open: true, message: 'Processed decisions.', severity: 'success' });
+      }
+
+      await fetchCandidates();
+
+    } catch (e) {
+      console.error('Error processing decisions:', e);
+      setSnackbar({ open: true, message: 'Failed to process decisions', severity: 'error' });
+    } finally {
+      setPushAllLoading(false);
+    }
+  };
+
+  const fixInvalidDecision = async (candidateId, newDecision) => {
+    try {
+      await stagingAPI.saveDecision(candidateId, newDecision, 'resume');
+
+      setPushAllPreview(prev => ({
+        ...prev,
+        invalidDecisions: prev.invalidDecisions - 1,
+        invalidDecisionCandidates: prev.invalidDecisionCandidates.filter(c => c.id !== candidateId)
+      }));
+
+      await fetchCandidates();
+
+      setSnackbar({ open: true, message: 'Decision updated successfully', severity: 'success' });
+    } catch (error) {
+      console.error('Error fixing invalid decision:', error);
+      setSnackbar({ open: true, message: 'Failed to update decision', severity: 'error' });
+    }
+  };
+
   const calculateDemographics = (data, isApplicationData = false) => {
     const graduationYearBreakdown = {
       '2026': { total: 0, yes: 0, no: 0, maybe: 0, pending: 0 },
@@ -1293,9 +1458,16 @@ export default function Staging() {
   const filteredCandidates = candidates.filter(candidate => {
     const matchesStatus = filters.status === 'all' || candidate.status === filters.status;
     const matchesRound = filters.round === 'all' || parseInt(candidate.currentRound) === parseInt(filters.round);
-    const matchesDecision = filters.decision === 'all' || 
-      (filters.decision === 'pending' && !candidate.decisions[`round${candidate.currentRound}`]) ||
-      (filters.decision !== 'pending' && candidate.decisions[`round${candidate.currentRound}`] === filters.decision);
+
+    let matchesDecision = true;
+    if (filters.decision !== 'all') {
+      const candidateDecision = inlineDecisions[candidate.id] || '';
+      if (filters.decision === 'pending') {
+        matchesDecision = candidateDecision === '';
+      } else {
+        matchesDecision = candidateDecision === filters.decision;
+      }
+    }
     
     let matchesAttendance = true;
     if (filters.attendance !== 'all' && events.length > 0) {
@@ -1357,12 +1529,73 @@ export default function Staging() {
       }
     }
     
-    const matchesSearch = filters.search === '' || 
+    const matchesSearch = filters.search === '' ||
       `${candidate.firstName} ${candidate.lastName}`.toLowerCase().includes(filters.search.toLowerCase()) ||
       candidate.email.toLowerCase().includes(filters.search.toLowerCase());
 
-    return matchesStatus && matchesRound && matchesDecision && matchesAttendance && matchesReviewTeam && matchesReferral && matchesSearch;
-  }).sort((a, b) => b.scores.overall - a.scores.overall);
+    let matchesGraduationYear = true;
+    if (filters.graduationYear !== 'all') {
+      matchesGraduationYear = candidate.graduationYear === filters.graduationYear;
+    }
+
+    let matchesGender = true;
+    if (filters.gender !== 'all') {
+      const candidateGender = candidate.gender?.toLowerCase() || '';
+      if (filters.gender === 'male') {
+        matchesGender = candidateGender.includes('male') && !candidateGender.includes('female');
+      } else if (filters.gender === 'female') {
+        matchesGender = candidateGender.includes('female');
+      } else if (filters.gender === 'other') {
+        matchesGender = !candidateGender.includes('male') && !candidateGender.includes('female');
+      }
+    }
+
+    return matchesStatus && matchesRound && matchesDecision && matchesAttendance && matchesReviewTeam && matchesReferral && matchesSearch && matchesGraduationYear && matchesGender;
+  }).sort((a, b) => {
+    const multiplier = sortConfig.direction === 'asc' ? 1 : -1;
+
+    switch (sortConfig.field) {
+      case 'score': {
+        // desc = high scores first (default), asc = low scores first
+        const diff = (a.scores?.overall || 0) - (b.scores?.overall || 0);
+        return multiplier * diff;
+      }
+      case 'name': {
+        // asc = A-Z (default for name), desc = Z-A
+        const diff = `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`);
+        return multiplier * diff;
+      }
+      case 'graduationYear': {
+        // asc = 2026 first, desc = 2029 first
+        const diff = (a.graduationYear || '').localeCompare(b.graduationYear || '');
+        return multiplier * diff;
+      }
+      case 'decision': {
+        // desc = Yes first (default), asc = Pending first
+        const decisionOrder = { 'yes': 1, 'maybe_yes': 2, 'maybe_no': 3, 'no': 4, '': 5 };
+        const aDecision = inlineDecisions[a.id] || '';
+        const bDecision = inlineDecisions[b.id] || '';
+        const diff = (decisionOrder[aDecision] || 5) - (decisionOrder[bDecision] || 5);
+        return multiplier * diff;
+      }
+      case 'attendance': {
+        // desc = high attendance first (default), asc = low attendance first
+        const getAttendanceCount = (candidate) => {
+          if (!candidate.attendance || events.length === 0) return 0;
+          return events.filter(event => {
+            const eventName = event.eventName || event.name || event.id;
+            return candidate.attendance[eventName] !== undefined ? Boolean(candidate.attendance[eventName]) : false;
+          }).length;
+        };
+        const diff = getAttendanceCount(a) - getAttendanceCount(b);
+        return multiplier * diff;
+      }
+      default: {
+        const diff = (a.scores?.overall || 0) - (b.scores?.overall || 0);
+        return multiplier * diff;
+      }
+    }
+  });
 
   const paginatedCandidates = filteredCandidates.slice(
     (pagination.page - 1) * pagination.limit,
@@ -1512,6 +1745,183 @@ export default function Staging() {
           {/* Main Table */}
           <Card>
             <CardContent>
+              <Box mb={2} display="flex" justifyContent="space-between" alignItems="center">
+                <Typography variant="body2" color="text.secondary">
+                  {currentTab === 0 && '⚠️ All candidates must have a "Yes" or "No" decision. "Yes" advances to Coffee Chats (no email), "No" marks as rejected (no email).'}
+                  {currentTab === 1 && '⚠️ All candidates must have a "Yes" or "No" decision. "Yes" advances to First Round (no email), "No" marks as rejected (no email).'}
+                  {currentTab === 2 && '⚠️ All candidates must have a "Yes" or "No" decision. "Yes" advances to Final Round (no email), "No" marks as rejected (no email).'}
+                  {currentTab === 3 && '⚠️ All candidates must have a "Yes" or "No" decision. This will send emails and finalize decisions.'}
+                </Typography>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  startIcon={<SkipNextIcon />}
+                  onClick={currentTab === 0 ? openPushAll : currentTab === 1 ? openPushAllCoffee : currentTab === 2 ? openPushAllFirstRound : openPushAllFinal}
+                >
+                  Process All Decisions
+                </Button>
+              </Box>
+
+              {/* Filters and Sorting */}
+              <Box sx={{ mb: 3, p: 2, bgcolor: 'grey.50', borderRadius: 2 }}>
+                <Box display="flex" alignItems="center" gap={1} mb={2}>
+                  <FilterListIcon color="action" />
+                  <Typography variant="subtitle2" fontWeight="bold">Filters & Sorting</Typography>
+                  <Chip
+                    label={`${filteredCandidates.length} candidates`}
+                    size="small"
+                    color="primary"
+                    sx={{ ml: 1 }}
+                  />
+                  {(filters.decision !== 'all' || filters.graduationYear !== 'all' || filters.gender !== 'all' || filters.attendance !== 'all' || filters.search !== '') && (
+                    <Button
+                      size="small"
+                      startIcon={<ClearIcon />}
+                      onClick={() => setFilters({
+                        ...filters,
+                        decision: 'all',
+                        graduationYear: 'all',
+                        gender: 'all',
+                        attendance: 'all',
+                        search: ''
+                      })}
+                      sx={{ ml: 'auto' }}
+                    >
+                      Clear Filters
+                    </Button>
+                  )}
+                </Box>
+
+                <Grid container spacing={2} alignItems="center">
+                  {/* Search */}
+                  <Grid item xs={12} md={3}>
+                    <TextField
+                      size="small"
+                      fullWidth
+                      placeholder="Search by name or email..."
+                      value={filters.search}
+                      onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+                      InputProps={{
+                        startAdornment: <SearchIcon color="action" sx={{ mr: 1 }} />
+                      }}
+                    />
+                  </Grid>
+
+                  {/* Decision Filter */}
+                  <Grid item xs={6} md={2}>
+                    <FormControl size="small" fullWidth>
+                      <InputLabel>Decision</InputLabel>
+                      <Select
+                        value={filters.decision}
+                        label="Decision"
+                        onChange={(e) => setFilters({ ...filters, decision: e.target.value })}
+                      >
+                        <MenuItem value="all">All Decisions</MenuItem>
+                        <MenuItem value="yes">Yes</MenuItem>
+                        <MenuItem value="maybe_yes">Maybe Yes</MenuItem>
+                        <MenuItem value="maybe_no">Maybe No</MenuItem>
+                        <MenuItem value="no">No</MenuItem>
+                        <MenuItem value="pending">Pending</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+
+                  {/* Graduation Year Filter */}
+                  <Grid item xs={6} md={2}>
+                    <FormControl size="small" fullWidth>
+                      <InputLabel>Grad Year</InputLabel>
+                      <Select
+                        value={filters.graduationYear}
+                        label="Grad Year"
+                        onChange={(e) => setFilters({ ...filters, graduationYear: e.target.value })}
+                      >
+                        <MenuItem value="all">All Years</MenuItem>
+                        <MenuItem value="2026">2026</MenuItem>
+                        <MenuItem value="2027">2027</MenuItem>
+                        <MenuItem value="2028">2028</MenuItem>
+                        <MenuItem value="2029">2029</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+
+                  {/* Gender Filter */}
+                  <Grid item xs={6} md={2}>
+                    <FormControl size="small" fullWidth>
+                      <InputLabel>Gender</InputLabel>
+                      <Select
+                        value={filters.gender}
+                        label="Gender"
+                        onChange={(e) => setFilters({ ...filters, gender: e.target.value })}
+                      >
+                        <MenuItem value="all">All Genders</MenuItem>
+                        <MenuItem value="male">Male</MenuItem>
+                        <MenuItem value="female">Female</MenuItem>
+                        <MenuItem value="other">Other/Not Specified</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+
+                  {/* Attendance Filter */}
+                  <Grid item xs={6} md={2}>
+                    <FormControl size="small" fullWidth>
+                      <InputLabel>Attendance</InputLabel>
+                      <Select
+                        value={filters.attendance}
+                        label="Attendance"
+                        onChange={(e) => setFilters({ ...filters, attendance: e.target.value })}
+                      >
+                        <MenuItem value="all">All Attendance</MenuItem>
+                        <MenuItem value="high">High (80%+)</MenuItem>
+                        <MenuItem value="medium">Medium (60-79%)</MenuItem>
+                        <MenuItem value="low">Low (40-59%)</MenuItem>
+                        <MenuItem value="very_low">Very Low (&lt;40%)</MenuItem>
+                        <MenuItem value="none">No Events</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                </Grid>
+
+                {/* Sorting Row */}
+                <Box display="flex" alignItems="center" gap={2} mt={2}>
+                  <Box display="flex" alignItems="center" gap={1}>
+                    <SortIcon color="action" fontSize="small" />
+                    <Typography variant="body2" color="text.secondary">Sort by:</Typography>
+                  </Box>
+                  <Stack direction="row" spacing={1}>
+                    {[
+                      { field: 'score', label: 'Score' },
+                      { field: 'name', label: 'Name' },
+                      { field: 'graduationYear', label: 'Grad Year' },
+                      { field: 'decision', label: 'Decision' },
+                      { field: 'attendance', label: 'Attendance' }
+                    ].map(({ field, label }) => (
+                      <Chip
+                        key={field}
+                        label={
+                          <Box display="flex" alignItems="center" gap={0.5}>
+                            {label}
+                            {sortConfig.field === field && (
+                              sortConfig.direction === 'desc' ? <ArrowDownwardIcon fontSize="small" /> : <ArrowUpwardIcon fontSize="small" />
+                            )}
+                          </Box>
+                        }
+                        onClick={() => {
+                          if (sortConfig.field === field) {
+                            setSortConfig({ field, direction: sortConfig.direction === 'desc' ? 'asc' : 'desc' });
+                          } else {
+                            setSortConfig({ field, direction: 'desc' });
+                          }
+                        }}
+                        color={sortConfig.field === field ? 'primary' : 'default'}
+                        variant={sortConfig.field === field ? 'filled' : 'outlined'}
+                        size="small"
+                        sx={{ cursor: 'pointer' }}
+                      />
+                    ))}
+                  </Stack>
+                </Box>
+              </Box>
+
               <TableContainer component={Paper}>
                 <Table stickyHeader sx={{ tableLayout: 'fixed', minWidth: 900 }}>
                   <TableHead>
@@ -1682,6 +2092,157 @@ export default function Staging() {
                 <ApplicationDetail applicationId={appModal.id} embedded={true} />
               )}
             </DialogContent>
+          </Dialog>
+
+          {/* Push All Decisions Confirmation Dialog */}
+          <Dialog open={pushAllDialogOpen} onClose={() => {
+            setPushAllDialogOpen(false);
+            setPushAllPreview({ totalApproved: 0, invalidDecisions: 0, invalidDecisionCandidates: [] });
+          }} maxWidth="md" fullWidth>
+            <DialogTitle>Process All Decisions</DialogTitle>
+            <DialogContent>
+              <Stack spacing={2} sx={{ mt: 1 }}>
+                <Alert severity="info">
+                  <Typography variant="subtitle2" gutterBottom>
+                    {currentTab === 0 ? '🔄 This will advance candidates to the next round (no emails sent)' :
+                     currentTab === 1 ? '🔄 This will advance candidates to the next round (no emails sent)' :
+                     currentTab === 2 ? '🔄 This will advance candidates to the next round (no emails sent)' :
+                     '📧 This will send emails and advance candidates to the next round'}
+                  </Typography>
+                  <Typography variant="body2">
+                    {currentTab === 0 ? (
+                      <>
+                        • <strong>Yes</strong> decisions: Advance to Coffee Chats round (no email)<br/>
+                        • <strong>No</strong> decisions: Mark as rejected (no email)<br/>
+                        • This action cannot be easily undone
+                      </>
+                    ) : (
+                      <>
+                        • <strong>Yes</strong> decisions: Acceptance emails + advance to next round<br/>
+                        • <strong>No</strong> decisions: Rejection emails + mark as rejected<br/>
+                        • This action cannot be easily undone
+                      </>
+                    )}
+                  </Typography>
+                </Alert>
+
+                {pushAllPreview.invalidDecisions > 0 && (
+                  <Alert severity="error">
+                    <Typography variant="subtitle2" gutterBottom>
+                      ⚠️ Warning: {pushAllPreview.invalidDecisions} application(s) have no decision or decisions other than "Yes" or "No"
+                    </Typography>
+                    <Typography variant="body2" sx={{ mb: 2 }}>
+                      All applications must have a clear "Yes" or "No" decision before proceeding.
+                    </Typography>
+
+                    <Stack spacing={1}>
+                      {pushAllPreview.invalidDecisionCandidates?.map((candidate) => {
+                        const currentDecisionValue = candidate.approved;
+                        let decisionStatus = 'No decision';
+
+                        if (currentDecisionValue === true) {
+                          decisionStatus = 'Yes';
+                        } else if (currentDecisionValue === false) {
+                          decisionStatus = 'No';
+                        }
+
+                        return (
+                          <Box key={candidate.id} sx={{ p: 1, border: '1px solid', borderColor: 'error.main', borderRadius: 1, bgcolor: 'error.light' }}>
+                            <Typography variant="body2" fontWeight="bold" gutterBottom>
+                              {candidate.firstName} {candidate.lastName} - {candidate.email}
+                            </Typography>
+                            <Typography variant="caption" display="block" sx={{ mb: 1 }}>
+                              Current decision: <strong>{decisionStatus}</strong>
+                            </Typography>
+                            <Stack direction="row" spacing={1}>
+                              <Button
+                                size="small"
+                                variant="contained"
+                                color="success"
+                                onClick={() => fixInvalidDecision(candidate.id, 'yes')}
+                                sx={{ textTransform: 'none' }}
+                              >
+                                Set to Yes
+                              </Button>
+                              <Button
+                                size="small"
+                                variant="contained"
+                                color="error"
+                                onClick={() => fixInvalidDecision(candidate.id, 'no')}
+                                sx={{ textTransform: 'none' }}
+                              >
+                                Set to No
+                              </Button>
+                            </Stack>
+                          </Box>
+                        );
+                      })}
+                    </Stack>
+                  </Alert>
+                )}
+
+                <Typography variant="body2">
+                  {currentTab === 1 ? (
+                    (() => {
+                      const coffeeApps = (adminApplications || []).filter(app => String(app.currentRound) === '2');
+                      const toProcess = coffeeApps.filter(app => {
+                        const localDecision = inlineDecisions[app.id];
+                        const dbDecision = app.approved === true ? 'yes' : app.approved === false ? 'no' : '';
+                        const decision = localDecision || dbDecision;
+                        return decision === 'yes' || decision === 'no';
+                      });
+                      return (<span>Applications to process: <strong>{toProcess.length}</strong></span>);
+                    })()
+                  ) : currentTab === 2 ? (
+                    (() => {
+                      const firstRoundApps = (adminApplications || []).filter(app => String(app.currentRound) === '3');
+                      const toProcess = firstRoundApps.filter(app => {
+                        const localDecision = inlineDecisions[app.id];
+                        const dbDecision = app.approved === true ? 'yes' : app.approved === false ? 'no' : '';
+                        const decision = localDecision || dbDecision;
+                        return decision === 'yes' || decision === 'no';
+                      });
+                      return (<span>Applications to process: <strong>{toProcess.length}</strong></span>);
+                    })()
+                  ) : currentTab === 3 ? (
+                    (() => {
+                      const finalRoundApps = (adminApplications || []).filter(app => String(app.currentRound) === '4');
+                      const toProcess = finalRoundApps.filter(app => {
+                        const localDecision = inlineDecisions[app.id];
+                        const dbDecision = app.approved === true ? 'yes' : app.approved === false ? 'no' : '';
+                        const decision = localDecision || dbDecision;
+                        return decision === 'yes' || decision === 'no';
+                      });
+                      return (<span>Applications to process: <strong>{toProcess.length}</strong></span>);
+                    })()
+                  ) : (
+                    <span>Candidates to process: <strong>{candidates.filter(c => inlineDecisions[c.id] === 'yes' || inlineDecisions[c.id] === 'no').length}</strong></span>
+                  )}
+                </Typography>
+                <TextField
+                  label="Type PROCESS to confirm"
+                  value={pushAllConfirmText}
+                  onChange={(e) => setPushAllConfirmText(e.target.value)}
+                  placeholder="PROCESS"
+                  fullWidth
+                />
+                <FormControlLabel
+                  control={<Checkbox checked={pushAllAcknowledge} onChange={(e) => setPushAllAcknowledge(e.target.checked)} />}
+                  label={currentTab === 0 ? "I understand this will advance candidates to the next round (no emails will be sent)" : "I understand this will send emails and advance candidates to the next round"}
+                />
+              </Stack>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setPushAllDialogOpen(false)} disabled={pushAllLoading}>Cancel</Button>
+              <Button
+                onClick={confirmPushAll}
+                variant="contained"
+                color="error"
+                disabled={pushAllLoading || pushAllConfirmText !== 'PROCESS' || !pushAllAcknowledge || pushAllPreview.invalidDecisions > 0}
+              >
+                {pushAllLoading ? 'Processing…' : 'Process All Decisions'}
+              </Button>
+            </DialogActions>
           </Dialog>
 
           <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={() => setSnackbar({ ...snackbar, open: false })}>
