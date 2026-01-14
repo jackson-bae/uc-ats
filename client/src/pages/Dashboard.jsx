@@ -1,12 +1,12 @@
-import React, { useEffect, useState } from 'react';
-import { 
-  Box, 
-  Paper, 
-  Stack, 
-  Typography, 
-  Button, 
-  Grid, 
-  Card, 
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import {
+  Box,
+  Paper,
+  Stack,
+  Typography,
+  Button,
+  Grid,
+  Card,
   CardContent,
   CircularProgress,
   Alert,
@@ -36,12 +36,32 @@ import {
 import { useAuth } from '../context/AuthContext';
 import apiClient from '../utils/api';
 import AccessControl from '../components/AccessControl';
+import { useStats } from '../hooks/useStats';
+import { useData } from '../context/DataContext';
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const [stats, setStats] = useState({ totalApplicants: 0, tasks: 0, candidates: 0, currentRound: 'SUBMITTED' });
-  const [activeCycle, setActiveCycle] = useState(null);
-  const [loading, setLoading] = useState(false);
+
+  // Use cached stats hook
+  const {
+    stats: cachedStats,
+    activeCycle,
+    loading: statsLoading,
+    error: statsError,
+    refetch: refetchStats
+  } = useStats();
+
+  // Cache context for demographic data
+  const { isCacheValid, getCache, setCache } = useData();
+
+  // Transform cached stats
+  const stats = useMemo(() => ({
+    totalApplicants: cachedStats?.totalApplicants || 0,
+    tasks: cachedStats?.tasks || 0,
+    candidates: cachedStats?.candidates || 0,
+    currentRound: cachedStats?.currentRound || 'SUBMITTED'
+  }), [cachedStats]);
+
   const [error, setError] = useState('');
   const [timelineEvents, setTimelineEvents] = useState([]);
   const [demographicData, setDemographicData] = useState({
@@ -58,36 +78,7 @@ export default function Dashboard() {
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
 
-  const load = async () => {
-    try {
-      setLoading(true);
-      const [s, c] = await Promise.allSettled([
-        apiClient.get('/admin/stats'),
-        apiClient.get('/admin/cycles/active'),
-      ]);
-      
-      // Handle stats result
-      if (s.status === 'fulfilled') {
-        setStats(s.value);
-      } else {
-        console.error('Failed to load stats:', s.reason);
-        setStats({ totalApplicants: 0, tasks: 0, candidates: 0, currentRound: 'SUBMITTED' });
-      }
-      
-      // Handle active cycle result
-      if (c.status === 'fulfilled') {
-        setActiveCycle(c.value);
-      } else {
-        console.error('Failed to load active cycle:', c.reason);
-        setActiveCycle(null);
-      }
-    } catch (e) {
-      console.error('Error in load function:', e);
-      setError(e.message || 'Failed to load dashboard data');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const loading = statsLoading;
 
   const fetchTimelineEvents = async () => {
     try {
@@ -155,25 +146,38 @@ export default function Dashboard() {
     }
   };
 
-  const fetchDemographicData = async () => {
+  const fetchDemographicData = useCallback(async (forceRefresh = false) => {
+    // Check cache first
+    if (!forceRefresh && isCacheValid('demographics', 'default')) {
+      const cached = getCache('demographics', 'default');
+      if (cached) {
+        setDemographicData(cached);
+        return;
+      }
+    }
+
     try {
       setDemographicsLoading(true);
-      const applications = await apiClient.get('/admin/applications');
-      
+      const response = await apiClient.get('/admin/applications');
+
+      // Handle paginated response format
+      const applications = response.data || response;
+
       // Handle case where applications might be null or undefined
       if (!applications || !Array.isArray(applications)) {
         console.warn('No applications data received or invalid format');
-        setDemographicData({
+        const emptyData = {
           majors: [],
           genders: [],
           gpaRanges: [],
           graduationYears: [],
           transferStudents: [],
           firstGeneration: []
-        });
+        };
+        setDemographicData(emptyData);
         return;
       }
-      
+
       // Process demographic data
       const majors = {};
       const genders = {};
@@ -232,14 +236,18 @@ export default function Dashboard() {
       // Filter out zero-value entries for cleaner charts
       const filterZeroValues = (data) => data.filter(item => item.value > 0);
 
-      setDemographicData({
+      const processedData = {
         majors: Object.entries(majors).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value),
         genders: filterZeroValues(Object.entries(genders).map(([name, value]) => ({ name, value }))),
         gpaRanges: filterZeroValues(Object.entries(gpaRanges).map(([name, value]) => ({ name, value }))),
         graduationYears: Object.entries(graduationYears).map(([name, value]) => ({ name, value })).sort((a, b) => a.name.localeCompare(b.name)),
         transferStudents: filterZeroValues(Object.entries(transferStudents).map(([name, value]) => ({ name, value }))),
         firstGeneration: filterZeroValues(Object.entries(firstGeneration).map(([name, value]) => ({ name, value })))
-      });
+      };
+
+      // Cache the processed demographic data
+      setCache('demographics', processedData, 'default');
+      setDemographicData(processedData);
     } catch (err) {
       console.error('Error fetching demographic data:', err);
       // Set empty demographic data instead of showing error
@@ -254,23 +262,21 @@ export default function Dashboard() {
     } finally {
       setDemographicsLoading(false);
     }
-  };
+  }, [isCacheValid, getCache, setCache]);
 
   useEffect(() => {
     if (user) {
-      // Load stats/cycle and demographic data in parallel
-      // Note: fetchTimelineEvents depends on activeCycle, so it's triggered
-      // by the activeCycle useEffect below after load() completes
-      Promise.all([load(), fetchDemographicData()]);
+      // Demographic data loading (stats is handled by useStats hook)
+      fetchDemographicData();
     }
-  }, [user]);
+  }, [user, fetchDemographicData]);
 
   // Fetch timeline events when active cycle is available
   useEffect(() => {
     if (user && activeCycle) {
       fetchTimelineEvents();
     }
-  }, [activeCycle]);
+  }, [activeCycle, user]);
 
   // Listen for cycle activation events
   useEffect(() => {
@@ -278,8 +284,7 @@ export default function Dashboard() {
 
     const handleCycleActivated = async () => {
       // Reload dashboard data when a new cycle is activated
-      // load() will update activeCycle, which triggers fetchTimelineEvents via useEffect
-      await Promise.all([load(), fetchDemographicData()]);
+      await Promise.all([refetchStats(), fetchDemographicData(true)]);
     };
 
     window.addEventListener('cycleActivated', handleCycleActivated);
@@ -287,7 +292,7 @@ export default function Dashboard() {
     return () => {
       window.removeEventListener('cycleActivated', handleCycleActivated);
     };
-  }, [user]);
+  }, [user, refetchStats, fetchDemographicData]);
 
   // Update scroll button states when timeline events change
   useEffect(() => {
