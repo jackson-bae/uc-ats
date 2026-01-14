@@ -38,6 +38,7 @@ import CoffeeChatsPublic from './pages/CoffeeChatsPublic';
 import MemberMeetingSlots from './pages/MemberMeetingSlots';
 import CandidateList from './pages/CandidateList';
 import CandidateDetail from './pages/CandidateDetail';
+import NotFound from './pages/NotFound';
 import './styles/variables.css';
 // Protected Route wrapper for admin/member users
 const ProtectedRoute = ({ children }) => {
@@ -304,6 +305,9 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
+
+      {/* 404 - Page Not Found */}
+      <Route path="*" element={<NotFound />} />
     </Routes>
   );
 };
