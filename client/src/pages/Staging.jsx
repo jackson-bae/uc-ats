@@ -701,12 +701,7 @@ export default function Staging() {
   };
 
   useEffect(() => {
-    setPagination(prev => ({
-      ...prev,
-      page: 1,
-      hasNextPage: 1 < prev.totalPages,
-      hasPrevPage: false
-    }));
+    setPagination(prev => ({ ...prev, page: 1 }));
   }, [filters]);
 
   const [currentDecision, setCurrentDecision] = useState({
@@ -1372,8 +1367,8 @@ export default function Staging() {
       else graduationYearBreakdown[year].pending++;
       
       if (!gender) gender = 'Other/Prefer not to say';
-      else if (gender.toLowerCase().includes('male')) gender = 'Male';
       else if (gender.toLowerCase().includes('female')) gender = 'Female';
+      else if (gender.toLowerCase().includes('male')) gender = 'Male';
       else gender = 'Other/Prefer not to say';
       
       genderBreakdown[gender].total++;
