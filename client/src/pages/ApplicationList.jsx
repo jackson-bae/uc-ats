@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { MagnifyingGlassIcon, PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 import apiClient from '../utils/api';
@@ -8,31 +8,12 @@ import AddApplicationModal from '../components/AddApplicationModal';
 import EditApplicationModal from '../components/EditApplicationModal';
 import AccessControl from '../components/AccessControl';
 import { useAuth } from '../context/AuthContext';
-import { useApplications } from '../hooks/useApplications';
-import { useData } from '../context/DataContext';
-import Pagination from '../components/Pagination';
 import '../styles/ApplicationList.css';
 
 export default function ApplicationList() {
-  // Pagination state
-  const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(50);
-
-  // Use cached applications hook
-  const {
-    applications: rawApplications,
-    pagination,
-    loading,
-    error,
-    refetch: refetchApplications,
-    invalidate: invalidateApplications
-  } = useApplications({ page, limit });
-
-  const { invalidateRelated } = useData();
-
-  // Transform applications data
-  const applicants = useMemo(() => rawApplications || [], [rawApplications]);
-
+  const [applicants, setApplicants] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState({
     year: '',
@@ -49,26 +30,37 @@ export default function ApplicationList() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'ADMIN';
 
-  // Preload images when applications change
   useEffect(() => {
-    if (applicants.length > 0) {
-      const imageUrls = applicants
-        .filter(applicant => applicant.headshotUrl)
-        .map(applicant => applicant.headshotUrl);
-
-      if (imageUrls.length > 0) {
-        console.log(`Preloading ${imageUrls.length} profile images...`);
-        ImageCache.preloadImages(imageUrls, apiClient.token)
-          .then(results => {
-            const successful = results.filter(r => r.status === 'fulfilled').length;
-            console.log(`Successfully preloaded ${successful}/${imageUrls.length} images`);
-          })
-          .catch(err => {
-            console.error('Error preloading images:', err);
-          });
+    const fetchApplicants = async () => {
+      try {
+        const data = await apiClient.get('/applications');
+        setApplicants(data);
+        
+        // Preload all profile images in the background
+        const imageUrls = data
+          .filter(applicant => applicant.headshotUrl)
+          .map(applicant => applicant.headshotUrl);
+        
+        if (imageUrls.length > 0) {
+          console.log(`Preloading ${imageUrls.length} profile images...`);
+          ImageCache.preloadImages(imageUrls, apiClient.token)
+            .then(results => {
+              const successful = results.filter(r => r.status === 'fulfilled').length;
+              console.log(`Successfully preloaded ${successful}/${imageUrls.length} images`);
+            })
+            .catch(err => {
+              console.error('Error preloading images:', err);
+            });
+        }
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
       }
-    }
-  }, [applicants]);
+    };
+
+    fetchApplicants();
+  }, []);
 
   // Filter and search logic
   const filteredApplicants = applicants.filter(applicant => {
@@ -103,11 +95,18 @@ export default function ApplicationList() {
     }));
   };
 
-  const handleApplicationAdded = useCallback(() => {
-    // Invalidate cache and refetch
-    invalidateRelated('applications');
-    refetchApplications();
-  }, [invalidateRelated, refetchApplications]);
+  const handleApplicationAdded = () => {
+    // Refresh the applications list
+    const fetchApplicants = async () => {
+      try {
+        const data = await apiClient.get('/applications');
+        setApplicants(data);
+      } catch (err) {
+        setError(err.message);
+      }
+    };
+    fetchApplicants();
+  };
 
   const handleEdit = (e, applicant) => {
     e.preventDefault();
@@ -119,7 +118,7 @@ export default function ApplicationList() {
   const handleDelete = async (e, applicant) => {
     e.preventDefault();
     e.stopPropagation();
-
+    
     if (!window.confirm(`Are you sure you want to delete the application for ${applicant.firstName} ${applicant.lastName}? This action cannot be undone.`)) {
       return;
     }
@@ -127,9 +126,9 @@ export default function ApplicationList() {
     setDeletingApplication(applicant.id);
     try {
       await apiClient.delete(`/admin/applications/${applicant.id}`);
-      // Invalidate cache and refetch
-      invalidateRelated('applications');
-      await refetchApplications();
+      // Refresh the applications list
+      const data = await apiClient.get('/applications');
+      setApplicants(data);
     } catch (err) {
       alert(err.message || 'Failed to delete application');
     } finally {
@@ -137,22 +136,11 @@ export default function ApplicationList() {
     }
   };
 
-  const handleApplicationUpdated = useCallback(() => {
+  const handleApplicationUpdated = () => {
     handleApplicationAdded();
     setShowEditModal(false);
     setEditingApplication(null);
-  }, [handleApplicationAdded]);
-
-  // Handle page change
-  const handlePageChange = useCallback((newPage) => {
-    setPage(newPage);
-  }, []);
-
-  // Handle limit change
-  const handleLimitChange = useCallback((newLimit) => {
-    setLimit(newLimit);
-    setPage(1);
-  }, []);
+  };
 
 
   if (loading) {
@@ -349,19 +337,6 @@ export default function ApplicationList() {
             </div>
           ))}
         </div>
-      )}
-
-      {/* Pagination */}
-      {pagination && (
-        <Pagination
-          page={page}
-          totalPages={pagination.totalPages}
-          total={pagination.total}
-          limit={limit}
-          onPageChange={handlePageChange}
-          onLimitChange={handleLimitChange}
-          loading={loading}
-        />
       )}
 
       {/* Add Application Modal */}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { MagnifyingGlassIcon, PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 import apiClient from '../utils/api';
@@ -7,40 +7,13 @@ import ImageCache from '../utils/imageCache';
 import { useAuth } from '../context/AuthContext';
 import AccessControl from '../components/AccessControl';
 import EditCandidateModal from '../components/EditCandidateModal';
-import { useCandidates } from '../hooks/useCandidates';
-import { useData } from '../context/DataContext';
-import Pagination from '../components/Pagination';
 import '../styles/CandidateList.css';
 
 export default function CandidateList() {
   const { user } = useAuth();
-
-  // Pagination state
-  const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(50);
-
-  // Use cached candidates hook with minimal data for list view
-  const {
-    candidates: rawCandidates,
-    pagination,
-    loading,
-    error,
-    refetch: refetchCandidates
-  } = useCandidates({
-    page,
-    limit,
-    endpoint: '/member/all-candidates',
-    enabled: !!user?.id
-  });
-
-  const { invalidateRelated } = useData();
-
-  // Transform candidates data
-  const candidates = useMemo(() => {
-    // Handle paginated response format
-    return rawCandidates || [];
-  }, [rawCandidates]);
-
+  const [candidates, setCandidates] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState({
     group: '',
@@ -54,42 +27,49 @@ export default function CandidateList() {
 
   const isAdmin = user?.role === 'ADMIN';
 
-  // Fetch cycles separately (they don't change often)
   useEffect(() => {
-    const fetchCycles = async () => {
+    const fetchCandidates = async () => {
+      if (!user?.id) return;
+
       try {
-        const cyclesData = await apiClient.get('/admin/cycles');
+        // Fetch candidates and cycles in parallel
+        const [candidatesData, cyclesData] = await Promise.all([
+          apiClient.get('/member/all-candidates'),
+          apiClient.get('/admin/cycles')
+        ]);
+        console.log('Fetched all candidates data:', candidatesData);
+        console.log('Number of candidates:', candidatesData?.length || 0);
+        setCandidates(candidatesData);
         setCycles(cyclesData || []);
+        const data = candidatesData;
+        
+        // Preload all profile images from applications in the background if they exist
+        const imageUrls = data
+          .filter(candidate => candidate.applications && candidate.applications.length > 0)
+          .map(candidate => candidate.applications[0].headshotUrl)
+          .filter(url => url);
+        
+        if (imageUrls.length > 0) {
+          console.log(`Preloading ${imageUrls.length} profile images...`);
+          ImageCache.preloadImages(imageUrls, apiClient.token)
+            .then(results => {
+              const successful = results.filter(r => r.status === 'fulfilled').length;
+              console.log(`Successfully preloaded ${successful}/${imageUrls.length} images`);
+            })
+            .catch(err => {
+              console.error('Error preloading images:', err);
+            });
+        }
       } catch (err) {
-        console.error('Error loading cycles:', err);
+        console.error('Error loading candidates:', err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
       }
     };
-    if (user?.id) {
-      fetchCycles();
-    }
+
+    fetchCandidates();
   }, [user?.id]);
-
-  // Preload images when candidates change
-  useEffect(() => {
-    if (candidates.length > 0) {
-      const imageUrls = candidates
-        .filter(candidate => candidate.applications && candidate.applications.length > 0)
-        .map(candidate => candidate.applications[0].headshotUrl)
-        .filter(url => url);
-
-      if (imageUrls.length > 0) {
-        console.log(`Preloading ${imageUrls.length} profile images...`);
-        ImageCache.preloadImages(imageUrls, apiClient.token)
-          .then(results => {
-            const successful = results.filter(r => r.status === 'fulfilled').length;
-            console.log(`Successfully preloaded ${successful}/${imageUrls.length} images`);
-          })
-          .catch(err => {
-            console.error('Error preloading images:', err);
-          });
-      }
-    }
-  }, [candidates]);
 
   // Filter and search logic
   const filteredCandidates = candidates.filter(candidate => {
@@ -165,11 +145,11 @@ export default function CandidateList() {
   const handleDelete = async (e, candidate) => {
     e.preventDefault();
     e.stopPropagation();
-
-    const candidateName = candidate.applications?.[0] ?
-      `${candidate.applications[0].firstName} ${candidate.applications[0].lastName}` :
+    
+    const candidateName = candidate.applications?.[0] ? 
+      `${candidate.applications[0].firstName} ${candidate.applications[0].lastName}` : 
       `${candidate.firstName} ${candidate.lastName}`;
-
+    
     if (!window.confirm(`Are you sure you want to delete candidate ${candidateName}? This action cannot be undone.`)) {
       return;
     }
@@ -183,9 +163,9 @@ export default function CandidateList() {
     setDeletingCandidate(candidate.id);
     try {
       await apiClient.delete(`/admin/candidates/${candidate.id}`);
-      // Invalidate cache and refetch
-      invalidateRelated('candidates');
-      await refetchCandidates();
+      // Refresh the candidates list
+      const data = await apiClient.get('/member/all-candidates');
+      setCandidates(data);
     } catch (err) {
       alert(err.message || 'Failed to delete candidate');
     } finally {
@@ -193,24 +173,20 @@ export default function CandidateList() {
     }
   };
 
-  const handleCandidateUpdated = useCallback(() => {
-    // Invalidate cache and refetch
-    invalidateRelated('candidates');
-    refetchCandidates();
+  const handleCandidateUpdated = () => {
+    // Refresh the candidates list
+    const fetchCandidates = async () => {
+      try {
+        const data = await apiClient.get('/member/all-candidates');
+        setCandidates(data);
+      } catch (err) {
+        console.error('Error loading candidates:', err);
+      }
+    };
+    fetchCandidates();
     setShowEditModal(false);
     setEditingCandidate(null);
-  }, [invalidateRelated, refetchCandidates]);
-
-  // Handle page change
-  const handlePageChange = useCallback((newPage) => {
-    setPage(newPage);
-  }, []);
-
-  // Handle limit change
-  const handleLimitChange = useCallback((newLimit) => {
-    setLimit(newLimit);
-    setPage(1);
-  }, []);
+  };
 
   if (loading) {
     return (
@@ -374,19 +350,6 @@ export default function CandidateList() {
             </div>
           ))}
         </div>
-      )}
-
-      {/* Pagination */}
-      {pagination && (
-        <Pagination
-          page={page}
-          totalPages={pagination.totalPages}
-          total={pagination.total}
-          limit={limit}
-          onPageChange={handlePageChange}
-          onLimitChange={handleLimitChange}
-          loading={loading}
-        />
       )}
 
       {/* Edit Candidate Modal */}

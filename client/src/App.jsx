@@ -8,7 +8,6 @@ import MemberSignUp from './pages/MemberSignUp';
 import Layout from './components/Layout';
 import CandidateLayout from './components/CandidateLayout';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { DataProvider } from './context/DataContext';
 import CandidateManagement from './pages/CandidateManagement';
 import CycleManagement from './pages/CycleManagement';
 import ForgotPassword from './pages/ForgotPassword';
@@ -323,9 +322,7 @@ export default function App() {
 
   return (
     <AuthProvider>
-      <DataProvider>
-        <AppRoutes />
-      </DataProvider>
+      <AppRoutes />
     </AuthProvider>
   );
 }

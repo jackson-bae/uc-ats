@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -82,7 +82,6 @@ import AuthenticatedImage from '../components/AuthenticatedImage';
 import DocumentPreviewModal from '../components/DocumentPreviewModal';
 import AccessControl from '../components/AccessControl';
 import { useAuth } from '../context/AuthContext';
-import { useData } from '../context/DataContext';
 import ApplicationDetail from './ApplicationDetail';
 
 // API functions for staging
@@ -444,10 +443,7 @@ export default function Staging() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const isAdmin = user?.role === 'ADMIN';
-
-  // Cache context for staging data
-  const { isCacheValid, getCache, setCache, invalidateRelated } = useData();
-
+  
   const [candidates, setCandidates] = useState([]);
   const [events, setEvents] = useState([]);
   const [reviewTeams, setReviewTeams] = useState([]);
@@ -721,71 +717,8 @@ export default function Staging() {
     feedback: ''
   });
 
-  // Memoized function to process and set staging data
-  const processStagingData = useCallback((data) => {
-    const { candidatesData, activeCycle, adminApplicationsData, eventsData, reviewTeamsData, existingDecisionsData } = data;
-
-    setCandidates(candidatesData);
-    setCurrentCycle(activeCycle);
-    setAdminApplications(adminApplicationsData || []);
-    setEvents(eventsData || []);
-    setReviewTeams(reviewTeamsData || []);
-
-    calculateDemographics(candidatesData, false);
-
-    setPagination(prev => ({
-      ...prev,
-      total: candidatesData.length,
-      totalPages: Math.ceil(candidatesData.length / prev.limit),
-      hasNextPage: prev.page < Math.ceil(candidatesData.length / prev.limit),
-      hasPrevPage: prev.page > 1
-    }));
-
-    if (existingDecisionsData && existingDecisionsData.decisions) {
-      setInlineDecisions(existingDecisionsData.decisions);
-    }
-
-    const gradingMap = {};
-    (adminApplicationsData || []).forEach(app => {
-      const hasResume = Boolean(app.resumeUrl);
-      const hasCoverLetter = Boolean(app.coverLetterUrl);
-      const hasVideo = Boolean(app.videoUrl);
-
-      const hasResumeScore = Boolean(app.hasResumeScore);
-      const hasCoverLetterScore = Boolean(app.hasCoverLetterScore);
-      const hasVideoScore = Boolean(app.hasVideoScore);
-
-      let gradingComplete = true;
-
-      if (hasResume && !hasResumeScore) gradingComplete = false;
-      if (hasCoverLetter && !hasCoverLetterScore) gradingComplete = false;
-      if (hasVideo && !hasVideoScore) gradingComplete = false;
-
-      gradingMap[app.candidateId] = {
-        complete: gradingComplete,
-        hasResume,
-        hasCoverLetter,
-        hasVideo,
-        hasResumeScore,
-        hasCoverLetterScore,
-        hasVideoScore
-      };
-    });
-    setGradingCompleteByCandidate(gradingMap);
-  }, []);
-
   useEffect(() => {
     const fetchData = async () => {
-      // Check cache first
-      if (isCacheValid('staging', 'default')) {
-        const cached = getCache('staging', 'default');
-        if (cached) {
-          processStagingData(cached);
-          setLoading(false);
-          return;
-        }
-      }
-
       try {
         setLoading(true);
         const [candidatesResponse, activeCycle, adminApplicationsResponse, eventsData, reviewTeamsData, existingDecisionsData] = await Promise.all([
@@ -796,22 +729,57 @@ export default function Staging() {
           stagingAPI.fetchReviewTeams(),
           stagingAPI.loadExistingDecisions()
         ]);
-
+        
         const candidatesData = candidatesResponse.candidates || candidatesResponse;
         const adminApplicationsData = adminApplicationsResponse.applications || adminApplicationsResponse;
+        
+        setCandidates(candidatesData);
+        setCurrentCycle(activeCycle);
+        setAdminApplications(adminApplicationsData || []);
+        setEvents(eventsData || []);
+        setReviewTeams(reviewTeamsData || []);
+        
+        calculateDemographics(candidatesData, false);
+        
+        setPagination(prev => ({
+          ...prev,
+          total: candidatesData.length,
+          totalPages: Math.ceil(candidatesData.length / prev.limit),
+          hasNextPage: prev.page < Math.ceil(candidatesData.length / prev.limit),
+          hasPrevPage: prev.page > 1
+        }));
 
-        // Store in cache
-        const cacheData = {
-          candidatesData,
-          activeCycle,
-          adminApplicationsData,
-          eventsData,
-          reviewTeamsData,
-          existingDecisionsData
-        };
-        setCache('staging', cacheData, 'default');
+        if (existingDecisionsData && existingDecisionsData.decisions) {
+          setInlineDecisions(existingDecisionsData.decisions);
+        }
 
-        processStagingData(cacheData);
+        const gradingMap = {};
+        (adminApplicationsData || []).forEach(app => {
+          const hasResume = Boolean(app.resumeUrl);
+          const hasCoverLetter = Boolean(app.coverLetterUrl);
+          const hasVideo = Boolean(app.videoUrl);
+          
+          const hasResumeScore = Boolean(app.hasResumeScore);
+          const hasCoverLetterScore = Boolean(app.hasCoverLetterScore);
+          const hasVideoScore = Boolean(app.hasVideoScore);
+          
+          let gradingComplete = true;
+          
+          if (hasResume && !hasResumeScore) gradingComplete = false;
+          if (hasCoverLetter && !hasCoverLetterScore) gradingComplete = false;
+          if (hasVideo && !hasVideoScore) gradingComplete = false;
+          
+          gradingMap[app.candidateId] = {
+            complete: gradingComplete,
+            hasResume,
+            hasCoverLetter,
+            hasVideo,
+            hasResumeScore,
+            hasCoverLetterScore,
+            hasVideoScore
+          };
+        });
+        setGradingCompleteByCandidate(gradingMap);
       } catch (error) {
         console.error('Error fetching data:', error);
         setSnackbar({
@@ -825,7 +793,7 @@ export default function Staging() {
     };
 
     fetchData();
-  }, [isCacheValid, getCache, setCache, processStagingData]);
+  }, []);
 
   useEffect(() => {
     if (currentTab === 1 && adminApplications.length > 0) {
@@ -881,34 +849,64 @@ export default function Staging() {
   }, [currentTab, adminApplications]);
 
   const fetchCandidates = async () => {
-    // Invalidate cache before refetch (called after mutations)
-    invalidateRelated('staging');
-
     try {
-      const [candidatesResponse, activeCycle, adminApplicationsResponse, eventsData, reviewTeamsData, existingDecisionsData] = await Promise.all([
+      const [candidatesResponse, adminApplicationsResponse, eventsData, reviewTeamsData, existingDecisionsData] = await Promise.all([
         stagingAPI.fetchCandidates(),
-        stagingAPI.fetchActiveCycle(),
         stagingAPI.fetchAdminApplications(),
         stagingAPI.fetchEventAttendance(),
         stagingAPI.fetchReviewTeams(),
         stagingAPI.loadExistingDecisions()
       ]);
-
+      
       const candidatesData = candidatesResponse.candidates || candidatesResponse;
       const adminApplicationsData = adminApplicationsResponse.applications || adminApplicationsResponse;
-
-      // Update cache with new data
-      const cacheData = {
-        candidatesData,
-        activeCycle,
-        adminApplicationsData,
-        eventsData,
-        reviewTeamsData,
-        existingDecisionsData
-      };
-      setCache('staging', cacheData, 'default');
-
-      processStagingData(cacheData);
+      
+      setCandidates(candidatesData);
+      setAdminApplications(adminApplicationsData || []);
+      setEvents(eventsData || []);
+      setReviewTeams(reviewTeamsData || []);
+      
+      calculateDemographics(candidatesData, false);
+      
+      setPagination(prev => ({
+        ...prev,
+        total: candidatesData.length,
+        totalPages: Math.ceil(candidatesData.length / prev.limit),
+        hasNextPage: prev.page < Math.ceil(candidatesData.length / prev.limit),
+        hasPrevPage: prev.page > 1
+      }));
+      
+      if (existingDecisionsData && existingDecisionsData.decisions) {
+        setInlineDecisions(existingDecisionsData.decisions);
+      }
+      
+      const gradingMap = {};
+      (adminApplicationsData || []).forEach(app => {
+        const hasResume = Boolean(app.resumeUrl);
+        const hasCoverLetter = Boolean(app.coverLetterUrl);
+        const hasVideo = Boolean(app.videoUrl);
+        
+        const hasResumeScore = Boolean(app.hasResumeScore);
+        const hasCoverLetterScore = Boolean(app.hasCoverLetterScore);
+        const hasVideoScore = Boolean(app.hasVideoScore);
+        
+        let gradingComplete = true;
+        
+        if (hasResume && !hasResumeScore) gradingComplete = false;
+        if (hasCoverLetter && !hasCoverLetterScore) gradingComplete = false;
+        if (hasVideo && !hasVideoScore) gradingComplete = false;
+        
+        gradingMap[app.candidateId] = {
+          complete: gradingComplete,
+          hasResume,
+          hasCoverLetter,
+          hasVideo,
+          hasResumeScore,
+          hasCoverLetterScore,
+          hasVideoScore
+        };
+      });
+      setGradingCompleteByCandidate(gradingMap);
     } catch (error) {
       console.error('Error fetching candidates:', error);
       setSnackbar({

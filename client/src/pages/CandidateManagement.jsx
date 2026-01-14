@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Box,
     Typography,
@@ -40,10 +40,6 @@ import globalTheme from '../styles/globalTheme';
 import '../styles/CandidateManagement.css';
 import apiClient from '../utils/api';
 import AccessControl from '../components/AccessControl';
-import { useCandidates } from '../hooks/useCandidates';
-import { useStats } from '../hooks/useStats';
-import { useData } from '../context/DataContext';
-import Pagination from '../components/Pagination';
 
 const adminAPI = {
     async fetchStats() {
@@ -387,55 +383,9 @@ const calculateGPA = (application) => {
 };
 
 export default function CandidateManagement() {
-    // Pagination state
-    const [page, setPage] = useState(1);
-    const [limit, setLimit] = useState(50);
-
-    // Use cached data hooks
-    const { invalidateRelated } = useData();
-    const {
-        candidates: rawCandidates,
-        pagination,
-        loading: candidatesLoading,
-        error: candidatesError,
-        refetch: refetchCandidates,
-        updateCandidate: updateCandidateCache
-    } = useCandidates({ page, limit });
-
-    const {
-        stats: statsData,
-        loading: statsLoading,
-        refetch: refetchStats
-    } = useStats();
-
-    // Transform candidates data
-    const candidates = useMemo(() => {
-        if (!rawCandidates) return [];
-        return rawCandidates.map(app => ({
-            id: app.id,
-            name: `${app.firstName || ''} ${app.lastName || ''}`.trim() || app.name || 'Unknown',
-            email: app.email || 'No email',
-            status: getRoundDisplayName(app.status),
-            gpa: calculateGPA(app),
-            cumulativeGpa: app.cumulativeGpa,
-            majorGpa: app.majorGpa,
-            currentRound: app.status || 'SUBMITTED',
-            approved: app.approved,
-            submittedAt: app.submittedAt,
-            applicationStatus: app.status,
-            application: app
-        }));
-    }, [rawCandidates]);
-
-    // Transform stats data
-    const stats = useMemo(() => ({
-        totalApplicants: statsData?.totalApplicants || 0,
-        tasks: statsData?.tasks || 0,
-        candidates: statsData?.candidates || candidates.length,
-        currentRound: statsData?.currentRound || 'resume'
-    }), [statsData, candidates.length]);
-
-    const loading = candidatesLoading || statsLoading;
+    const [stats, setStats] = useState(mockStats);
+    const [candidates, setCandidates] = useState(mockCandidates);
+    const [loading, setLoading] = useState(false);
 
     const [statusFilter, setStatusFilter] = useState('all');
     const [approvalFilter, setApprovalFilter] = useState('all');
@@ -452,31 +402,55 @@ export default function CandidateManagement() {
 
     const [refreshing, setRefreshing] = useState(false);
 
-    // Helper to refetch only stats after mutations (optimistic update for candidates)
-    const refetchStatsOnly = useCallback(async () => {
-        await refetchStats();
-    }, [refetchStats]);
+    const fetchDashboardData = async () => {
+        try {
+            setLoading(true);
 
-    // Full refetch for major changes
-    const refetchAll = useCallback(async () => {
-        await Promise.all([refetchCandidates(), refetchStats()]);
-    }, [refetchCandidates, refetchStats]);
+            const [statsData, candidatesData] = await Promise.all([
+                adminAPI.fetchStats(),
+                adminAPI.fetchCandidates()
+            ]);
+
+            const transformedCandidates = candidatesData.map(app => ({
+                id: app.id,
+                name: `${app.firstName || ''} ${app.lastName || ''}`.trim() || app.name || 'Unknown',
+                email: app.email || 'No email',
+                status: getRoundDisplayName(app.status),
+                gpa: calculateGPA(app),
+                cumulativeGpa: app.cumulativeGpa,
+                majorGpa: app.majorGpa,
+                currentRound: app.status || 'SUBMITTED',
+                approved: app.approved,
+                submittedAt: app.submittedAt,
+                applicationStatus: app.status,
+                application: app
+            }));
+
+            setCandidates(transformedCandidates);
+            setStats({
+                totalApplicants: statsData.totalApplicants || 0,
+                tasks: statsData.tasks || 0,
+                candidates: statsData.candidates || transformedCandidates.length,
+                currentRound: statsData.currentRound || 'resume'
+            });
+        } catch (error) {
+            console.error('Error fetching dashboard data:', error);
+            setSnackbarMessage('Error loading data. Please check your connection.');
+            setSnackbarOpen(true);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const handleApprovalChange = async (candidateId, approved) => {
         try {
-            // Optimistic update - update cache immediately
-            updateCandidateCache(candidateId, { approved });
-
             await adminAPI.updateApproval(candidateId, approved);
-            // Only refetch stats, not the full candidate list
-            await refetchStatsOnly();
+            await fetchDashboardData();
 
             setSnackbarMessage(`Candidate ${approved === null ? 'approval reset' : approved ? 'approved' : 'rejected'} successfully`);
             setSnackbarOpen(true);
         } catch (error) {
             console.error('Error updating candidate approval: ', error);
-            // Revert on error by refetching
-            await refetchCandidates();
             setSnackbarMessage('Error updating approval. Please try again.');
             setSnackbarOpen(true);
         }
@@ -501,9 +475,7 @@ export default function CandidateManagement() {
             };
 
             await adminAPI.updateCandidate(selectedCandidate.id, updateData);
-            // Invalidate related caches and refetch
-            invalidateRelated('candidates');
-            await refetchAll();
+            await fetchDashboardData();
 
             setEditDialogOpen(false);
             setSelectedCandidate(null);
@@ -566,9 +538,7 @@ export default function CandidateManagement() {
             ];
 
             await Promise.all(updatePromises.filter(Boolean));
-            // Full refetch after bulk operation
-            invalidateRelated('candidates');
-            await refetchAll();
+            await fetchDashboardData();
 
             setBulkAdvanceDialogOpen(false);
             setSnackbarMessage(
@@ -584,7 +554,7 @@ export default function CandidateManagement() {
 
     const handleRefresh = async () => {
         setRefreshing(true);
-        await refetchAll();
+        await fetchDashboardData();
         setRefreshing(false);
         setSnackbarMessage('Data refreshed successfully');
         setSnackbarOpen(true);
@@ -607,20 +577,16 @@ export default function CandidateManagement() {
                 return;
             }
 
-            // Optimistic update
-            updateCandidateCache(candidateId, { status: nextStatus, approved: null });
-
             await adminAPI.updateCandidate(candidateId, {
                 status: nextStatus,
                 approved: null
             });
 
-            await refetchStatsOnly();
+            await fetchDashboardData();
             setSnackbarMessage(`Candidate ${nextStatus === 'ACCEPTED' ? 'accepted and hired' : 'advanced to ' + getRoundDisplayName(nextStatus)}`);
             setSnackbarOpen(true);
         } catch (error) {
             console.error('Error advancing candidate:', error);
-            await refetchCandidates();
             setSnackbarMessage('Error advancing candidate. Please try again.');
             setSnackbarOpen(true);
         }
@@ -628,20 +594,16 @@ export default function CandidateManagement() {
 
     const handleRejectCandidate = async (candidateId) => {
         try {
-            // Optimistic update
-            updateCandidateCache(candidateId, { status: 'REJECTED', approved: false });
-
             await adminAPI.updateCandidate(candidateId, {
                 status: 'REJECTED',
                 approved: false
             });
 
-            await refetchStatsOnly();
+            await fetchDashboardData();
             setSnackbarMessage('Candidate rejected successfully');
             setSnackbarOpen(true);
         } catch (error) {
             console.error('Error rejecting candidate:', error);
-            await refetchCandidates();
             setSnackbarMessage('Error rejecting candidate. Please try again.');
             setSnackbarOpen(true);
         }
@@ -650,9 +612,7 @@ export default function CandidateManagement() {
     const handleResetAll = async () => {
         try {
             await adminAPI.resetAll();
-            // Full refetch after reset
-            invalidateRelated('candidates');
-            await refetchAll();
+            await fetchDashboardData();
             setResetDialogOpen(false);
             setSnackbarMessage('All candidates reset to submitted status');
             setSnackbarOpen(true);
@@ -679,15 +639,8 @@ export default function CandidateManagement() {
             return 0;
         });
 
-    // Handle page change
-    const handlePageChange = useCallback((newPage) => {
-        setPage(newPage);
-    }, []);
-
-    // Handle limit change
-    const handleLimitChange = useCallback((newLimit) => {
-        setLimit(newLimit);
-        setPage(1); // Reset to first page when limit changes
+    useEffect(() => {
+        fetchDashboardData();
     }, []);
 
     if (loading) {
@@ -947,19 +900,6 @@ export default function CandidateManagement() {
                     </TableBody>
                 </Table>
             </TableContainer>
-
-            {/* Pagination */}
-            {pagination && (
-                <Pagination
-                    page={page}
-                    totalPages={pagination.totalPages}
-                    total={pagination.total}
-                    limit={limit}
-                    onPageChange={handlePageChange}
-                    onLimitChange={handleLimitChange}
-                    loading={loading}
-                />
-            )}
 
             <Dialog open={bulkAdvanceDialogOpen} onClose={() => setBulkAdvanceDialogOpen(false)}>
                 <DialogTitle sx={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', }}>Advance Round</DialogTitle>

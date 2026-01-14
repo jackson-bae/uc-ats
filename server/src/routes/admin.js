@@ -128,46 +128,16 @@ router.get('/stats', async (req, res) => {
 // Get all candidates
 router.get('/candidates', async (req, res) => {
   try {
-    // Pagination parameters
-    const page = parseInt(req.query.page) || 1;
-    const limit = Math.min(parseInt(req.query.limit) || 50, 200); // Max 200 items
-    const skip = (page - 1) * limit;
-
     // Scope to active cycle if present
     const active = await prisma.recruitingCycle.findFirst({ where: { isActive: true } });
     if (!active) {
-      return res.json({
-        data: [],
-        pagination: { page, limit, total: 0, totalPages: 0, hasNextPage: false, hasPrevPage: false }
-      });
+      return res.json([]);
     }
-
-    // Fetch paginated data and total count in parallel
-    const [candidates, total] = await Promise.all([
-      prisma.application.findMany({
-        where: { cycleId: active.id },
-        orderBy: { submittedAt: 'desc' },
-        skip,
-        take: limit
-      }),
-      prisma.application.count({
-        where: { cycleId: active.id }
-      })
-    ]);
-
-    const totalPages = Math.ceil(total / limit);
-
-    res.json({
-      data: candidates,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages,
-        hasNextPage: page < totalPages,
-        hasPrevPage: page > 1
-      }
+    const candidates = await prisma.application.findMany({
+      where: { cycleId: active.id },
+      orderBy: { submittedAt: 'desc' }
     });
+    res.json(candidates);
   } catch (error) {
     console.error('[GET /api/admin/candidates]', error);
     res.status(500).json({ error: 'Failed to fetch candidates' });

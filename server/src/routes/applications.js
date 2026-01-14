@@ -249,67 +249,51 @@ router.post('/manual', async (req, res) => {
 // Get all applications with average grades
 router.get('/', async (req, res) => {
   try {
-    // Pagination parameters
-    const page = parseInt(req.query.page) || 1;
-    const limit = Math.min(parseInt(req.query.limit) || 50, 200);
-    const skip = (page - 1) * limit;
-
     // Optional: scope to active recruiting cycle if one exists
     const activeCycle = await prisma.recruitingCycle.findFirst({ where: { isActive: true } });
     if (!activeCycle) {
-      // When no active cycle, return empty result
-      return res.json({
-        data: [],
-        pagination: { page, limit, total: 0, totalPages: 0, hasNextPage: false, hasPrevPage: false }
-      });
+      // When no active cycle, return empty list instead of all
+      return res.json([]);
     }
     const whereClause = { cycleId: activeCycle.id };
 
-    // Get total count and paginated applications in parallel
-    const [total, applications] = await Promise.all([
-      prisma.application.count({ where: whereClause }),
-      prisma.application.findMany({
-        where: whereClause,
-        orderBy: { submittedAt: 'desc' },
-        skip,
-        take: limit
-      })
-    ]);
-
-    // Get grades only for the applications on this page
-    const applicationIds = applications.map(app => app.id);
-    const allGrades = await prisma.grade.findMany({
-      where: { applicant: { in: applicationIds } }
+    // First, get applications
+    const applications = await prisma.application.findMany({
+      where: whereClause,
+      orderBy: { submittedAt: 'desc' }
     });
+
+    // Get all grades
+    const allGrades = await prisma.grade.findMany();
 
     // Get counts of past applications by candidateId (primary) and studentId (fallback)
     const candidateIds = [...new Set(applications.map(app => app.candidateId).filter(Boolean))];
     const studentIds = [...new Set(applications.map(app => app.studentId).filter(Boolean))];
 
     // Count by candidateId first (this is the proper relation)
-    const pastAppCountsByCandidateId = candidateIds.length > 0 ? await prisma.application.groupBy({
+    const pastAppCountsByCandidateId = await prisma.application.groupBy({
       by: ['candidateId'],
       where: {
         candidateId: { in: candidateIds },
         cycleId: { not: activeCycle.id }
       },
       _count: { id: true }
-    }) : [];
+    });
     const pastAppCountMapByCandidateId = new Map(pastAppCountsByCandidateId.map(p => [p.candidateId, p._count.id]));
 
     // Also count by studentId as fallback for applications without candidateId
-    const pastAppCountsByStudentId = studentIds.length > 0 ? await prisma.application.groupBy({
+    const pastAppCountsByStudentId = await prisma.application.groupBy({
       by: ['studentId'],
       where: {
         studentId: { in: studentIds },
         cycleId: { not: activeCycle.id }
       },
       _count: { id: true }
-    }) : [];
+    });
     const pastAppCountMapByStudentId = new Map(pastAppCountsByStudentId.map(p => [p.studentId, p._count.id]));
 
     // Calculate average grades for each application
-    const applicationsWithAverages = applications.map((application) => {
+    const applicationsWithAverages = await Promise.all(applications.map(async (application) => {
       // Find grades for this application
       const appGrades = allGrades.filter(grade => grade.applicant === application.id);
 
@@ -361,21 +345,9 @@ router.get('/', async (req, res) => {
         pastApplicationCount,
         isReturningApplicant: pastApplicationCount > 0
       };
-    });
+    }));
 
-    const totalPages = Math.ceil(total / limit);
-
-    res.json({
-      data: applicationsWithAverages,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages,
-        hasNextPage: page < totalPages,
-        hasPrevPage: page > 1
-      }
-    });
+    res.json(applicationsWithAverages);
   } catch (error) {
     console.error('Error fetching applications:', error);
     res.status(500).json({ error: 'Failed to fetch applications' });
