@@ -3129,6 +3129,7 @@ router.get('/review-teams', async (req, res) => {
       where: { cycleId: active.id },
       select: {
         id: true,
+        name: true,
         memberOneUser: {
           select: {
             id: true,
@@ -3162,9 +3163,10 @@ router.get('/review-teams', async (req, res) => {
         team.memberThreeUser
       ].filter(Boolean);
 
-      const teamName = members.length > 0 
+      // Use the name from the database if it exists, otherwise generate a fallback name
+      const teamName = team.name || (members.length > 0 
         ? `Team ${team.id.slice(-4)} (${members.map(m => m.fullName.split(' ')[0]).join(', ')})`
-        : `Team ${team.id.slice(-4)}`;
+        : `Team ${team.id.slice(-4)}`);
 
       return {
         id: team.id,

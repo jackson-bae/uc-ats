@@ -365,13 +365,13 @@ model RoundTwo {
 }
 
 model Referral {
-  id           String          @id @default(uuid())
+  id           String           @id @default(uuid())
   referrerName String
   relationship String
   candidateId  String
+  createdAt    DateTime         @default(now())
   cycleId      String?
-  createdAt    DateTime        @default(now())
-  candidate    Candidate       @relation(fields: [candidateId], references: [id])
+  candidate    Candidate        @relation(fields: [candidateId], references: [id])
   cycle        RecruitingCycle? @relation(fields: [cycleId], references: [id])
 
   @@map("referrals")
