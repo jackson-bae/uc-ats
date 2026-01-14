@@ -123,6 +123,7 @@ model RecruitingCycle {
   events              Events[]
   groups              Groups[]
   interviews          Interview[]
+  referrals           Referral[]
   resumeScores        ResumeScore[]
   videoScores         VideoScore[]
 
@@ -364,12 +365,14 @@ model RoundTwo {
 }
 
 model Referral {
-  id           String    @id @default(uuid())
+  id           String          @id @default(uuid())
   referrerName String
   relationship String
   candidateId  String
-  createdAt    DateTime  @default(now())
-  candidate    Candidate @relation(fields: [candidateId], references: [id])
+  cycleId      String?
+  createdAt    DateTime        @default(now())
+  candidate    Candidate       @relation(fields: [candidateId], references: [id])
+  cycle        RecruitingCycle? @relation(fields: [cycleId], references: [id])
 
   @@map("referrals")
 }

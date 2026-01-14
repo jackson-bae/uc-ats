@@ -678,15 +678,35 @@ export default function Staging() {
   const [evaluationSummariesFirstRound, setEvaluationSummariesFirstRound] = useState({});
 
   const handlePageChange = (newPage) => {
-    setPagination(prev => ({ ...prev, page: newPage }));
+    setPagination(prev => ({
+      ...prev,
+      page: newPage,
+      hasNextPage: newPage < prev.totalPages,
+      hasPrevPage: newPage > 1
+    }));
   };
 
   const handleLimitChange = (newLimit) => {
-    setPagination(prev => ({ ...prev, limit: newLimit, page: 1 }));
+    setPagination(prev => {
+      const newTotalPages = Math.ceil(prev.total / newLimit);
+      return {
+        ...prev,
+        limit: newLimit,
+        page: 1,
+        totalPages: newTotalPages,
+        hasNextPage: 1 < newTotalPages,
+        hasPrevPage: false
+      };
+    });
   };
 
   useEffect(() => {
-    setPagination(prev => ({ ...prev, page: 1 }));
+    setPagination(prev => ({
+      ...prev,
+      page: 1,
+      hasNextPage: 1 < prev.totalPages,
+      hasPrevPage: false
+    }));
   }, [filters]);
 
   const [currentDecision, setCurrentDecision] = useState({

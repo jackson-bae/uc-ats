@@ -2718,8 +2718,9 @@ router.get('/staging/candidates', async (req, res) => {
             email: true,
             studentId: true,
             assignedGroupId: true,
-            // Only get basic referral info
+            // Only get referrals for the current cycle
             referrals: {
+              where: { cycleId: active.id },
               select: {
                 id: true,
                 referrerName: true
@@ -2964,10 +2965,10 @@ router.get('/staging/candidates', async (req, res) => {
       return {
         id: app.id,
         candidateId: app.candidateId,
-        firstName: app.candidate.firstName,
-        lastName: app.candidate.lastName,
-        email: app.candidate.email,
-        studentId: app.candidate.studentId,
+        firstName: app.firstName,
+        lastName: app.lastName,
+        email: app.email,
+        studentId: app.studentId,
         major: app.major1,
         graduationYear: app.graduationYear,
         cumulativeGpa: parseFloat(app.cumulativeGpa),

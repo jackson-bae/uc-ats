@@ -1230,19 +1230,22 @@ router.get('/:id/referral', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Get the application to find the candidate ID
+    // Get the application to find the candidate ID and cycle ID
     const application = await prisma.application.findUnique({
       where: { id },
-      select: { candidateId: true }
+      select: { candidateId: true, cycleId: true }
     });
 
     if (!application || !application.candidateId) {
       return res.status(404).json({ error: 'Application not found' });
     }
 
-    // Get referral for this candidate
+    // Get referral for this candidate in this cycle
     const referral = await prisma.referral.findFirst({
-      where: { candidateId: application.candidateId }
+      where: {
+        candidateId: application.candidateId,
+        cycleId: application.cycleId
+      }
     });
 
     res.json(referral);
@@ -1262,31 +1265,35 @@ router.post('/:id/referral', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Referrer name and relationship are required' });
     }
 
-    // Get the application to find the candidate ID
+    // Get the application to find the candidate ID and cycle ID
     const application = await prisma.application.findUnique({
       where: { id },
-      select: { candidateId: true }
+      select: { candidateId: true, cycleId: true }
     });
 
     if (!application || !application.candidateId) {
       return res.status(404).json({ error: 'Application not found' });
     }
 
-    // Check if referral already exists for this candidate
+    // Check if referral already exists for this candidate in this cycle
     const existingReferral = await prisma.referral.findFirst({
-      where: { candidateId: application.candidateId }
+      where: {
+        candidateId: application.candidateId,
+        cycleId: application.cycleId
+      }
     });
 
     if (existingReferral) {
       return res.status(400).json({ error: 'This application already has a referral' });
     }
 
-    // Create the referral
+    // Create the referral with cycle association
     const referral = await prisma.referral.create({
       data: {
         referrerName,
         relationship,
-        candidateId: application.candidateId
+        candidateId: application.candidateId,
+        cycleId: application.cycleId
       }
     });
 
@@ -1302,19 +1309,22 @@ router.delete('/:id/referral', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Get the application to find the candidate ID
+    // Get the application to find the candidate ID and cycle ID
     const application = await prisma.application.findUnique({
       where: { id },
-      select: { candidateId: true }
+      select: { candidateId: true, cycleId: true }
     });
 
     if (!application || !application.candidateId) {
       return res.status(404).json({ error: 'Application not found' });
     }
 
-    // Delete the referral
+    // Delete the referral for this candidate in this cycle only
     const deletedReferral = await prisma.referral.deleteMany({
-      where: { candidateId: application.candidateId }
+      where: {
+        candidateId: application.candidateId,
+        cycleId: application.cycleId
+      }
     });
 
     if (deletedReferral.count === 0) {
