@@ -1,74 +1,67 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useData } from '../context/DataContext';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import apiClient from '../utils/api';
 
+// Simple in-memory cache
+const cache = new Map();
+const CACHE_TTL = 2 * 60 * 1000; // 2 minutes
+
+function getCacheKey(page, limit, search, status, year, gender, firstGen, transfer) {
+  return `applications:${page}:${limit}:${search}:${status}:${year}:${gender}:${firstGen}:${transfer}`;
+}
+
+function getFromCache(key) {
+  const entry = cache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.timestamp > CACHE_TTL) {
+    cache.delete(key);
+    return null;
+  }
+  return entry.data;
+}
+
+function setToCache(key, data) {
+  cache.set(key, { data, timestamp: Date.now() });
+}
+
+export function invalidateApplicationsCache() {
+  for (const key of cache.keys()) {
+    cache.delete(key);
+  }
+}
+
 /**
- * Hook for fetching and caching applications data with pagination and search
- * @param {Object} options - Hook options
- * @param {number} options.page - Current page (1-indexed)
- * @param {number} options.limit - Items per page
- * @param {string} options.search - Search term (name or email)
- * @param {string} options.status - Filter by status
- * @param {string} options.year - Filter by graduation year
- * @param {string} options.gender - Filter by gender
- * @param {string} options.firstGen - Filter by first generation ('true'/'false')
- * @param {string} options.transfer - Filter by transfer student ('true'/'false')
- * @param {boolean} options.forceRefresh - Force refetch ignoring cache
- * @param {boolean} options.enabled - Whether to fetch data (default: true)
- * @returns {Object} { applications, total, pagination, loading, error, refetch, updateApplication }
+ * Hook for fetching applications data with pagination, search, filters, and caching
  */
 export function useApplications(options = {}) {
   const {
     page = 1,
-    limit = 50,
+    limit = 10,
     search = '',
     status = null,
     year = null,
     gender = null,
     firstGen = null,
     transfer = null,
-    forceRefresh = false,
     enabled = true,
   } = options;
 
-  const {
-    isCacheValid,
-    getCache,
-    setCache,
-    invalidate,
-    updateCacheItem,
-    registerRequest,
-    clearRequest,
-  } = useData();
-
+  const [data, setData] = useState({ applications: [], pagination: null });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [localData, setLocalData] = useState(null);
+  const isMounted = useRef(true);
 
-  // Create a unique cache ID based on parameters
-  const cacheId = useMemo(() => {
-    const params = { page, limit, search, status, year, gender, firstGen, transfer };
-    return Object.entries(params)
-      .filter(([, v]) => v != null && v !== '')
-      .map(([k, v]) => `${k}=${v}`)
-      .join('&') || 'default';
-  }, [page, limit, search, status, year, gender, firstGen, transfer]);
+  const fetchApplications = useCallback(async (skipCache = false) => {
+    if (!enabled) return;
 
-  const requestKey = `applications_${cacheId}`;
+    const cacheKey = getCacheKey(page, limit, search, status, year, gender, firstGen, transfer);
 
-  const fetchApplications = useCallback(async (force = false) => {
     // Check cache first
-    if (!force && isCacheValid('applications', cacheId)) {
-      const cached = getCache('applications', cacheId);
+    if (!skipCache) {
+      const cached = getFromCache(cacheKey);
       if (cached) {
-        setLocalData(cached);
-        return cached;
+        setData(cached);
+        return;
       }
-    }
-
-    // Prevent duplicate requests
-    if (!registerRequest(requestKey)) {
-      return null;
     }
 
     setLoading(true);
@@ -87,78 +80,61 @@ export function useApplications(options = {}) {
 
       const response = await apiClient.get(`/applications?${params.toString()}`);
 
-      // Handle both paginated and non-paginated response formats
-      const normalizedData = response.pagination
-        ? response
-        : {
-            data: response,
-            pagination: {
-              page: 1,
-              limit: response.length,
-              total: response.length,
-              totalPages: 1,
-              hasNextPage: false,
-              hasPrevPage: false,
-            }
-          };
+      let result;
+      if (response.pagination) {
+        result = {
+          applications: response.data || [],
+          pagination: response.pagination,
+        };
+      } else {
+        const items = Array.isArray(response) ? response : [];
+        result = {
+          applications: items,
+          pagination: {
+            page: 1,
+            limit: items.length,
+            total: items.length,
+            totalPages: 1,
+            hasNextPage: false,
+            hasPrevPage: false,
+          },
+        };
+      }
 
-      setCache('applications', normalizedData, cacheId);
-      setLocalData(normalizedData);
-      return normalizedData;
+      setToCache(cacheKey, result);
+      if (isMounted.current) {
+        setData(result);
+      }
     } catch (err) {
-      setError(err.message || 'Failed to fetch applications');
-      return null;
+      if (isMounted.current) {
+        setError(err.message || 'Failed to fetch applications');
+        setData({ applications: [], pagination: null });
+      }
     } finally {
-      setLoading(false);
-      clearRequest(requestKey);
+      if (isMounted.current) {
+        setLoading(false);
+      }
     }
-  }, [page, limit, search, status, year, gender, firstGen, transfer, cacheId, requestKey, isCacheValid, getCache, setCache, registerRequest, clearRequest]);
+  }, [page, limit, search, status, year, gender, firstGen, transfer, enabled]);
 
-  // Fetch on mount and when parameters change
   useEffect(() => {
-    if (enabled) {
-      fetchApplications(forceRefresh);
-    }
-  }, [enabled, fetchApplications, forceRefresh]);
+    isMounted.current = true;
+    fetchApplications();
+    return () => {
+      isMounted.current = false;
+    };
+  }, [fetchApplications]);
 
-  // Get current data from cache or local state
-  const currentData = useMemo(() => {
-    const cached = getCache('applications', cacheId);
-    return cached || localData;
-  }, [getCache, cacheId, localData]);
-
-  /**
-   * Update a single application optimistically
-   * @param {string} id - Application ID
-   * @param {Object} updates - Fields to update
-   */
-  const updateApplication = useCallback((id, updates) => {
-    updateCacheItem('applications', cacheId, id, updates);
-  }, [updateCacheItem, cacheId]);
-
-  /**
-   * Force refetch data
-   */
   const refetch = useCallback(() => {
     return fetchApplications(true);
   }, [fetchApplications]);
 
-  /**
-   * Invalidate all applications cache
-   */
-  const invalidateApplications = useCallback(() => {
-    invalidate('applications');
-  }, [invalidate]);
-
   return {
-    applications: currentData?.data || [],
-    total: currentData?.pagination?.total || 0,
-    pagination: currentData?.pagination || null,
+    applications: data.applications,
+    pagination: data.pagination,
     loading,
     error,
     refetch,
-    updateApplication,
-    invalidate: invalidateApplications,
   };
 }
 

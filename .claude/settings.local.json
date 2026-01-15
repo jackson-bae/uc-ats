@@ -12,7 +12,8 @@
       "Bash(findstr:*)",
       "Bash(node scripts/fix-file-urls.js:*)",
       "Bash(node:*)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(git checkout:*)"
     ]
   }
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -83,6 +83,31 @@ import DocumentPreviewModal from '../components/DocumentPreviewModal';
 import AccessControl from '../components/AccessControl';
 import { useAuth } from '../context/AuthContext';
 import ApplicationDetail from './ApplicationDetail';
+
+// Simple cache for staging data
+const stagingCache = {
+  data: null,
+  timestamp: null,
+  TTL: 2 * 60 * 1000, // 2 minutes
+
+  isValid() {
+    return this.data && this.timestamp && (Date.now() - this.timestamp < this.TTL);
+  },
+
+  set(data) {
+    this.data = data;
+    this.timestamp = Date.now();
+  },
+
+  get() {
+    return this.isValid() ? this.data : null;
+  },
+
+  invalidate() {
+    this.data = null;
+    this.timestamp = null;
+  }
+};
 
 // API functions for staging
 const stagingAPI = {
@@ -804,8 +829,32 @@ export default function Staging() {
   }, []);
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchData = async (skipCache = false) => {
       try {
+        // Check cache first
+        if (!skipCache) {
+          const cached = stagingCache.get();
+          if (cached) {
+            setCandidates(cached.candidatesData);
+            setCurrentCycle(cached.activeCycle);
+            setAdminApplications(cached.adminApplicationsData || []);
+            setEvents(cached.eventsData || []);
+            setReviewTeams(cached.reviewTeamsData || []);
+            setPerRoundDecisions(cached.perRoundDecisions || { resume: {}, coffee: {}, firstRound: {}, final: {} });
+            setGradingCompleteByCandidate(cached.gradingMap);
+            calculateDemographics(cached.candidatesData, false);
+            setPagination(prev => ({
+              ...prev,
+              total: cached.candidatesData.length,
+              totalPages: Math.ceil(cached.candidatesData.length / prev.limit),
+              hasNextPage: prev.page < Math.ceil(cached.candidatesData.length / prev.limit),
+              hasPrevPage: prev.page > 1
+            }));
+            setLoading(false);
+            return;
+          }
+        }
+
         setLoading(true);
         const [candidatesResponse, activeCycle, adminApplicationsResponse, eventsData, reviewTeamsData, existingDecisionsData] = await Promise.all([
           stagingAPI.fetchCandidates(),
@@ -815,18 +864,18 @@ export default function Staging() {
           stagingAPI.fetchReviewTeams(),
           stagingAPI.loadExistingDecisions()
         ]);
-        
+
         const candidatesData = candidatesResponse.candidates || candidatesResponse;
         const adminApplicationsData = adminApplicationsResponse.applications || adminApplicationsResponse;
-        
+
         setCandidates(candidatesData);
         setCurrentCycle(activeCycle);
         setAdminApplications(adminApplicationsData || []);
         setEvents(eventsData || []);
         setReviewTeams(reviewTeamsData || []);
-        
+
         calculateDemographics(candidatesData, false);
-        
+
         setPagination(prev => ({
           ...prev,
           total: candidatesData.length,
@@ -835,8 +884,9 @@ export default function Staging() {
           hasPrevPage: prev.page > 1
         }));
 
-        if (existingDecisionsData && existingDecisionsData.decisions) {
-          setInlineDecisions(existingDecisionsData.decisions);
+        const perRoundDecisionsData = existingDecisionsData?.perRoundDecisions || { resume: {}, coffee: {}, firstRound: {}, final: {} };
+        if (existingDecisionsData && existingDecisionsData.perRoundDecisions) {
+          setPerRoundDecisions(existingDecisionsData.perRoundDecisions);
         }
 
         const gradingMap = {};
@@ -844,17 +894,17 @@ export default function Staging() {
           const hasResume = Boolean(app.resumeUrl);
           const hasCoverLetter = Boolean(app.coverLetterUrl);
           const hasVideo = Boolean(app.videoUrl);
-          
+
           const hasResumeScore = Boolean(app.hasResumeScore);
           const hasCoverLetterScore = Boolean(app.hasCoverLetterScore);
           const hasVideoScore = Boolean(app.hasVideoScore);
-          
+
           let gradingComplete = true;
-          
+
           if (hasResume && !hasResumeScore) gradingComplete = false;
           if (hasCoverLetter && !hasCoverLetterScore) gradingComplete = false;
           if (hasVideo && !hasVideoScore) gradingComplete = false;
-          
+
           gradingMap[app.candidateId] = {
             complete: gradingComplete,
             hasResume,
@@ -866,6 +916,17 @@ export default function Staging() {
           };
         });
         setGradingCompleteByCandidate(gradingMap);
+
+        // Save to cache
+        stagingCache.set({
+          candidatesData,
+          activeCycle,
+          adminApplicationsData,
+          eventsData,
+          reviewTeamsData,
+          perRoundDecisions: perRoundDecisionsData,
+          gradingMap
+        });
       } catch (error) {
         console.error('Error fetching data:', error);
         setSnackbar({
@@ -934,6 +995,9 @@ export default function Staging() {
   }, [currentTab, adminApplications]);
 
   const fetchCandidates = async () => {
+    // Invalidate cache when manually refreshing
+    stagingCache.invalidate();
+
     try {
       const [candidatesResponse, adminApplicationsResponse, eventsData, reviewTeamsData, existingDecisionsData] = await Promise.all([
         stagingAPI.fetchCandidates(),
@@ -961,8 +1025,8 @@ export default function Staging() {
         hasPrevPage: prev.page > 1
       }));
       
-      if (existingDecisionsData && existingDecisionsData.decisions) {
-        setInlineDecisions(existingDecisionsData.decisions);
+      if (existingDecisionsData && existingDecisionsData.perRoundDecisions) {
+        setPerRoundDecisions(existingDecisionsData.perRoundDecisions);
       }
       
       const gradingMap = {};

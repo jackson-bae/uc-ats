@@ -384,7 +384,19 @@ router.get('/', async (req, res) => {
       };
     }));
 
-    res.json(applicationsWithAverages);
+    // Return with pagination metadata
+    const totalPages = Math.ceil(total / limit);
+    res.json({
+      data: applicationsWithAverages,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1
+      }
+    });
   } catch (error) {
     console.error('Error fetching applications:', error);
     res.status(500).json({ error: 'Failed to fetch applications' });

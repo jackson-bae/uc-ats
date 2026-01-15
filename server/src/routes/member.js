@@ -217,39 +217,26 @@ router.get('/all-candidates', requireAuth, async (req, res) => {
                 }
               }
             },
-            orderBy: {
-              submittedAt: 'desc'
-            }
-          },
-          eventAttendance: {
-            include: {
-              event: {
-                select: {
-                  id: true,
-                  eventName: true,
-                  eventStartDate: true,
-                  eventEndDate: true
+            eventRsvp: {
+              include: {
+                event: {
+                  select: {
+                    id: true,
+                    eventName: true,
+                    eventStartDate: true,
+                    eventEndDate: true
+                  }
                 }
               }
             }
           },
-          eventRsvp: {
-            include: {
-              event: {
-                select: {
-                  id: true,
-                  eventName: true,
-                  eventStartDate: true,
-                  eventEndDate: true
-                }
-              }
-            }
-          }
-        },
-        orderBy: {
-          createdAt: 'desc'
-        }
-      });
+          orderBy: {
+            createdAt: 'desc'
+          },
+          skip,
+          take: limit
+        });
+      }
     } catch (queryError) {
       console.error('Prisma query error:', queryError);
       // Try a simpler query without includes
@@ -268,7 +255,20 @@ router.get('/all-candidates', requireAuth, async (req, res) => {
     }
 
     console.log('Found candidates:', candidates.length);
-    res.json(candidates);
+
+    // Return with pagination metadata
+    const totalPages = Math.ceil(total / limit);
+    res.json({
+      data: candidates,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1
+      }
+    });
   } catch (error) {
     console.error('Error fetching all candidates for member:', error);
     console.error('Error details:', error.message, error.stack);
