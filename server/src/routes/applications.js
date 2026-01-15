@@ -261,11 +261,8 @@ router.get('/', async (req, res) => {
     // Optional: scope to active recruiting cycle if one exists
     const activeCycle = await prisma.recruitingCycle.findFirst({ where: { isActive: true } });
     if (!activeCycle) {
-      // When no active cycle, return empty result
-      return res.json({
-        data: [],
-        pagination: { page, limit, total: 0, totalPages: 0, hasNextPage: false, hasPrevPage: false }
-      });
+      // When no active cycle, return empty list instead of all
+      return res.json([]);
     }
 
     // Build where clause with filters
@@ -311,29 +308,29 @@ router.get('/', async (req, res) => {
     const studentIds = [...new Set(applications.map(app => app.studentId).filter(Boolean))];
 
     // Count by candidateId first (this is the proper relation)
-    const pastAppCountsByCandidateId = candidateIds.length > 0 ? await prisma.application.groupBy({
+    const pastAppCountsByCandidateId = await prisma.application.groupBy({
       by: ['candidateId'],
       where: {
         candidateId: { in: candidateIds },
         cycleId: { not: activeCycle.id }
       },
       _count: { id: true }
-    }) : [];
+    });
     const pastAppCountMapByCandidateId = new Map(pastAppCountsByCandidateId.map(p => [p.candidateId, p._count.id]));
 
     // Also count by studentId as fallback for applications without candidateId
-    const pastAppCountsByStudentId = studentIds.length > 0 ? await prisma.application.groupBy({
+    const pastAppCountsByStudentId = await prisma.application.groupBy({
       by: ['studentId'],
       where: {
         studentId: { in: studentIds },
         cycleId: { not: activeCycle.id }
       },
       _count: { id: true }
-    }) : [];
+    });
     const pastAppCountMapByStudentId = new Map(pastAppCountsByStudentId.map(p => [p.studentId, p._count.id]));
 
     // Calculate average grades for each application
-    const applicationsWithAverages = applications.map((application) => {
+    const applicationsWithAverages = await Promise.all(applications.map(async (application) => {
       // Find grades for this application
       const appGrades = allGrades.filter(grade => grade.applicant === application.id);
 
@@ -385,21 +382,9 @@ router.get('/', async (req, res) => {
         pastApplicationCount,
         isReturningApplicant: pastApplicationCount > 0
       };
-    });
+    }));
 
-    const totalPages = Math.ceil(total / limit);
-
-    res.json({
-      data: applicationsWithAverages,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages,
-        hasNextPage: page < totalPages,
-        hasPrevPage: page > 1
-      }
-    });
+    res.json(applicationsWithAverages);
   } catch (error) {
     console.error('Error fetching applications:', error);
     res.status(500).json({ error: 'Failed to fetch applications' });

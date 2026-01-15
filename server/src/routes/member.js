@@ -55,50 +55,39 @@ router.get('/events', requireAuth, async (req, res) => {
 // Get all applications (member version - no admin access required)
 router.get('/all-applications', requireAuth, async (req, res) => {
   try {
-    // Pagination parameters
-    const page = parseInt(req.query.page) || 1;
-    const limit = Math.min(parseInt(req.query.limit) || 50, 200);
-    const skip = (page - 1) * limit;
-
-    console.log('Fetching all applications for member:', req.user.id, `(page ${page}, limit ${limit})`);
-
+    console.log('Fetching all applications for member:', req.user.id);
+    
     // Get the active cycle first
-    const activeCycle = await prisma.recruitingCycle.findFirst({
-      where: { isActive: true }
+    const activeCycle = await prisma.recruitingCycle.findFirst({ 
+      where: { isActive: true } 
     });
-
+    
     console.log('Active cycle found:', activeCycle?.id);
-
+    
     if (!activeCycle) {
-      console.log('No active cycle found, returning empty result');
-      return res.json({
-        data: [],
-        pagination: { page, limit, total: 0, totalPages: 0, hasNextPage: false, hasPrevPage: false }
-      });
+      console.log('No active cycle found, returning empty array');
+      return res.json([]);
     }
 
-    // Get paginated applications and total count in parallel
-    const [applications, total] = await Promise.all([
-      prisma.application.findMany({
-        where: { cycleId: activeCycle.id },
-        include: {
-          candidate: {
-            select: {
-              id: true,
-              assignedGroupId: true
-            }
+    // Get all applications for the active cycle
+    const applications = await prisma.application.findMany({
+      where: {
+        cycleId: activeCycle.id
+      },
+      include: {
+        candidate: {
+          select: {
+            id: true,
+            assignedGroupId: true
           }
-        },
-        orderBy: { submittedAt: 'desc' },
-        skip,
-        take: limit
-      }),
-      prisma.application.count({
-        where: { cycleId: activeCycle.id }
-      })
-    ]);
+        }
+      },
+      orderBy: {
+        submittedAt: 'desc'
+      }
+    });
 
-    console.log('Found applications:', applications.length, 'of', total);
+    console.log('Found applications:', applications.length);
 
     // Transform the data
     const transformedApplications = applications.map(app => ({
@@ -119,24 +108,12 @@ router.get('/all-applications', requireAuth, async (req, res) => {
       coverLetterUrl: app.coverLetterUrl,
       videoUrl: app.videoUrl,
       groupId: app.candidate?.assignedGroupId,
-      groupName: app.candidate?.assignedGroupId ?
+      groupName: app.candidate?.assignedGroupId ? 
         `Team ${app.candidate.assignedGroupId.slice(-4)}` : 'Unassigned'
     }));
 
-    const totalPages = Math.ceil(total / limit);
-
     console.log('Transformed applications:', transformedApplications.length);
-    res.json({
-      data: transformedApplications,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages,
-        hasNextPage: page < totalPages,
-        hasPrevPage: page > 1
-      }
-    });
+    res.json(transformedApplications);
   } catch (error) {
     console.error('Error fetching all applications for member:', error);
     console.error('Error details:', error.message, error.stack);
@@ -240,24 +217,39 @@ router.get('/all-candidates', requireAuth, async (req, res) => {
                 }
               }
             },
-            eventRsvp: {
-              include: {
-                event: {
-                  select: {
-                    id: true,
-                    eventName: true,
-                    eventStartDate: true,
-                    eventEndDate: true
-                  }
+            orderBy: {
+              submittedAt: 'desc'
+            }
+          },
+          eventAttendance: {
+            include: {
+              event: {
+                select: {
+                  id: true,
+                  eventName: true,
+                  eventStartDate: true,
+                  eventEndDate: true
                 }
               }
             }
           },
-          orderBy: { createdAt: 'desc' },
-          skip,
-          take: limit
-        });
-      }
+          eventRsvp: {
+            include: {
+              event: {
+                select: {
+                  id: true,
+                  eventName: true,
+                  eventStartDate: true,
+                  eventEndDate: true
+                }
+              }
+            }
+          }
+        },
+        orderBy: {
+          createdAt: 'desc'
+        }
+      });
     } catch (queryError) {
       console.error('Prisma query error:', queryError);
       // Try a simpler query without includes
@@ -268,27 +260,15 @@ router.get('/all-candidates', requireAuth, async (req, res) => {
           createdAt: true,
           assignedGroupId: true
         },
-        orderBy: { createdAt: 'desc' },
-        skip,
-        take: limit
+        orderBy: {
+          createdAt: 'desc'
+        }
       });
       console.log('Using simplified query, found candidates:', candidates.length);
     }
 
-    const totalPages = Math.ceil(total / limit);
-
-    console.log('Found candidates:', candidates.length, 'of', total);
-    res.json({
-      data: candidates,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages,
-        hasNextPage: page < totalPages,
-        hasPrevPage: page > 1
-      }
-    });
+    console.log('Found candidates:', candidates.length);
+    res.json(candidates);
   } catch (error) {
     console.error('Error fetching all candidates for member:', error);
     console.error('Error details:', error.message, error.stack);

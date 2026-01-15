@@ -140,10 +140,7 @@ router.get('/candidates', async (req, res) => {
     // Scope to active cycle if present
     const active = await prisma.recruitingCycle.findFirst({ where: { isActive: true } });
     if (!active) {
-      return res.json({
-        data: [],
-        pagination: { page, limit, total: 0, totalPages: 0, hasNextPage: false, hasPrevPage: false }
-      });
+      return res.json([]);
     }
 
     // Build where clause with filters
@@ -193,6 +190,7 @@ router.get('/candidates', async (req, res) => {
         hasPrevPage: page > 1
       }
     });
+    res.json(candidates);
   } catch (error) {
     console.error('[GET /api/admin/candidates]', error);
     res.status(500).json({ error: 'Failed to fetch candidates' });
