@@ -3,11 +3,16 @@ import { useData } from '../context/DataContext';
 import apiClient from '../utils/api';
 
 /**
- * Hook for fetching and caching applications data with pagination
+ * Hook for fetching and caching applications data with pagination and search
  * @param {Object} options - Hook options
  * @param {number} options.page - Current page (1-indexed)
  * @param {number} options.limit - Items per page
+ * @param {string} options.search - Search term (name or email)
  * @param {string} options.status - Filter by status
+ * @param {string} options.year - Filter by graduation year
+ * @param {string} options.gender - Filter by gender
+ * @param {string} options.firstGen - Filter by first generation ('true'/'false')
+ * @param {string} options.transfer - Filter by transfer student ('true'/'false')
  * @param {boolean} options.forceRefresh - Force refetch ignoring cache
  * @param {boolean} options.enabled - Whether to fetch data (default: true)
  * @returns {Object} { applications, total, pagination, loading, error, refetch, updateApplication }
@@ -16,7 +21,12 @@ export function useApplications(options = {}) {
   const {
     page = 1,
     limit = 50,
+    search = '',
     status = null,
+    year = null,
+    gender = null,
+    firstGen = null,
+    transfer = null,
     forceRefresh = false,
     enabled = true,
   } = options;
@@ -37,12 +47,12 @@ export function useApplications(options = {}) {
 
   // Create a unique cache ID based on parameters
   const cacheId = useMemo(() => {
-    const params = { page, limit, status };
+    const params = { page, limit, search, status, year, gender, firstGen, transfer };
     return Object.entries(params)
-      .filter(([, v]) => v != null)
+      .filter(([, v]) => v != null && v !== '')
       .map(([k, v]) => `${k}=${v}`)
       .join('&') || 'default';
-  }, [page, limit, status]);
+  }, [page, limit, search, status, year, gender, firstGen, transfer]);
 
   const requestKey = `applications_${cacheId}`;
 
@@ -68,7 +78,12 @@ export function useApplications(options = {}) {
       const params = new URLSearchParams();
       params.append('page', page.toString());
       params.append('limit', limit.toString());
+      if (search) params.append('search', search);
       if (status) params.append('status', status);
+      if (year) params.append('year', year);
+      if (gender) params.append('gender', gender);
+      if (firstGen) params.append('firstGen', firstGen);
+      if (transfer) params.append('transfer', transfer);
 
       const response = await apiClient.get(`/applications?${params.toString()}`);
 
@@ -97,7 +112,7 @@ export function useApplications(options = {}) {
       setLoading(false);
       clearRequest(requestKey);
     }
-  }, [page, limit, status, cacheId, requestKey, isCacheValid, getCache, setCache, registerRequest, clearRequest]);
+  }, [page, limit, search, status, year, gender, firstGen, transfer, cacheId, requestKey, isCacheValid, getCache, setCache, registerRequest, clearRequest]);
 
   // Fetch on mount and when parameters change
   useEffect(() => {

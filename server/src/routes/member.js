@@ -153,12 +153,24 @@ router.get('/all-candidates', requireAuth, async (req, res) => {
     const skip = (page - 1) * limit;
     // Option to load minimal data (for faster list views)
     const minimal = req.query.minimal === 'true';
+    // Search parameter
+    const search = req.query.search?.trim() || '';
 
-    console.log('Fetching all candidates for member:', req.user.id, `(page ${page}, limit ${limit}, minimal: ${minimal})`);
+    console.log('Fetching all candidates for member:', req.user.id, `(page ${page}, limit ${limit}, minimal: ${minimal}, search: "${search}")`);
 
-    // Get total count
-    const total = await prisma.candidate.count();
-    console.log('Total candidates in database:', total);
+    // Build where clause for search
+    const whereClause = search ? {
+      OR: [
+        { studentId: { contains: search, mode: 'insensitive' } },
+        { applications: { some: { firstName: { contains: search, mode: 'insensitive' } } } },
+        { applications: { some: { lastName: { contains: search, mode: 'insensitive' } } } },
+        { applications: { some: { email: { contains: search, mode: 'insensitive' } } } }
+      ]
+    } : {};
+
+    // Get total count with search filter
+    const total = await prisma.candidate.count({ where: whereClause });
+    console.log('Total candidates matching search:', total);
 
     // Try the full query with error handling for each part
     let candidates;
@@ -166,6 +178,7 @@ router.get('/all-candidates', requireAuth, async (req, res) => {
       if (minimal) {
         // Minimal query for faster list loading
         candidates = await prisma.candidate.findMany({
+          where: whereClause,
           select: {
             id: true,
             studentId: true,
@@ -193,6 +206,7 @@ router.get('/all-candidates', requireAuth, async (req, res) => {
       } else {
         // Full query with all includes
         candidates = await prisma.candidate.findMany({
+          where: whereClause,
           include: {
             assignedGroup: {
               select: {

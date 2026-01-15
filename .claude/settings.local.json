@@ -11,7 +11,8 @@
       "Bash(npx prisma:*)",
       "Bash(findstr:*)",
       "Bash(node scripts/fix-file-urls.js:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(dir:*)"
     ]
   }
 }

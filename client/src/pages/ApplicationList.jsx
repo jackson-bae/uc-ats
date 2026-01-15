@@ -18,23 +18,10 @@ export default function ApplicationList() {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(50);
 
-  // Use cached applications hook
-  const {
-    applications: rawApplications,
-    pagination,
-    loading,
-    error,
-    refetch: refetchApplications,
-    invalidate: invalidateApplications
-  } = useApplications({ page, limit });
-
-  const { invalidateRelated } = useData();
-
-  // Transform applications data
-  const applicants = useMemo(() => rawApplications || [], [rawApplications]);
-
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filters, setFilters] = useState({
+  // Search and filter state (pending = what user is typing, applied = what's sent to server)
+  const [pendingSearch, setPendingSearch] = useState('');
+  const [appliedSearch, setAppliedSearch] = useState('');
+  const [pendingFilters, setPendingFilters] = useState({
     year: '',
     gender: '',
     firstGen: '',
@@ -42,6 +29,69 @@ export default function ApplicationList() {
     decision: '',
     returning: ''
   });
+  const [appliedFilters, setAppliedFilters] = useState({
+    year: '',
+    gender: '',
+    firstGen: '',
+    transfer: '',
+    decision: '',
+    returning: ''
+  });
+
+  // Check if there are unapplied filter or search changes
+  const hasUnappliedFilters = JSON.stringify(pendingFilters) !== JSON.stringify(appliedFilters) || pendingSearch !== appliedSearch;
+
+  // Apply filters handler
+  const handleApplyFilters = useCallback(() => {
+    setAppliedFilters(pendingFilters);
+    setAppliedSearch(pendingSearch);
+    setPage(1);
+  }, [pendingFilters, pendingSearch]);
+
+  // Clear all filters
+  const handleClearFilters = useCallback(() => {
+    const emptyFilters = { year: '', gender: '', firstGen: '', transfer: '', decision: '', returning: '' };
+    setPendingFilters(emptyFilters);
+    setAppliedFilters(emptyFilters);
+    setPendingSearch('');
+    setAppliedSearch('');
+    setPage(1);
+  }, []);
+
+  // Use cached applications hook with server-side search and filters
+  const {
+    applications: rawApplications,
+    pagination,
+    loading,
+    error,
+    refetch: refetchApplications,
+    invalidate: invalidateApplications
+  } = useApplications({
+    page,
+    limit,
+    search: appliedSearch,
+    status: appliedFilters.decision || null,
+    year: appliedFilters.year || null,
+    gender: appliedFilters.gender || null,
+    firstGen: appliedFilters.firstGen || null,
+    transfer: appliedFilters.transfer || null,
+  });
+
+  const { invalidateRelated } = useData();
+
+  // Transform applications data - apply client-side filter for returning (not supported server-side)
+  const applicants = useMemo(() => {
+    let data = rawApplications || [];
+    // Filter by returning status client-side (computed field)
+    if (appliedFilters.returning) {
+      data = data.filter(app =>
+        (appliedFilters.returning === 'true' && app.isReturningApplicant) ||
+        (appliedFilters.returning === 'false' && !app.isReturningApplicant)
+      );
+    }
+    return data;
+  }, [rawApplications, appliedFilters.returning]);
+
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingApplication, setEditingApplication] = useState(null);
@@ -70,24 +120,6 @@ export default function ApplicationList() {
     }
   }, [applicants]);
 
-  // Filter and search logic
-  const filteredApplicants = applicants.filter(applicant => {
-    const matchesSearch = applicant.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         applicant.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         applicant.email.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesYear = !filters.year || applicant.graduationYear === filters.year;
-    const matchesGender = !filters.gender || applicant.gender === filters.gender;
-    const matchesFirstGen = !filters.firstGen || applicant.isFirstGeneration.toString() === filters.firstGen;
-    const matchesTransfer = !filters.transfer || applicant.isTransferStudent.toString() === filters.transfer;
-    const matchesDecision = !filters.decision || applicant.status === filters.decision;
-    const matchesReturning = !filters.returning ||
-      (filters.returning === 'true' && applicant.isReturningApplicant) ||
-      (filters.returning === 'false' && !applicant.isReturningApplicant);
-
-    return matchesSearch && matchesYear && matchesGender && matchesFirstGen && matchesTransfer && matchesDecision && matchesReturning;
-  });
-
   const getInitials = (firstName, lastName) => {
     return `${firstName?.charAt(0) || ''}${lastName?.charAt(0) || ''}`.toUpperCase();
   };
@@ -97,11 +129,14 @@ export default function ApplicationList() {
   };
 
   const handleFilterChange = (filterType, value) => {
-    setFilters(prev => ({
+    setPendingFilters(prev => ({
       ...prev,
       [filterType]: value
     }));
   };
+
+  // Check if any filters are active
+  const hasActiveFilters = Object.values(appliedFilters).some(v => v !== '') || appliedSearch !== '';
 
   const handleApplicationAdded = useCallback(() => {
     // Invalidate cache and refetch
@@ -194,12 +229,13 @@ export default function ApplicationList() {
               type="text"
               placeholder="Search candidates..."
               className="search-input"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              value={pendingSearch}
+              onChange={(e) => setPendingSearch(e.target.value)}
             />
           </div>
           <div className="results-count">
-            {filteredApplicants.length} candidate{filteredApplicants.length !== 1 ? 's' : ''}
+            {appliedFilters.returning ? applicants.length : (pagination?.total || applicants.length)} candidate{(appliedFilters.returning ? applicants.length : (pagination?.total || applicants.length)) !== 1 ? 's' : ''}
+            {pagination && !appliedFilters.returning && pagination.totalPages > 1 && ` (page ${pagination.page} of ${pagination.totalPages})`}
           </div>
         </div>
       </div>
@@ -208,7 +244,7 @@ export default function ApplicationList() {
       <div className="filters-row">
         <select 
           className="filter-select"
-          value={filters.year}
+          value={pendingFilters.year}
           onChange={(e) => handleFilterChange('year', e.target.value)}
         >
           <option value="">Year: All</option>
@@ -221,7 +257,7 @@ export default function ApplicationList() {
         
         <select 
           className="filter-select"
-          value={filters.gender}
+          value={pendingFilters.gender}
           onChange={(e) => handleFilterChange('gender', e.target.value)}
         >
           <option value="">Gender: All</option>
@@ -232,7 +268,7 @@ export default function ApplicationList() {
         
         <select 
           className="filter-select"
-          value={filters.firstGen}
+          value={pendingFilters.firstGen}
           onChange={(e) => handleFilterChange('firstGen', e.target.value)}
         >
           <option value="">First Gen: All</option>
@@ -242,7 +278,7 @@ export default function ApplicationList() {
         
         <select 
           className="filter-select"
-          value={filters.transfer}
+          value={pendingFilters.transfer}
           onChange={(e) => handleFilterChange('transfer', e.target.value)}
         >
           <option value="">Transfer: All</option>
@@ -252,7 +288,7 @@ export default function ApplicationList() {
         
         <select
           className="filter-select"
-          value={filters.decision}
+          value={pendingFilters.decision}
           onChange={(e) => handleFilterChange('decision', e.target.value)}
         >
           <option value="">Status: All</option>
@@ -265,24 +301,42 @@ export default function ApplicationList() {
 
         <select
           className="filter-select"
-          value={filters.returning}
+          value={pendingFilters.returning}
           onChange={(e) => handleFilterChange('returning', e.target.value)}
         >
           <option value="">Returning: All</option>
           <option value="true">Returning: Yes</option>
           <option value="false">Returning: No</option>
         </select>
+
+        <button
+          className={`apply-filters-btn ${hasUnappliedFilters ? 'has-changes' : ''}`}
+          onClick={handleApplyFilters}
+          disabled={!hasUnappliedFilters || loading}
+        >
+          {loading ? 'Loading...' : 'Apply Filters'}
+        </button>
+
+        {hasActiveFilters && (
+          <button
+            className="clear-filters-btn"
+            onClick={handleClearFilters}
+            disabled={loading}
+          >
+            Clear All
+          </button>
+        )}
       </div>
 
       {/* Candidates List */}
-      {filteredApplicants.length === 0 ? (
+      {applicants.length === 0 ? (
         <div className="empty-state">
           <h3>No candidates found</h3>
           <p>Try adjusting your search or filter criteria.</p>
         </div>
       ) : (
         <div className="candidates-grid">
-          {filteredApplicants.map((applicant, index) => (
+          {applicants.map((applicant, index) => (
             <div key={applicant.id} className="candidate-card-wrapper">
               <Link
                 to={`/application/${applicant.id}`}

@@ -465,7 +465,12 @@ export default function Staging() {
   const [loading, setLoading] = useState(true);
   const [currentCycle, setCurrentCycle] = useState(null);
   const [gradingCompleteByCandidate, setGradingCompleteByCandidate] = useState({});
-  const [inlineDecisions, setInlineDecisions] = useState({});
+  const [perRoundDecisions, setPerRoundDecisions] = useState({
+    resume: {},
+    coffee: {},
+    firstRound: {},
+    final: {}
+  });
   const [selectedCandidate, setSelectedCandidate] = useState(null);
   const [decisionDialogOpen, setDecisionDialogOpen] = useState(false);
   const [finalDecisionDialogOpen, setFinalDecisionDialogOpen] = useState(false);
@@ -537,6 +542,34 @@ export default function Staging() {
     adminNotes: ''
   });
   const [savingScore, setSavingScore] = useState(false);
+
+  // Helper to map tab index to phase name
+  const tabToPhase = (tabIndex) => {
+    const phaseMap = { 0: 'resume', 1: 'coffee', 2: 'firstRound', 3: 'final' };
+    return phaseMap[tabIndex] || 'resume';
+  };
+
+  // Helper to get decision for current tab
+  const getDecisionForTab = (appId, tabIndex) => {
+    const phase = tabToPhase(tabIndex);
+    return perRoundDecisions[phase]?.[appId] || '';
+  };
+
+  // Helper to check if candidate passed a round (either via decision or already advanced past it)
+  const passedRound = (candidate, round) => {
+    const roundNum = parseInt(candidate.currentRound) || 1;
+    if (round === 'resume') {
+      // Passed resume if: explicit yes decision OR already at round 2+
+      return perRoundDecisions.resume[candidate.id] === 'yes' || roundNum >= 2;
+    } else if (round === 'coffee') {
+      // Passed coffee chat if: explicit yes decision OR already at round 3+
+      return perRoundDecisions.coffee[candidate.id] === 'yes' || roundNum >= 3;
+    } else if (round === 'firstRound') {
+      // Passed first round if: explicit yes decision OR already at round 4+
+      return perRoundDecisions.firstRound[candidate.id] === 'yes' || roundNum >= 4;
+    }
+    return false;
+  };
 
   const fetchModalResumeScores = async (candidateId, cycleId) => {
     try {
@@ -741,8 +774,8 @@ export default function Staging() {
       hasPrevPage: prev.page > 1
     }));
 
-    if (existingDecisionsData && existingDecisionsData.decisions) {
-      setInlineDecisions(existingDecisionsData.decisions);
+    if (existingDecisionsData && existingDecisionsData.perRoundDecisions) {
+      setPerRoundDecisions(existingDecisionsData.perRoundDecisions);
     }
 
     const gradingMap = {};
@@ -849,27 +882,26 @@ export default function Staging() {
   }, [currentTab]);
 
   useEffect(() => {
-    if (currentTab === 0) {
-      if (candidates && candidates.length > 0) {
+    // Calculate demographics based on per-round filtering
+    if (candidates && candidates.length > 0) {
+      if (currentTab === 0) {
+        // Resume Review: Show ALL candidates
         calculateDemographics(candidates, false);
-      }
-    } else if (currentTab === 1) {
-      if (adminApplications && adminApplications.length > 0) {
-        const coffeeChatApps = adminApplications.filter(app => String(app.currentRound) === '2');
-        calculateDemographics(coffeeChatApps, true);
-      }
-    } else if (currentTab === 2) {
-      if (adminApplications && adminApplications.length > 0) {
-        const firstRoundApps = adminApplications.filter(app => String(app.currentRound) === '3');
-        calculateDemographics(firstRoundApps, true);
-      }
-    } else if (currentTab === 3) {
-      if (adminApplications && adminApplications.length > 0) {
-        const finalRoundApps = adminApplications.filter(app => String(app.currentRound) === '4' && app.candidate);
-        calculateDemographics(finalRoundApps, true);
+      } else if (currentTab === 1) {
+        // Coffee Chat: Show only candidates who passed resume review
+        const coffeeChatCandidates = candidates.filter(c => passedRound(c, 'resume'));
+        calculateDemographics(coffeeChatCandidates, false);
+      } else if (currentTab === 2) {
+        // First Round: Show only candidates who passed coffee chat
+        const firstRoundCandidates = candidates.filter(c => passedRound(c, 'coffee'));
+        calculateDemographics(firstRoundCandidates, false);
+      } else if (currentTab === 3) {
+        // Final Round: Show only candidates who passed first round
+        const finalRoundCandidates = candidates.filter(c => passedRound(c, 'firstRound'));
+        calculateDemographics(finalRoundCandidates, false);
       }
     }
-  }, [currentTab, candidates, adminApplications, inlineDecisions]);
+  }, [currentTab, candidates, adminApplications, perRoundDecisions]);
 
   useEffect(() => {
     if (currentTab === 2 && adminApplications.length > 0) {
@@ -1181,12 +1213,12 @@ export default function Staging() {
 
   const openPushAllCoffee = async () => {
     try {
-      const adminCandidates = await stagingAPI.fetchAdminCandidates();
-      const coffeeCandidates = adminCandidates.filter(c => String(c.currentRound) === '2');
+      // Coffee Chat tab: candidates who passed resume review
+      const coffeeCandidates = candidates.filter(c => passedRound(c, 'resume'));
 
       const invalidDecisions = coffeeCandidates.filter(c => {
-        const decision = c.approved;
-        return decision === null || (decision !== true && decision !== false);
+        const decision = perRoundDecisions.coffee[c.id];
+        return !decision || (decision !== 'yes' && decision !== 'no');
       });
 
       setPushAllPreview({
@@ -1205,16 +1237,17 @@ export default function Staging() {
 
   const openPushAllFirstRound = async () => {
     try {
-      const firstRoundApps = (adminApplications || []).filter(app => String(app.currentRound) === '3');
+      // First Round tab: candidates who passed coffee chat
+      const firstRoundCandidates = candidates.filter(c => passedRound(c, 'coffee'));
 
-      const invalidDecisions = firstRoundApps.filter(app => {
-        const decision = app.approved;
-        return decision === null || (decision !== true && decision !== false);
+      const invalidDecisions = firstRoundCandidates.filter(c => {
+        const decision = perRoundDecisions.firstRound[c.id];
+        return !decision || (decision !== 'yes' && decision !== 'no');
       });
 
       setPushAllPreview({
-        totalCandidates: firstRoundApps.length,
-        validDecisions: firstRoundApps.length - invalidDecisions.length,
+        totalCandidates: firstRoundCandidates.length,
+        validDecisions: firstRoundCandidates.length - invalidDecisions.length,
         invalidDecisions: invalidDecisions.length,
         invalidDecisionCandidates: invalidDecisions
       });
@@ -1230,12 +1263,12 @@ export default function Staging() {
 
   const openPushAllFinal = async () => {
     try {
-      const adminCandidates = await stagingAPI.fetchAdminCandidates();
-      const finalCandidates = adminCandidates.filter(c => String(c.currentRound) === '4');
+      // Final Round tab: candidates who passed first round
+      const finalCandidates = candidates.filter(c => passedRound(c, 'firstRound'));
 
       const invalidDecisions = finalCandidates.filter(c => {
-        const decision = c.approved;
-        return decision === null || (decision !== true && decision !== false);
+        const decision = perRoundDecisions.final[c.id];
+        return !decision || (decision !== 'yes' && decision !== 'no');
       });
 
       setPushAllPreview({
@@ -1358,9 +1391,9 @@ export default function Staging() {
       
       let decision = '';
       if (isApplicationData) {
-        decision = inlineDecisions[item.id] || (item.approved === true ? 'yes' : item.approved === false ? 'no' : '');
+        decision = getDecisionForTab(item.id, currentTab) || (item.approved === true ? 'yes' : item.approved === false ? 'no' : '');
       } else {
-        decision = inlineDecisions[candidate.id] || '';
+        decision = getDecisionForTab(candidate.id, currentTab) || '';
       }
       
       if (decision === 'yes') graduationYearBreakdown[year].yes++;
@@ -1390,16 +1423,19 @@ export default function Staging() {
     setDemographics({ graduationYear: graduationYearBreakdown, gender: genderBreakdown, referral: referralBreakdown });
   };
 
-  const handleInlineDecisionChange = async (item, value, phase = 'resume') => {
+  const handleInlineDecisionChange = async (item, value, tabIndex = currentTab) => {
+    const phase = tabToPhase(tabIndex);
     try {
       await stagingAPI.saveDecision(item.id, value, phase);
-      setInlineDecisions(prev => ({ ...prev, [item.id]: value }));
+      setPerRoundDecisions(prev => ({
+        ...prev,
+        [phase]: { ...prev[phase], [item.id]: value }
+      }));
       setSnackbar({ open: true, message: 'Decision saved successfully', severity: 'success' });
       await fetchCandidates();
     } catch (error) {
       console.error('Error saving inline decision:', error);
       setSnackbar({ open: true, message: 'Failed to save decision', severity: 'error' });
-      setInlineDecisions(prev => ({ ...prev, [item.id]: prev[item.id] || '' }));
     }
   };
 
@@ -1413,18 +1449,23 @@ export default function Staging() {
     
     let roundFilteredData = dataSource;
     let roundName = 'All Rounds';
-    
+
+    // Filter based on previous round decisions (or currentRound for backward compatibility)
     if (currentTab === 0) {
-      roundFilteredData = dataSource.filter(app => String(app.currentRound) === '1');
+      // Resume Review: Show ALL applicants
+      roundFilteredData = dataSource;
       roundName = 'Resume Review';
     } else if (currentTab === 1) {
-      roundFilteredData = dataSource.filter(app => String(app.currentRound) === '2');
+      // Coffee Chat: Show only applicants who passed resume review
+      roundFilteredData = dataSource.filter(app => passedRound(app, 'resume'));
       roundName = 'Coffee Chat';
     } else if (currentTab === 2) {
-      roundFilteredData = dataSource.filter(app => String(app.currentRound) === '3');
+      // First Round: Show only applicants who passed coffee chat
+      roundFilteredData = dataSource.filter(app => passedRound(app, 'coffee'));
       roundName = 'First Round';
     } else if (currentTab === 3) {
-      roundFilteredData = dataSource.filter(app => String(app.currentRound) === '4');
+      // Final Round: Show only applicants who passed first round
+      roundFilteredData = dataSource.filter(app => passedRound(app, 'firstRound'));
       roundName = 'Final Round';
     }
     
@@ -1439,19 +1480,23 @@ export default function Staging() {
     
     let candidatesToExport = roundFilteredData;
     if (exportDialog) {
-      candidatesToExport = roundFilteredData.filter(app => app.approved === true || app.approved === false);
+      candidatesToExport = roundFilteredData.filter(app => {
+        const decision = getDecisionForTab(app.id, currentTab);
+        return decision === 'yes' || decision === 'no';
+      });
     }
-    
+
     const csvHeaders = ['Name', 'Email', 'Student ID', 'Decision', 'Grad Year', 'Gender', 'Referral'];
     const csvRows = candidatesToExport.map(app => {
       const name = `${app.firstName || ''} ${app.lastName || ''}`.trim();
       const email = app.email || '';
       const studentId = app.studentId || '';
-      const decision = app.approved === true ? 'Yes' : app.approved === false ? 'No' : 'Pending';
+      const roundDecision = getDecisionForTab(app.id, currentTab);
+      const decision = roundDecision === 'yes' ? 'Yes' : roundDecision === 'no' ? 'No' : 'Pending';
       const gradYear = app.graduationYear || app.year || '';
       const gender = app.gender || '';
       const referral = app.hasReferral ? 'Yes' : 'No';
-      
+
       return [name, email, studentId, decision, gradYear, gender, referral];
     });
     
@@ -1472,13 +1517,31 @@ export default function Staging() {
     setSnackbar({ open: true, message: `Exported ${candidatesToExport.length} candidates`, severity: 'success' });
   };
 
-  const filteredCandidates = candidates.filter(candidate => {
+  // First, filter candidates based on which tab we're on (previous round decisions)
+  const tabFilteredCandidates = candidates.filter(candidate => {
+    if (currentTab === 0) {
+      // Resume Review: Show ALL applicants
+      return true;
+    } else if (currentTab === 1) {
+      // Coffee Chat: Show only applicants who passed resume review
+      return passedRound(candidate, 'resume');
+    } else if (currentTab === 2) {
+      // First Round: Show only applicants who passed coffee chat
+      return passedRound(candidate, 'coffee');
+    } else if (currentTab === 3) {
+      // Final Round: Show only applicants who passed first round
+      return passedRound(candidate, 'firstRound');
+    }
+    return true;
+  });
+
+  const filteredCandidates = tabFilteredCandidates.filter(candidate => {
     const matchesStatus = filters.status === 'all' || candidate.status === filters.status;
     const matchesRound = filters.round === 'all' || parseInt(candidate.currentRound) === parseInt(filters.round);
 
     let matchesDecision = true;
     if (filters.decision !== 'all') {
-      const candidateDecision = inlineDecisions[candidate.id] || '';
+      const candidateDecision = getDecisionForTab(candidate.id, currentTab);
       if (filters.decision === 'pending') {
         matchesDecision = candidateDecision === '';
       } else {
@@ -1590,8 +1653,8 @@ export default function Staging() {
       case 'decision': {
         // desc = Yes first (default), asc = Pending first
         const decisionOrder = { 'yes': 1, 'maybe_yes': 2, 'maybe_no': 3, 'no': 4, '': 5 };
-        const aDecision = inlineDecisions[a.id] || '';
-        const bDecision = inlineDecisions[b.id] || '';
+        const aDecision = getDecisionForTab(a.id, currentTab);
+        const bDecision = getDecisionForTab(b.id, currentTab);
         const diff = (decisionOrder[aDecision] || 5) - (decisionOrder[bDecision] || 5);
         return multiplier * diff;
       }
@@ -1979,7 +2042,7 @@ export default function Staging() {
                   <TableBody>
                     {paginatedCandidates.map((candidate) => {
                       const gradingData = gradingCompleteByCandidate[candidate.id];
-                      const displayDecision = inlineDecisions[candidate.id] || '';
+                      const displayDecision = getDecisionForTab(candidate.id, currentTab);
                       
                       return (
                         <TableRow key={candidate.id} hover>
@@ -2228,7 +2291,7 @@ export default function Staging() {
                     (() => {
                       const coffeeApps = (adminApplications || []).filter(app => String(app.currentRound) === '2');
                       const toProcess = coffeeApps.filter(app => {
-                        const localDecision = inlineDecisions[app.id];
+                        const localDecision = getDecisionForTab(app.id, currentTab);
                         const dbDecision = app.approved === true ? 'yes' : app.approved === false ? 'no' : '';
                         const decision = localDecision || dbDecision;
                         return decision === 'yes' || decision === 'no';
@@ -2239,7 +2302,7 @@ export default function Staging() {
                     (() => {
                       const firstRoundApps = (adminApplications || []).filter(app => String(app.currentRound) === '3');
                       const toProcess = firstRoundApps.filter(app => {
-                        const localDecision = inlineDecisions[app.id];
+                        const localDecision = getDecisionForTab(app.id, currentTab);
                         const dbDecision = app.approved === true ? 'yes' : app.approved === false ? 'no' : '';
                         const decision = localDecision || dbDecision;
                         return decision === 'yes' || decision === 'no';
@@ -2250,7 +2313,7 @@ export default function Staging() {
                     (() => {
                       const finalRoundApps = (adminApplications || []).filter(app => String(app.currentRound) === '4');
                       const toProcess = finalRoundApps.filter(app => {
-                        const localDecision = inlineDecisions[app.id];
+                        const localDecision = getDecisionForTab(app.id, currentTab);
                         const dbDecision = app.approved === true ? 'yes' : app.approved === false ? 'no' : '';
                         const decision = localDecision || dbDecision;
                         return decision === 'yes' || decision === 'no';
@@ -2258,7 +2321,7 @@ export default function Staging() {
                       return (<span>Applications to process: <strong>{toProcess.length}</strong></span>);
                     })()
                   ) : (
-                    <span>Candidates to process: <strong>{candidates.filter(c => inlineDecisions[c.id] === 'yes' || inlineDecisions[c.id] === 'no').length}</strong></span>
+                    <span>Candidates to process: <strong>{candidates.filter(c => getDecisionForTab(c.id, currentTab) === 'yes' || getDecisionForTab(c.id, currentTab) === 'no').length}</strong></span>
                   )}
                 </Typography>
                 <TextField

@@ -19,7 +19,41 @@ export default function CandidateList() {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(50);
 
-  // Use cached candidates hook with minimal data for list view
+  // Search and filter state (pending = what user is selecting, applied = what's sent to server)
+  const [pendingSearch, setPendingSearch] = useState('');
+  const [appliedSearch, setAppliedSearch] = useState('');
+  const [pendingFilters, setPendingFilters] = useState({
+    group: '',
+    createdDate: '',
+    cycle: ''
+  });
+  const [appliedFilters, setAppliedFilters] = useState({
+    group: '',
+    createdDate: '',
+    cycle: ''
+  });
+
+  // Check if there are unapplied filter or search changes
+  const hasUnappliedFilters = JSON.stringify(pendingFilters) !== JSON.stringify(appliedFilters) || pendingSearch !== appliedSearch;
+
+  // Apply filters handler
+  const handleApplyFilters = useCallback(() => {
+    setAppliedFilters(pendingFilters);
+    setAppliedSearch(pendingSearch);
+    setPage(1);
+  }, [pendingFilters, pendingSearch]);
+
+  // Clear all filters
+  const handleClearFilters = useCallback(() => {
+    const emptyFilters = { group: '', createdDate: '', cycle: '' };
+    setPendingFilters(emptyFilters);
+    setAppliedFilters(emptyFilters);
+    setPendingSearch('');
+    setAppliedSearch('');
+    setPage(1);
+  }, []);
+
+  // Use cached candidates hook with server-side search
   const {
     candidates: rawCandidates,
     pagination,
@@ -29,24 +63,51 @@ export default function CandidateList() {
   } = useCandidates({
     page,
     limit,
+    search: appliedSearch,
     endpoint: '/member/all-candidates',
     enabled: !!user?.id
   });
 
   const { invalidateRelated } = useData();
 
-  // Transform candidates data
+  // Transform candidates data - apply client-side filters that aren't supported server-side
   const candidates = useMemo(() => {
-    // Handle paginated response format
-    return rawCandidates || [];
-  }, [rawCandidates]);
+    let data = rawCandidates || [];
 
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filters, setFilters] = useState({
-    group: '',
-    createdDate: '',
-    cycle: ''
-  });
+    // Apply client-side filters (group, createdDate, cycle)
+    if (appliedFilters.group) {
+      data = data.filter(candidate =>
+        (appliedFilters.group === 'applied' && candidate.applications && candidate.applications.length > 0) ||
+        (appliedFilters.group === 'not_applied' && (!candidate.applications || candidate.applications.length === 0))
+      );
+    }
+
+    if (appliedFilters.cycle) {
+      data = data.filter(candidate =>
+        candidate.applications?.some(app => app.cycleId === appliedFilters.cycle || app.cycle?.id === appliedFilters.cycle)
+      );
+    }
+
+    if (appliedFilters.createdDate) {
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+      data = data.filter(candidate => {
+        const candidateDate = new Date(candidate.createdAt || candidate.applications?.[0]?.submittedAt);
+        switch (appliedFilters.createdDate) {
+          case 'today': return candidateDate >= today;
+          case 'week': return candidateDate >= weekAgo;
+          case 'month': return candidateDate >= monthAgo;
+          default: return true;
+        }
+      });
+    }
+
+    return data;
+  }, [rawCandidates, appliedFilters]);
+
   const [cycles, setCycles] = useState([]);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingCandidate, setEditingCandidate] = useState(null);
@@ -91,48 +152,11 @@ export default function CandidateList() {
     }
   }, [candidates]);
 
-  // Filter and search logic
-  const filteredCandidates = candidates.filter(candidate => {
-    // Get the latest application for search
-    const latestApp = candidate.applications?.[0];
-    // Use candidate's own name if no application, otherwise use application name
-    const candidateName = latestApp ? 
-      `${latestApp.firstName} ${latestApp.lastName}` : 
-      `${candidate.firstName} ${candidate.lastName}`;
-    const candidateEmail = latestApp?.email || candidate.email;
-    
-    const matchesSearch = candidateName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         candidateEmail.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (candidate.studentId || '').toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesGroup = !filters.group ||
-      (filters.group === 'applied' && candidate.applications && candidate.applications.length > 0) ||
-      (filters.group === 'not_applied' && (!candidate.applications || candidate.applications.length === 0));
+  // Check if any client-side filters are active
+  const hasClientSideFilters = appliedFilters.group || appliedFilters.createdDate || appliedFilters.cycle;
 
-    const matchesCycle = !filters.cycle ||
-      candidate.applications?.some(app => app.cycleId === filters.cycle || app.cycle?.id === filters.cycle);
-
-    const matchesDate = !filters.createdDate || (() => {
-      const candidateDate = new Date(candidate.createdAt || latestApp?.submittedAt);
-      const now = new Date();
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-      const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
-      
-      switch (filters.createdDate) {
-        case 'today':
-          return candidateDate >= today;
-        case 'week':
-          return candidateDate >= weekAgo;
-        case 'month':
-          return candidateDate >= monthAgo;
-        default:
-          return true;
-      }
-    })();
-    
-    return matchesSearch && matchesGroup && matchesCycle && matchesDate;
-  });
+  // Check if any filters are active
+  const hasActiveFilters = Object.values(appliedFilters).some(v => v !== '') || appliedSearch !== '';
 
   const getInitials = (name) => {
     if (!name) return '?';
@@ -141,7 +165,7 @@ export default function CandidateList() {
   };
 
   const handleFilterChange = (filterType, value) => {
-    setFilters(prev => ({
+    setPendingFilters(prev => ({
       ...prev,
       [filterType]: value
     }));
@@ -244,31 +268,32 @@ export default function CandidateList() {
               type="text"
               placeholder="Search candidates..."
               className="search-input"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              value={pendingSearch}
+              onChange={(e) => setPendingSearch(e.target.value)}
             />
           </div>
           <div className="results-count">
-            {filteredCandidates.length} candidate{filteredCandidates.length !== 1 ? 's' : ''}
+            {hasClientSideFilters ? candidates.length : (pagination?.total || candidates.length)} candidate{(hasClientSideFilters ? candidates.length : (pagination?.total || candidates.length)) !== 1 ? 's' : ''}
+            {pagination && !hasClientSideFilters && pagination.totalPages > 1 && ` (page ${pagination.page} of ${pagination.totalPages})`}
           </div>
         </div>
       </div>
 
       {/* Simple inline filters */}
       <div className="filters-row">
-        <select 
+        <select
           className="filter-select"
-          value={filters.group}
+          value={pendingFilters.group}
           onChange={(e) => handleFilterChange('group', e.target.value)}
         >
           <option value="">Application: All</option>
           <option value="applied">Application: Applied</option>
           <option value="not_applied">Application: Not Applied</option>
         </select>
-        
+
         <select
           className="filter-select"
-          value={filters.createdDate}
+          value={pendingFilters.createdDate}
           onChange={(e) => handleFilterChange('createdDate', e.target.value)}
         >
           <option value="">Date Added: All</option>
@@ -279,7 +304,7 @@ export default function CandidateList() {
 
         <select
           className="filter-select"
-          value={filters.cycle}
+          value={pendingFilters.cycle}
           onChange={(e) => handleFilterChange('cycle', e.target.value)}
         >
           <option value="">Cycle: All</option>
@@ -289,17 +314,35 @@ export default function CandidateList() {
             </option>
           ))}
         </select>
+
+        <button
+          className={`apply-filters-btn ${hasUnappliedFilters ? 'has-changes' : ''}`}
+          onClick={handleApplyFilters}
+          disabled={!hasUnappliedFilters || loading}
+        >
+          {loading ? 'Loading...' : 'Apply Filters'}
+        </button>
+
+        {hasActiveFilters && (
+          <button
+            className="clear-filters-btn"
+            onClick={handleClearFilters}
+            disabled={loading}
+          >
+            Clear All
+          </button>
+        )}
       </div>
 
       {/* Candidates List */}
-      {filteredCandidates.length === 0 ? (
+      {candidates.length === 0 ? (
         <div className="empty-state">
           <h3>No candidates found</h3>
           <p>Try adjusting your search or filter criteria.</p>
         </div>
       ) : (
         <div className="candidates-grid">
-          {filteredCandidates.map((candidate, index) => (
+          {candidates.map((candidate, index) => (
             <div key={candidate.id} className="candidate-card-wrapper">
               <Link
                 to={`/candidate-detail/${candidate.id}`}

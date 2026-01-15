@@ -254,6 +254,10 @@ router.get('/', async (req, res) => {
     const limit = Math.min(parseInt(req.query.limit) || 50, 200);
     const skip = (page - 1) * limit;
 
+    // Search and filter parameters
+    const search = req.query.search?.trim() || '';
+    const { year, gender, firstGen, transfer, status: statusFilter, returning } = req.query;
+
     // Optional: scope to active recruiting cycle if one exists
     const activeCycle = await prisma.recruitingCycle.findFirst({ where: { isActive: true } });
     if (!activeCycle) {
@@ -263,7 +267,27 @@ router.get('/', async (req, res) => {
         pagination: { page, limit, total: 0, totalPages: 0, hasNextPage: false, hasPrevPage: false }
       });
     }
+
+    // Build where clause with filters
     const whereClause = { cycleId: activeCycle.id };
+
+    // Add search filter (search by name or email)
+    if (search) {
+      whereClause.OR = [
+        { firstName: { contains: search, mode: 'insensitive' } },
+        { lastName: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } }
+      ];
+    }
+
+    // Add other filters
+    if (year) whereClause.graduationYear = year;
+    if (gender) whereClause.gender = gender;
+    if (firstGen === 'true') whereClause.isFirstGeneration = true;
+    if (firstGen === 'false') whereClause.isFirstGeneration = false;
+    if (transfer === 'true') whereClause.isTransferStudent = true;
+    if (transfer === 'false') whereClause.isTransferStudent = false;
+    if (statusFilter) whereClause.status = statusFilter;
 
     // Get total count and paginated applications in parallel
     const [total, applications] = await Promise.all([
