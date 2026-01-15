@@ -734,6 +734,7 @@ export default function Staging() {
 
   const [evaluationSummaries, setEvaluationSummaries] = useState({});
   const [evaluationSummariesFirstRound, setEvaluationSummariesFirstRound] = useState({});
+  const [evaluationSummariesFinal, setEvaluationSummariesFinal] = useState({});
 
   const handlePageChange = (newPage) => {
     setPagination(prev => ({
@@ -994,6 +995,15 @@ export default function Staging() {
     }
   }, [currentTab, adminApplications]);
 
+  useEffect(() => {
+    if (currentTab === 3 && adminApplications.length > 0) {
+      const finalRoundApps = (adminApplications || []).filter(app => String(app.currentRound) === '4');
+      if (finalRoundApps.length > 0) {
+        fetchFinalRoundEvaluations(finalRoundApps);
+      }
+    }
+  }, [currentTab, adminApplications]);
+
   const fetchCandidates = async () => {
     // Invalidate cache when manually refreshing
     stagingCache.invalidate();
@@ -1118,8 +1128,44 @@ export default function Staging() {
     const avgMarketSizing = totalMarketSizing / evaluationsWithScores.length;
     
     const combinedScore = ((avgBehavioral + avgMarketSizing) / 30) * 10;
-    
+
     return combinedScore;
+  };
+
+  // Helper function to get the appropriate score based on the current tab
+  const getScoreForTab = (candidate, tab) => {
+    if (tab === 0) {
+      // Resume Review: use document scores
+      return candidate.scores?.overall || 0;
+    } else if (tab === 1) {
+      // Coffee Chat: use evaluation summaries
+      const adminApp = adminApplications.find(app => app.id === candidate.id || app.candidateId === candidate.candidateId);
+      const appId = adminApp?.id || candidate.id;
+      const summary = evaluationSummaries[appId];
+      if (summary?.evaluations?.length > 0) {
+        return calculateRankingScore(summary.evaluations);
+      }
+      return 0;
+    } else if (tab === 2) {
+      // First Round: use first round evaluation summaries
+      const adminApp = adminApplications.find(app => app.id === candidate.id || app.candidateId === candidate.candidateId);
+      const appId = adminApp?.id || candidate.id;
+      const summary = evaluationSummariesFirstRound[appId];
+      if (summary?.evaluations?.length > 0) {
+        return calculateFirstRoundRankingScore(summary.evaluations);
+      }
+      return 0;
+    } else if (tab === 3) {
+      // Final Round: use final round evaluation summaries
+      const adminApp = adminApplications.find(app => app.id === candidate.id || app.candidateId === candidate.candidateId);
+      const appId = adminApp?.id || candidate.id;
+      const summary = evaluationSummariesFinal[appId];
+      if (summary?.evaluations?.length > 0) {
+        return calculateRankingScore(summary.evaluations);
+      }
+      return 0;
+    }
+    return candidate.scores?.overall || 0;
   };
 
   const fetchCoffeeChatInterviews = async () => {
@@ -1223,6 +1269,25 @@ export default function Staging() {
       setEvaluationSummariesFirstRound(filteredSummaries);
     } catch (error) {
       console.error('Error fetching first round evaluation summaries:', error);
+    }
+  };
+
+  const fetchFinalRoundEvaluations = async (applications) => {
+    try {
+      const applicationIds = applications.map(app => app.id);
+      const summaries = await stagingAPI.fetchEvaluationSummaries(applicationIds);
+
+      const filteredSummaries = {};
+      Object.entries(summaries || {}).forEach(([appId, summary]) => {
+        const onlyFinalRound = (summary?.evaluations || []).filter(e =>
+          e?.interview?.interviewType === 'FINAL_ROUND' || e?.interview?.interviewType === 'ROUND_TWO'
+        );
+        filteredSummaries[appId] = { evaluations: onlyFinalRound };
+      });
+
+      setEvaluationSummariesFinal(filteredSummaries);
+    } catch (error) {
+      console.error('Error fetching final round evaluation summaries:', error);
     }
   };
 
@@ -1752,7 +1817,7 @@ export default function Staging() {
     switch (sortConfig.field) {
       case 'score': {
         // desc = high scores first (default), asc = low scores first
-        const diff = (a.scores?.overall || 0) - (b.scores?.overall || 0);
+        const diff = getScoreForTab(a, currentTab) - getScoreForTab(b, currentTab);
         return multiplier * diff;
       }
       case 'name': {
@@ -1793,7 +1858,7 @@ export default function Staging() {
         return multiplier * diff;
       }
       default: {
-        const diff = (a.scores?.overall || 0) - (b.scores?.overall || 0);
+        const diff = getScoreForTab(a, currentTab) - getScoreForTab(b, currentTab);
         return multiplier * diff;
       }
     }
@@ -2224,7 +2289,7 @@ export default function Staging() {
                             </Box>
                           </TableCell>
                           <TableCell>
-                            <ScoreDisplay score={candidate.scores.overall || 0} />
+                            <ScoreDisplay score={getScoreForTab(candidate, currentTab)} />
                           </TableCell>
                           <TableCell>
                             <GradingStatusDisplay candidate={candidate} gradingData={gradingData} />
