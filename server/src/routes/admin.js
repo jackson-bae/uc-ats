@@ -128,14 +128,67 @@ router.get('/stats', async (req, res) => {
 // Get all candidates
 router.get('/candidates', async (req, res) => {
   try {
+    // Pagination parameters
+    const page = parseInt(req.query.page) || 1;
+    const limit = Math.min(parseInt(req.query.limit) || 50, 200); // Max 200 items
+    const skip = (page - 1) * limit;
+
+    // Search and filter parameters
+    const search = req.query.search?.trim() || '';
+    const { year, gender, firstGen, transfer, status: statusFilter } = req.query;
+
     // Scope to active cycle if present
     const active = await prisma.recruitingCycle.findFirst({ where: { isActive: true } });
     if (!active) {
       return res.json([]);
     }
-    const candidates = await prisma.application.findMany({
-      where: { cycleId: active.id },
-      orderBy: { submittedAt: 'desc' }
+
+    // Build where clause with filters
+    const whereClause = { cycleId: active.id };
+
+    // Add search filter (search by name or email)
+    if (search) {
+      whereClause.OR = [
+        { firstName: { contains: search, mode: 'insensitive' } },
+        { lastName: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } }
+      ];
+    }
+
+    // Add other filters
+    if (year) whereClause.graduationYear = year;
+    if (gender) whereClause.gender = gender;
+    if (firstGen === 'true') whereClause.isFirstGeneration = true;
+    if (firstGen === 'false') whereClause.isFirstGeneration = false;
+    if (transfer === 'true') whereClause.isTransferStudent = true;
+    if (transfer === 'false') whereClause.isTransferStudent = false;
+    if (statusFilter) whereClause.status = statusFilter;
+
+    // Fetch paginated data and total count in parallel
+    const [candidates, total] = await Promise.all([
+      prisma.application.findMany({
+        where: whereClause,
+        orderBy: { submittedAt: 'desc' },
+        skip,
+        take: limit
+      }),
+      prisma.application.count({
+        where: whereClause
+      })
+    ]);
+
+    const totalPages = Math.ceil(total / limit);
+
+    res.json({
+      data: candidates,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1
+      }
     });
     res.json(candidates);
   } catch (error) {
@@ -3212,9 +3265,9 @@ router.post('/staging/candidates/:id/advance-round', async (req, res) => {
 router.post('/save-decision', async (req, res) => {
   try {
     const { candidateId, decision, phase } = req.body;
-    
+
     console.log('Saving decision:', { candidateId, decision, phase });
-    
+
     if (!candidateId) {
       return res.status(400).json({ error: 'Missing required field: candidateId' });
     }
@@ -3239,73 +3292,51 @@ router.post('/save-decision', async (req, res) => {
 
     console.log('Found application:', application.id, 'for candidate:', application.candidateId);
 
-    // Save the decision based on the value
-    let updateData = {};
-    
+    // Map phase to the correct decision field
+    const phaseToField = {
+      'resume': 'resumeDecision',
+      'coffee': 'coffeeChatDecision',
+      'firstRound': 'firstRoundDecision',
+      'final': 'finalRoundDecision'
+    };
+
+    const decisionField = phaseToField[phase] || 'resumeDecision';
+    const phaseLabel = {
+      'resume': 'Resume Review',
+      'coffee': 'Coffee Chat',
+      'firstRound': 'First Round',
+      'final': 'Final Round'
+    }[phase] || 'Resume Review';
+
     // Get user ID if available (from authentication middleware)
     const userId = req.user?.id || 'system';
-    
-    console.log('Processing decision:', decision, 'for application:', application.id);
-    
-    if (decision === 'yes') {
-      updateData = {
-        approved: true,
-        // Store the decision in a comment for tracking
-        comments: {
-          create: {
-            content: `${phase === 'coffee' ? 'Coffee Chat' : 'Resume Review'} decision: Yes - Advanced to next round`,
-            userId: userId
-          }
-        }
-      };
-    } else if (decision === 'no') {
-      updateData = {
-        approved: false,
-        comments: {
-          create: {
-            content: `${phase === 'coffee' ? 'Coffee Chat' : 'Resume Review'} decision: No - Not advanced`,
-            userId: userId
-          }
-        }
-      };
-    } else if (decision === 'maybe_yes') {
-      updateData = {
-        approved: null, // Keep as null for intermediate decision
-        comments: {
-          create: {
-            content: `${phase === 'coffee' ? 'Coffee Chat' : 'Resume Review'} decision: Maybe - Yes (needs final decision)`,
-            userId: userId
-          }
-        }
-      };
-    } else if (decision === 'maybe_no') {
-      updateData = {
-        approved: null, // Keep as null for intermediate decision
-        comments: {
-          create: {
-            content: `${phase === 'coffee' ? 'Coffee Chat' : 'Resume Review'} decision: Maybe - No (needs final decision)`,
-            userId: userId
-          }
-        }
-      };
-    } else if (decision === '' || decision === null || decision === undefined) {
-      // Handle empty decision - clear the approved field
-      updateData = {
-        approved: null,
-        comments: {
-          create: {
-            content: `${phase === 'coffee' ? 'Coffee Chat' : 'Resume Review'} decision: Cleared`,
-            userId: userId
-          }
-        }
-      };
-    }
+
+    console.log('Processing decision:', decision, 'for application:', application.id, 'phase:', phase, 'field:', decisionField);
+
+    // Build update data with the per-round decision field
+    let updateData = {
+      [decisionField]: decision || null,
+      // Keep updating approved for backward compatibility
+      approved: decision === 'yes' ? true : decision === 'no' ? false : null
+    };
+
+    // Add comment for tracking
+    const decisionLabel = decision === 'yes' ? 'Yes - Advanced' :
+                          decision === 'no' ? 'No - Not advanced' :
+                          decision === 'maybe_yes' ? 'Maybe - Yes (needs final decision)' :
+                          decision === 'maybe_no' ? 'Maybe - No (needs final decision)' :
+                          'Cleared';
+
+    updateData.comments = {
+      create: {
+        content: `${phaseLabel} decision: ${decisionLabel}`,
+        userId: userId
+      }
+    };
 
     console.log('Update data:', updateData);
 
     // Update the application
-    console.log('Updating application with data:', updateData);
-    
     const updatedApplication = await prisma.application.update({
       where: { id: application.id },
       data: updateData
@@ -3314,6 +3345,7 @@ router.post('/save-decision', async (req, res) => {
     console.log('Decision saved successfully for application:', updatedApplication.id);
     console.log('Updated application data:', {
       id: updatedApplication.id,
+      [decisionField]: updatedApplication[decisionField],
       approved: updatedApplication.approved,
       status: updatedApplication.status
     });
@@ -3335,10 +3367,10 @@ router.get('/existing-decisions', async (req, res) => {
   try {
     const active = await prisma.recruitingCycle.findFirst({ where: { isActive: true } });
     if (!active) {
-      return res.json({ decisions: {} });
+      return res.json({ decisions: {}, perRoundDecisions: { resume: {}, coffee: {}, firstRound: {}, final: {} } });
     }
 
-    // Get all applications for the current cycle with their comments
+    // Get all applications for the current cycle with per-round decision fields
     const applications = await prisma.application.findMany({
       where: {
         cycleId: active.id
@@ -3347,40 +3379,41 @@ router.get('/existing-decisions', async (req, res) => {
         id: true,
         candidateId: true,
         approved: true,
-        comments: {
-          select: {
-            content: true,
-            createdAt: true
-          },
-          orderBy: {
-            createdAt: 'desc'
-          }
-        }
+        currentRound: true,
+        resumeDecision: true,
+        coffeeChatDecision: true,
+        firstRoundDecision: true,
+        finalRoundDecision: true
       }
     });
 
-    // Convert to decisions object using application ID as key (matches frontend usage)
+    // Build per-round decisions structure
+    const perRoundDecisions = {
+      resume: {},
+      coffee: {},
+      firstRound: {},
+      final: {}
+    };
+
+    // Legacy format for backward compatibility
     const decisions = {};
+
     applications.forEach(app => {
-      // First check the approved field for final decisions
+      // Per-round decisions from new fields
+      if (app.resumeDecision) perRoundDecisions.resume[app.id] = app.resumeDecision;
+      if (app.coffeeChatDecision) perRoundDecisions.coffee[app.id] = app.coffeeChatDecision;
+      if (app.firstRoundDecision) perRoundDecisions.firstRound[app.id] = app.firstRoundDecision;
+      if (app.finalRoundDecision) perRoundDecisions.final[app.id] = app.finalRoundDecision;
+
+      // Legacy: use approved field for backward compatibility
       if (app.approved === true) {
         decisions[app.id] = 'yes';
       } else if (app.approved === false) {
         decisions[app.id] = 'no';
-      } else if (app.approved === null) {
-        // Check comments for intermediate decisions (maybe_yes, maybe_no)
-        const latestComment = app.comments[0];
-        if (latestComment && latestComment.content) {
-          if (latestComment.content.includes('Maybe - Yes')) {
-            decisions[app.id] = 'maybe_yes';
-          } else if (latestComment.content.includes('Maybe - No')) {
-            decisions[app.id] = 'maybe_no';
-          }
-        }
       }
     });
 
-    res.json({ decisions });
+    res.json({ decisions, perRoundDecisions });
   } catch (error) {
     console.error('[GET /api/admin/existing-decisions]', error);
     res.status(500).json({ error: 'Failed to fetch existing decisions', details: error.message });

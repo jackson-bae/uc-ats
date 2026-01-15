@@ -124,68 +124,119 @@ router.get('/all-applications', requireAuth, async (req, res) => {
 // Get all candidates (member version - no admin access required)
 router.get('/all-candidates', requireAuth, async (req, res) => {
   try {
-    console.log('Fetching all candidates for member:', req.user.id);
-    
-    // First, try a simpler query to test database connectivity
-    const candidateCount = await prisma.candidate.count();
-    console.log('Total candidates in database:', candidateCount);
-    
+    // Pagination parameters
+    const page = parseInt(req.query.page) || 1;
+    const limit = Math.min(parseInt(req.query.limit) || 50, 200);
+    const skip = (page - 1) * limit;
+    // Option to load minimal data (for faster list views)
+    const minimal = req.query.minimal === 'true';
+    // Search parameter
+    const search = req.query.search?.trim() || '';
+
+    console.log('Fetching all candidates for member:', req.user.id, `(page ${page}, limit ${limit}, minimal: ${minimal}, search: "${search}")`);
+
+    // Build where clause for search
+    const whereClause = search ? {
+      OR: [
+        { studentId: { contains: search, mode: 'insensitive' } },
+        { applications: { some: { firstName: { contains: search, mode: 'insensitive' } } } },
+        { applications: { some: { lastName: { contains: search, mode: 'insensitive' } } } },
+        { applications: { some: { email: { contains: search, mode: 'insensitive' } } } }
+      ]
+    } : {};
+
+    // Get total count with search filter
+    const total = await prisma.candidate.count({ where: whereClause });
+    console.log('Total candidates matching search:', total);
+
     // Try the full query with error handling for each part
     let candidates;
     try {
-      candidates = await prisma.candidate.findMany({
-        include: {
-          assignedGroup: {
-            select: {
-              id: true,
-              memberOne: true,
-              memberTwo: true,
-              memberThree: true
+      if (minimal) {
+        // Minimal query for faster list loading
+        candidates = await prisma.candidate.findMany({
+          where: whereClause,
+          select: {
+            id: true,
+            studentId: true,
+            createdAt: true,
+            assignedGroupId: true,
+            applications: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                status: true,
+                submittedAt: true,
+                headshotUrl: true,
+                cycleId: true
+              },
+              orderBy: { submittedAt: 'desc' },
+              take: 1 // Only get most recent application
             }
           },
-          applications: {
-            include: {
-              cycle: {
-                select: {
-                  id: true,
-                  name: true,
-                  isActive: true
+          orderBy: { createdAt: 'desc' },
+          skip,
+          take: limit
+        });
+      } else {
+        // Full query with all includes
+        candidates = await prisma.candidate.findMany({
+          where: whereClause,
+          include: {
+            assignedGroup: {
+              select: {
+                id: true,
+                memberOne: true,
+                memberTwo: true,
+                memberThree: true
+              }
+            },
+            applications: {
+              include: {
+                cycle: {
+                  select: {
+                    id: true,
+                    name: true,
+                    isActive: true
+                  }
+                }
+              },
+              orderBy: { submittedAt: 'desc' }
+            },
+            eventAttendance: {
+              include: {
+                event: {
+                  select: {
+                    id: true,
+                    eventName: true,
+                    eventStartDate: true,
+                    eventEndDate: true
+                  }
                 }
               }
             },
-            orderBy: {
-              submittedAt: 'desc'
-            }
-          },
-          eventAttendance: {
-            include: {
-              event: {
-                select: {
-                  id: true,
-                  eventName: true,
-                  eventStartDate: true,
-                  eventEndDate: true
+            eventRsvp: {
+              include: {
+                event: {
+                  select: {
+                    id: true,
+                    eventName: true,
+                    eventStartDate: true,
+                    eventEndDate: true
+                  }
                 }
               }
             }
           },
-          eventRsvp: {
-            include: {
-              event: {
-                select: {
-                  id: true,
-                  eventName: true,
-                  eventStartDate: true,
-                  eventEndDate: true
-                }
-              }
-            }
-          }
-        },
-        orderBy: {
-          createdAt: 'desc'
-        }
-      });
+          orderBy: {
+            createdAt: 'desc'
+          },
+          skip,
+          take: limit
+        });
+      }
     } catch (queryError) {
       console.error('Prisma query error:', queryError);
       // Try a simpler query without includes
@@ -204,7 +255,20 @@ router.get('/all-candidates', requireAuth, async (req, res) => {
     }
 
     console.log('Found candidates:', candidates.length);
-    res.json(candidates);
+
+    // Return with pagination metadata
+    const totalPages = Math.ceil(total / limit);
+    res.json({
+      data: candidates,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1
+      }
+    });
   } catch (error) {
     console.error('Error fetching all candidates for member:', error);
     console.error('Error details:', error.message, error.stack);

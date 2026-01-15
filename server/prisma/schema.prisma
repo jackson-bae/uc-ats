@@ -94,6 +94,10 @@ model Application {
   rawResponses          Json
   approved              Boolean?
   currentRound          String?
+  resumeDecision        String?
+  coffeeChatDecision    String?
+  firstRoundDecision    String?
+  finalRoundDecision    String?
   cycleId               String?
   candidateId           String?
   testFor               String?

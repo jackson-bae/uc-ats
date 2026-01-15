@@ -129,6 +129,64 @@
   box-shadow: 0 0 0 2px var(--hover-overlay);
 }
 
+/* Filter action buttons */
+.apply-filters-btn {
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--border-radius-sm);
+  font-size: 0.875rem;
+  font-family: var(--font-family);
+  font-weight: 500;
+  background-color: var(--bg-white);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.apply-filters-btn:hover:not(:disabled) {
+  border-color: var(--primary-blue);
+  color: var(--primary-blue);
+}
+
+.apply-filters-btn.has-changes {
+  background-color: var(--primary-blue);
+  border-color: var(--primary-blue);
+  color: white;
+}
+
+.apply-filters-btn.has-changes:hover:not(:disabled) {
+  background-color: var(--primary-blue-dark);
+  border-color: var(--primary-blue-dark);
+}
+
+.apply-filters-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.clear-filters-btn {
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--border-radius-sm);
+  font-size: 0.875rem;
+  font-family: var(--font-family);
+  font-weight: 500;
+  background-color: var(--bg-white);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.clear-filters-btn:hover:not(:disabled) {
+  border-color: var(--error-red);
+  color: var(--error-red);
+}
+
+.clear-filters-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* Candidates grid - Card layout */
 .candidates-grid {
   display: grid;

@@ -249,22 +249,59 @@ router.post('/manual', async (req, res) => {
 // Get all applications with average grades
 router.get('/', async (req, res) => {
   try {
+    // Pagination parameters
+    const page = parseInt(req.query.page) || 1;
+    const limit = Math.min(parseInt(req.query.limit) || 50, 200);
+    const skip = (page - 1) * limit;
+
+    // Search and filter parameters
+    const search = req.query.search?.trim() || '';
+    const { year, gender, firstGen, transfer, status: statusFilter, returning } = req.query;
+
     // Optional: scope to active recruiting cycle if one exists
     const activeCycle = await prisma.recruitingCycle.findFirst({ where: { isActive: true } });
     if (!activeCycle) {
       // When no active cycle, return empty list instead of all
       return res.json([]);
     }
+
+    // Build where clause with filters
     const whereClause = { cycleId: activeCycle.id };
 
-    // First, get applications
-    const applications = await prisma.application.findMany({
-      where: whereClause,
-      orderBy: { submittedAt: 'desc' }
-    });
+    // Add search filter (search by name or email)
+    if (search) {
+      whereClause.OR = [
+        { firstName: { contains: search, mode: 'insensitive' } },
+        { lastName: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } }
+      ];
+    }
 
-    // Get all grades
-    const allGrades = await prisma.grade.findMany();
+    // Add other filters
+    if (year) whereClause.graduationYear = year;
+    if (gender) whereClause.gender = gender;
+    if (firstGen === 'true') whereClause.isFirstGeneration = true;
+    if (firstGen === 'false') whereClause.isFirstGeneration = false;
+    if (transfer === 'true') whereClause.isTransferStudent = true;
+    if (transfer === 'false') whereClause.isTransferStudent = false;
+    if (statusFilter) whereClause.status = statusFilter;
+
+    // Get total count and paginated applications in parallel
+    const [total, applications] = await Promise.all([
+      prisma.application.count({ where: whereClause }),
+      prisma.application.findMany({
+        where: whereClause,
+        orderBy: { submittedAt: 'desc' },
+        skip,
+        take: limit
+      })
+    ]);
+
+    // Get grades only for the applications on this page
+    const applicationIds = applications.map(app => app.id);
+    const allGrades = await prisma.grade.findMany({
+      where: { applicant: { in: applicationIds } }
+    });
 
     // Get counts of past applications by candidateId (primary) and studentId (fallback)
     const candidateIds = [...new Set(applications.map(app => app.candidateId).filter(Boolean))];
@@ -347,7 +384,19 @@ router.get('/', async (req, res) => {
       };
     }));
 
-    res.json(applicationsWithAverages);
+    // Return with pagination metadata
+    const totalPages = Math.ceil(total / limit);
+    res.json({
+      data: applicationsWithAverages,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1
+      }
+    });
   } catch (error) {
     console.error('Error fetching applications:', error);
     res.status(500).json({ error: 'Failed to fetch applications' });
