@@ -35,10 +35,24 @@ class ImageCache {
       console.log('ImageCache: Fetching image from:', src);
       console.log('ImageCache: Using token:', token ? 'Present' : 'Missing');
       
-      const response = await fetch(src, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+      // Normalize URL - if it's a relative path starting with /api/, ensure it's properly formatted
+      let normalizedSrc = src;
+      if (src.startsWith('/api/') && !src.startsWith('http')) {
+        // Relative URL - fetch will use current origin
+        normalizedSrc = src;
+      } else if (src.startsWith('http://') || src.startsWith('https://')) {
+        // Absolute URL - use as is
+        normalizedSrc = src;
+      }
+      
+      const headers = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      const response = await fetch(normalizedSrc, {
+        headers: headers,
+        credentials: 'include' // Include cookies for session-based auth if needed
       });
 
       console.log('ImageCache: Response status:', response.status, response.statusText);

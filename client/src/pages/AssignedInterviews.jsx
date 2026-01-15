@@ -1005,7 +1005,7 @@ export default function AssignedInterviews() {
                                       <div className="evaluation-candidate">
                                         <div className="candidate-photo">
                                           {application.headshotUrl ? (
-                                            <img
+                                            <AuthenticatedImage
                                               src={application.headshotUrl}
                                               alt={`${application.firstName} ${application.lastName}`}
                                               className="candidate-headshot"
@@ -1014,10 +1014,6 @@ export default function AssignedInterviews() {
                                                 height: '48px',
                                                 borderRadius: '50%',
                                                 objectFit: 'cover'
-                                              }}
-                                              onError={(e) => {
-                                                e.currentTarget.style.display = 'none';
-                                                e.currentTarget.nextSibling.style.display = 'flex';
                                               }}
                                             />
                                           ) : null}
@@ -1236,7 +1232,7 @@ export default function AssignedInterviews() {
               <h3>Edit Evaluation</h3>
               <div className="candidate-info-modal">
                 {editingEvaluation.application.headshotUrl && (
-                  <img
+                  <AuthenticatedImage
                     src={editingEvaluation.application.headshotUrl}
                     alt={`${editingEvaluation.application.firstName} ${editingEvaluation.application.lastName}`}
                     className="modal-candidate-photo"
