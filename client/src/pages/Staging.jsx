@@ -1860,7 +1860,7 @@ export default function Staging() {
                     color="primary"
                     sx={{ ml: 1 }}
                   />
-                  {(filters.decision !== 'all' || filters.graduationYear !== 'all' || filters.gender !== 'all' || filters.attendance !== 'all' || filters.referral !== 'all' || filters.search !== '') && (
+                  {(filters.decision !== 'all' || filters.graduationYear !== 'all' || filters.gender !== 'all' || filters.attendance !== 'all' || filters.referral !== 'all' || filters.reviewTeam !== 'all' || filters.search !== '') && (
                     <Button
                       size="small"
                       startIcon={<ClearIcon />}
@@ -1871,6 +1871,7 @@ export default function Staging() {
                         gender: 'all',
                         attendance: 'all',
                         referral: 'all',
+                        reviewTeam: 'all',
                         search: ''
                       })}
                       sx={{ ml: 'auto' }}
@@ -1980,6 +1981,32 @@ export default function Staging() {
                         <MenuItem value="all">All</MenuItem>
                         <MenuItem value="yes">Has Referral</MenuItem>
                         <MenuItem value="no">No Referral</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+
+                  {/* Review Team Filter */}
+                  <Grid item xs={6} md={2}>
+                    <FormControl size="small" fullWidth>
+                      <InputLabel>Review Team</InputLabel>
+                      <Select
+                        value={filters.reviewTeam}
+                        label="Review Team"
+                        onChange={(e) => setFilters({ ...filters, reviewTeam: e.target.value })}
+                        renderValue={(selected) => {
+                          if (selected === 'all') return 'All Teams';
+                          if (selected === 'unassigned') return 'Unassigned';
+                          const selectedTeam = reviewTeams.find(team => team.id === selected);
+                          return selectedTeam ? selectedTeam.name : selected;
+                        }}
+                      >
+                        <MenuItem value="all">All Teams</MenuItem>
+                        <MenuItem value="unassigned">Unassigned</MenuItem>
+                        {reviewTeams.map((team) => (
+                          <MenuItem key={team.id} value={team.id}>
+                            {team.name}
+                          </MenuItem>
+                        ))}
                       </Select>
                     </FormControl>
                   </Grid>
