@@ -1810,7 +1810,15 @@ export default function Staging() {
       }
     }
 
-    return matchesStatus && matchesRound && matchesDecision && matchesAttendance && matchesReviewTeam && matchesReferral && matchesSearch && matchesGraduationYear && matchesGender;
+    // Coffee Chat Interview Filter - only applies when on coffee chat tab (tab 1)
+    let matchesInterview = true;
+    if (currentTab === 1 && coffeeChatInterviewFilter !== 'all') {
+      const interviewApplications = getApplicationsForInterview(coffeeChatInterviewFilter);
+      const applicationIds = new Set(interviewApplications.map(app => app.id));
+      matchesInterview = applicationIds.has(candidate.id);
+    }
+
+    return matchesStatus && matchesRound && matchesDecision && matchesAttendance && matchesReviewTeam && matchesReferral && matchesSearch && matchesGraduationYear && matchesGender && matchesInterview;
   }).sort((a, b) => {
     const multiplier = sortConfig.direction === 'asc' ? 1 : -1;
 
@@ -1908,7 +1916,7 @@ export default function Staging() {
 
           <Card sx={{ mb: 3 }}>
             <CardContent>
-              <Tabs value={currentTab} onChange={(e, v) => setCurrentTab(v)}>
+              <Tabs value={currentTab} onChange={(e, v) => { setCurrentTab(v); setCoffeeChatInterviewFilter('all'); }}>
                 <Tab label="Resume Review" />
                 <Tab label="Coffee Chats" />
                 <Tab label="First Round" />
@@ -2040,20 +2048,23 @@ export default function Staging() {
                     color="primary"
                     sx={{ ml: 1 }}
                   />
-                  {(filters.decision !== 'all' || filters.graduationYear !== 'all' || filters.gender !== 'all' || filters.attendance !== 'all' || filters.referral !== 'all' || filters.reviewTeam !== 'all' || filters.search !== '') && (
+                  {(filters.decision !== 'all' || filters.graduationYear !== 'all' || filters.gender !== 'all' || filters.attendance !== 'all' || filters.referral !== 'all' || filters.reviewTeam !== 'all' || filters.search !== '' || (currentTab === 1 && coffeeChatInterviewFilter !== 'all')) && (
                     <Button
                       size="small"
                       startIcon={<ClearIcon />}
-                      onClick={() => setFilters({
-                        ...filters,
-                        decision: 'all',
-                        graduationYear: 'all',
-                        gender: 'all',
-                        attendance: 'all',
-                        referral: 'all',
-                        reviewTeam: 'all',
-                        search: ''
-                      })}
+                      onClick={() => {
+                        setFilters({
+                          ...filters,
+                          decision: 'all',
+                          graduationYear: 'all',
+                          gender: 'all',
+                          attendance: 'all',
+                          referral: 'all',
+                          reviewTeam: 'all',
+                          search: ''
+                        });
+                        setCoffeeChatInterviewFilter('all');
+                      }}
                       sx={{ ml: 'auto' }}
                     >
                       Clear Filters
@@ -2190,6 +2201,32 @@ export default function Staging() {
                       </Select>
                     </FormControl>
                   </Grid>
+
+                  {/* Coffee Chat Interview Filter - Only shown on Coffee Chat tab */}
+                  {currentTab === 1 && (
+                    <Grid item xs={6} md={2}>
+                      <FormControl size="small" fullWidth>
+                        <InputLabel>Interview</InputLabel>
+                        <Select
+                          value={coffeeChatInterviewFilter}
+                          label="Interview"
+                          onChange={(e) => setCoffeeChatInterviewFilter(e.target.value)}
+                          renderValue={(selected) => {
+                            if (selected === 'all') return 'All Interviews';
+                            const selectedInterview = coffeeChatInterviews.find(i => i.id === selected);
+                            return selectedInterview ? selectedInterview.title : selected;
+                          }}
+                        >
+                          <MenuItem value="all">All Interviews</MenuItem>
+                          {coffeeChatInterviews.map((interview) => (
+                            <MenuItem key={interview.id} value={interview.id}>
+                              {interview.title}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                  )}
                 </Grid>
 
                 {/* Sorting Row */}
