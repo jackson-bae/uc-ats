@@ -270,11 +270,25 @@ router.get('/', async (req, res) => {
 
     // Add search filter (search by name or email)
     if (search) {
-      whereClause.OR = [
-        { firstName: { contains: search, mode: 'insensitive' } },
-        { lastName: { contains: search, mode: 'insensitive' } },
-        { email: { contains: search, mode: 'insensitive' } }
-      ];
+      // Split search into words for full name matching
+      const searchWords = search.split(/\s+/).filter(word => word.length > 0);
+
+      if (searchWords.length > 1) {
+        // Multi-word search: match each word against first or last name
+        whereClause.AND = searchWords.map(word => ({
+          OR: [
+            { firstName: { contains: word, mode: 'insensitive' } },
+            { lastName: { contains: word, mode: 'insensitive' } }
+          ]
+        }));
+      } else {
+        // Single word search: match against first name, last name, or email
+        whereClause.OR = [
+          { firstName: { contains: search, mode: 'insensitive' } },
+          { lastName: { contains: search, mode: 'insensitive' } },
+          { email: { contains: search, mode: 'insensitive' } }
+        ];
+      }
     }
 
     // Add other filters

@@ -136,14 +136,33 @@ router.get('/all-candidates', requireAuth, async (req, res) => {
     console.log('Fetching all candidates for member:', req.user.id, `(page ${page}, limit ${limit}, minimal: ${minimal}, search: "${search}")`);
 
     // Build where clause for search
-    const whereClause = search ? {
-      OR: [
-        { studentId: { contains: search, mode: 'insensitive' } },
-        { applications: { some: { firstName: { contains: search, mode: 'insensitive' } } } },
-        { applications: { some: { lastName: { contains: search, mode: 'insensitive' } } } },
-        { applications: { some: { email: { contains: search, mode: 'insensitive' } } } }
-      ]
-    } : {};
+    let whereClause = {};
+    if (search) {
+      // Split search into words for full name matching
+      const searchWords = search.split(/\s+/).filter(word => word.length > 0);
+
+      if (searchWords.length > 1) {
+        // Multi-word search: match each word against first or last name in applications
+        whereClause.AND = searchWords.map(word => ({
+          applications: {
+            some: {
+              OR: [
+                { firstName: { contains: word, mode: 'insensitive' } },
+                { lastName: { contains: word, mode: 'insensitive' } }
+              ]
+            }
+          }
+        }));
+      } else {
+        // Single word search: match against studentId, first name, last name, or email
+        whereClause.OR = [
+          { studentId: { contains: search, mode: 'insensitive' } },
+          { applications: { some: { firstName: { contains: search, mode: 'insensitive' } } } },
+          { applications: { some: { lastName: { contains: search, mode: 'insensitive' } } } },
+          { applications: { some: { email: { contains: search, mode: 'insensitive' } } } }
+        ];
+      }
+    }
 
     // Get total count with search filter
     const total = await prisma.candidate.count({ where: whereClause });
