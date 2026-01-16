@@ -3939,21 +3939,43 @@ router.get('/applications/:id/interview-evaluations', async (req, res) => {
       orderBy: { createdAt: 'desc' }
     });
 
+    // Get behavioral questions for all first round interviews
+    const firstRoundInterviewIds = [...new Set(firstRoundEvaluations.map(e => e.interviewId))];
+    const behavioralQuestions = firstRoundInterviewIds.length > 0
+      ? await prisma.behavioralQuestion.findMany({
+          where: {
+            interviewId: { in: firstRoundInterviewIds }
+          },
+          orderBy: { order: 'asc' }
+        })
+      : [];
+
+    // Create a map of question ID to question text
+    const questionMap = {};
+    behavioralQuestions.forEach(q => {
+      questionMap[q.id] = q.questionText;
+    });
+
     // Combine both types of evaluations
     const allEvaluations = [...regularEvaluations, ...firstRoundEvaluations];
-    
+
     // Parse JSON fields for each evaluation
     const parsedEvaluations = allEvaluations.map(evaluation => {
       const parsed = { ...evaluation };
-      
+
       // Safely parse JSON fields
       parsed.behavioralNotes = safeParseJsonField(parsed.behavioralNotes);
       parsed.casingNotes = safeParseJsonField(parsed.casingNotes);
       parsed.candidateDetails = safeParseJsonField(parsed.candidateDetails);
-      
+
+      // Add question map for first round evaluations
+      if (parsed.interview?.interviewType === 'ROUND_ONE') {
+        parsed.behavioralQuestionMap = questionMap;
+      }
+
       return parsed;
     });
-    
+
     res.json(parsedEvaluations);
   } catch (error) {
     console.error('[GET /api/admin/applications/:id/interview-evaluations]', error);

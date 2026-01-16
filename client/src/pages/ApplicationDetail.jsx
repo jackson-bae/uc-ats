@@ -1815,15 +1815,176 @@ export default function ApplicationDetail({ applicationId: propApplicationId, em
                   </div>
                 )}
                 
-                {/* Notes */}
-                {evaluation.notes && (
+                {/* First Round Interview Scores */}
+                {evaluation.interview.interviewType === 'ROUND_ONE' && (evaluation.behavioralTotal !== undefined || evaluation.marketSizingTotal !== undefined) && (
+                  <div style={{ marginBottom: '12px' }}>
+                    <div style={{ fontWeight: '600', color: '#374151', marginBottom: '8px', fontSize: '0.875rem' }}>
+                      First Round Scores:
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                      {/* Behavioral Section */}
+                      <div style={{
+                        backgroundColor: '#f3f4f6',
+                        padding: '12px',
+                        borderRadius: '4px'
+                      }}>
+                        <div style={{ fontWeight: '600', color: '#374151', marginBottom: '8px', fontSize: '0.875rem' }}>
+                          Behavioral
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.8rem', color: '#6b7280' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span>Leadership:</span>
+                            <span style={{ fontWeight: '500' }}>{evaluation.behavioralLeadership ?? 'N/A'}/5</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span>Problem Solving:</span>
+                            <span style={{ fontWeight: '500' }}>{evaluation.behavioralProblemSolving ?? 'N/A'}/5</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span>Interest:</span>
+                            <span style={{ fontWeight: '500' }}>{evaluation.behavioralInterest ?? 'N/A'}/5</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #d1d5db', paddingTop: '4px', marginTop: '4px' }}>
+                            <span style={{ fontWeight: '600' }}>Total:</span>
+                            <span style={{ fontWeight: '600', color: '#374151' }}>{evaluation.behavioralTotal ?? 'N/A'}/15</span>
+                          </div>
+                        </div>
+                      </div>
+                      {/* Market Sizing Section */}
+                      <div style={{
+                        backgroundColor: '#f3f4f6',
+                        padding: '12px',
+                        borderRadius: '4px'
+                      }}>
+                        <div style={{ fontWeight: '600', color: '#374151', marginBottom: '8px', fontSize: '0.875rem' }}>
+                          Market Sizing
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.8rem', color: '#6b7280' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span>Teamwork:</span>
+                            <span style={{ fontWeight: '500' }}>{evaluation.marketSizingTeamwork ?? 'N/A'}/5</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span>Logic:</span>
+                            <span style={{ fontWeight: '500' }}>{evaluation.marketSizingLogic ?? 'N/A'}/5</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span>Creativity:</span>
+                            <span style={{ fontWeight: '500' }}>{evaluation.marketSizingCreativity ?? 'N/A'}/5</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #d1d5db', paddingTop: '4px', marginTop: '4px' }}>
+                            <span style={{ fontWeight: '600' }}>Total:</span>
+                            <span style={{ fontWeight: '600', color: '#374151' }}>{evaluation.marketSizingTotal ?? 'N/A'}/15</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* First Round Interview Notes */}
+                {evaluation.interview.interviewType === 'ROUND_ONE' && (
+                  <>
+                    {evaluation.behavioralNotes && typeof evaluation.behavioralNotes === 'object' && Object.keys(evaluation.behavioralNotes).length > 0 && (
+                      <div style={{ marginBottom: '12px' }}>
+                        <div style={{ fontWeight: '600', color: '#374151', marginBottom: '8px', fontSize: '0.875rem' }}>
+                          Behavioral Notes:
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          {Object.entries(evaluation.behavioralNotes).map(([questionId, notes], index) => {
+                            const questionText = evaluation.behavioralQuestionMap?.[questionId] || `Question ${index + 1}`;
+                            return (
+                              <div key={questionId} style={{
+                                backgroundColor: '#f3f4f6',
+                                padding: '12px',
+                                borderRadius: '4px',
+                                borderLeft: '3px solid #6366f1'
+                              }}>
+                                <div style={{
+                                  fontWeight: '500',
+                                  color: '#4f46e5',
+                                  fontSize: '0.8rem',
+                                  marginBottom: '6px'
+                                }}>
+                                  {questionText}
+                                </div>
+                                <div style={{
+                                  whiteSpace: 'pre-wrap',
+                                  fontSize: '0.875rem',
+                                  color: '#374151',
+                                  lineHeight: '1.5'
+                                }}>
+                                  {notes || 'No notes'}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                    {evaluation.behavioralNotes && typeof evaluation.behavioralNotes === 'string' && (
+                      <div style={{ marginBottom: '12px' }}>
+                        <div style={{ fontWeight: '600', color: '#374151', marginBottom: '4px', fontSize: '0.875rem' }}>
+                          Behavioral Notes:
+                        </div>
+                        <div style={{
+                          backgroundColor: '#f3f4f6',
+                          padding: '8px',
+                          borderRadius: '4px',
+                          whiteSpace: 'pre-wrap',
+                          fontSize: '0.875rem',
+                          color: '#374151'
+                        }}>
+                          {evaluation.behavioralNotes}
+                        </div>
+                      </div>
+                    )}
+                    {evaluation.marketSizingNotes && (
+                      <div style={{ marginBottom: '12px' }}>
+                        <div style={{ fontWeight: '600', color: '#374151', marginBottom: '4px', fontSize: '0.875rem' }}>
+                          Market Sizing Notes:
+                        </div>
+                        <div style={{
+                          backgroundColor: '#f3f4f6',
+                          padding: '8px',
+                          borderRadius: '4px',
+                          whiteSpace: 'pre-wrap',
+                          fontSize: '0.875rem',
+                          color: '#374151'
+                        }}>
+                          {typeof evaluation.marketSizingNotes === 'object' ? JSON.stringify(evaluation.marketSizingNotes, null, 2) : evaluation.marketSizingNotes}
+                        </div>
+                      </div>
+                    )}
+                    {evaluation.additionalNotes && (
+                      <div style={{ marginBottom: '12px' }}>
+                        <div style={{ fontWeight: '600', color: '#374151', marginBottom: '4px', fontSize: '0.875rem' }}>
+                          Additional Notes:
+                        </div>
+                        <div style={{
+                          backgroundColor: '#f3f4f6',
+                          padding: '8px',
+                          borderRadius: '4px',
+                          whiteSpace: 'pre-wrap',
+                          fontSize: '0.875rem',
+                          color: '#374151'
+                        }}>
+                          {typeof evaluation.additionalNotes === 'object' ? JSON.stringify(evaluation.additionalNotes, null, 2) : evaluation.additionalNotes}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* Regular Notes (for non-first-round interviews) */}
+                {evaluation.interview.interviewType !== 'ROUND_ONE' && evaluation.notes && (
                   <div style={{ marginBottom: '12px' }}>
                     <div style={{ fontWeight: '600', color: '#374151', marginBottom: '4px', fontSize: '0.875rem' }}>
                       Notes:
                     </div>
-                    <div style={{ 
-                      backgroundColor: '#f3f4f6', 
-                      padding: '8px', 
+                    <div style={{
+                      backgroundColor: '#f3f4f6',
+                      padding: '8px',
                       borderRadius: '4px',
                       whiteSpace: 'pre-wrap',
                       fontSize: '0.875rem',
@@ -1833,7 +1994,7 @@ export default function ApplicationDetail({ applicationId: propApplicationId, em
                     </div>
                   </div>
                 )}
-                
+
               </div>
             ))}
           </div>
