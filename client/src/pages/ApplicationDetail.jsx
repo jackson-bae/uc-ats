@@ -1754,7 +1754,7 @@ export default function ApplicationDetail({ applicationId: propApplicationId, em
                       {new Date(evaluation.createdAt).toLocaleDateString()}
                     </div>
                   </div>
-                  {evaluation.decision && (
+                  {(evaluation.decision || evaluation.finalDecision) && (
                     <div 
                       style={{
                         padding: '4px 8px',
@@ -1762,27 +1762,27 @@ export default function ApplicationDetail({ applicationId: propApplicationId, em
                         fontSize: '0.75rem',
                         fontWeight: '600',
                         backgroundColor: 
-                          evaluation.decision === 'YES' ? '#dcfce7' :
-                          evaluation.decision === 'MAYBE_YES' ? '#dcfce7' :
-                          evaluation.decision === 'UNSURE' ? '#fef3c7' :
-                          evaluation.decision === 'MAYBE_NO' ? '#fee2e2' :
+                          (evaluation.decision || evaluation.finalDecision) === 'YES' ? '#dcfce7' :
+                          (evaluation.decision || evaluation.finalDecision) === 'MAYBE_YES' ? '#dcfce7' :
+                          (evaluation.decision || evaluation.finalDecision) === 'UNSURE' ? '#fef3c7' :
+                          (evaluation.decision || evaluation.finalDecision) === 'MAYBE_NO' ? '#fee2e2' :
                           '#fee2e2',
                         color: 
-                          evaluation.decision === 'YES' ? '#166534' :
-                          evaluation.decision === 'MAYBE_YES' ? '#166534' :
-                          evaluation.decision === 'UNSURE' ? '#92400e' :
-                          evaluation.decision === 'MAYBE_NO' ? '#991b1b' :
+                          (evaluation.decision || evaluation.finalDecision) === 'YES' ? '#166534' :
+                          (evaluation.decision || evaluation.finalDecision) === 'MAYBE_YES' ? '#166534' :
+                          (evaluation.decision || evaluation.finalDecision) === 'UNSURE' ? '#92400e' :
+                          (evaluation.decision || evaluation.finalDecision) === 'MAYBE_NO' ? '#991b1b' :
                           '#991b1b',
                         border: '1px solid',
                         borderColor: 
-                          evaluation.decision === 'YES' ? '#bbf7d0' :
-                          evaluation.decision === 'MAYBE_YES' ? '#bbf7d0' :
-                          evaluation.decision === 'UNSURE' ? '#fde68a' :
-                          evaluation.decision === 'MAYBE_NO' ? '#fecaca' :
+                          (evaluation.decision || evaluation.finalDecision) === 'YES' ? '#bbf7d0' :
+                          (evaluation.decision || evaluation.finalDecision) === 'MAYBE_YES' ? '#bbf7d0' :
+                          (evaluation.decision || evaluation.finalDecision) === 'UNSURE' ? '#fde68a' :
+                          (evaluation.decision || evaluation.finalDecision) === 'MAYBE_NO' ? '#fecaca' :
                           '#fecaca'
                       }}
                     >
-                      {evaluation.decision.replace(/_/g, ' ')}
+                      {(evaluation.decision || evaluation.finalDecision).replace(/_/g, ' ')}
                     </div>
                   )}
                 </div>
@@ -1976,8 +1976,146 @@ export default function ApplicationDetail({ applicationId: propApplicationId, em
                   </>
                 )}
 
-                {/* Regular Notes (for non-first-round interviews) */}
-                {evaluation.interview.interviewType !== 'ROUND_ONE' && evaluation.notes && (
+                {/* Final Round Interview Evaluations (FINAL_ROUND and ROUND_TWO) */}
+                {(evaluation.interview.interviewType === 'FINAL_ROUND' || evaluation.interview.interviewType === 'ROUND_TWO') && (
+                  <>
+                    {/* Behavioral Notes for Final Round */}
+                    {evaluation.behavioralNotes && typeof evaluation.behavioralNotes === 'object' && Object.keys(evaluation.behavioralNotes).length > 0 && (
+                      <div style={{ marginBottom: '12px' }}>
+                        <div style={{ fontWeight: '600', color: '#374151', marginBottom: '8px', fontSize: '0.875rem' }}>
+                          Behavioral Notes:
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          {Object.entries(evaluation.behavioralNotes).map(([questionId, notes], index) => (
+                            <div key={questionId} style={{
+                              backgroundColor: '#f3f4f6',
+                              padding: '12px',
+                              borderRadius: '4px',
+                              borderLeft: '3px solid #6366f1'
+                            }}>
+                              <div style={{
+                                fontWeight: '500',
+                                color: '#4f46e5',
+                                fontSize: '0.8rem',
+                                marginBottom: '6px'
+                              }}>
+                                Question {index + 1}
+                              </div>
+                              <div style={{
+                                whiteSpace: 'pre-wrap',
+                                fontSize: '0.875rem',
+                                color: '#374151',
+                                lineHeight: '1.5'
+                              }}>
+                                {notes || 'No notes'}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {evaluation.behavioralNotes && typeof evaluation.behavioralNotes === 'string' && evaluation.behavioralNotes.trim() && (
+                      <div style={{ marginBottom: '12px' }}>
+                        <div style={{ fontWeight: '600', color: '#374151', marginBottom: '4px', fontSize: '0.875rem' }}>
+                          Behavioral Notes:
+                        </div>
+                        <div style={{
+                          backgroundColor: '#f3f4f6',
+                          padding: '8px',
+                          borderRadius: '4px',
+                          whiteSpace: 'pre-wrap',
+                          fontSize: '0.875rem',
+                          color: '#374151'
+                        }}>
+                          {evaluation.behavioralNotes}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Casing Notes for Final Round */}
+                    {evaluation.casingNotes && typeof evaluation.casingNotes === 'object' && Object.keys(evaluation.casingNotes).length > 0 && (
+                      <div style={{ marginBottom: '12px' }}>
+                        <div style={{ fontWeight: '600', color: '#374151', marginBottom: '8px', fontSize: '0.875rem' }}>
+                          Casing Notes:
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          {Object.entries(evaluation.casingNotes).map(([sectionId, notes], index) => (
+                            <div key={sectionId} style={{
+                              backgroundColor: '#f3f4f6',
+                              padding: '12px',
+                              borderRadius: '4px',
+                              borderLeft: '3px solid #10b981'
+                            }}>
+                              <div style={{
+                                fontWeight: '500',
+                                color: '#059669',
+                                fontSize: '0.8rem',
+                                marginBottom: '6px'
+                              }}>
+                                Section {index + 1}
+                              </div>
+                              <div style={{
+                                whiteSpace: 'pre-wrap',
+                                fontSize: '0.875rem',
+                                color: '#374151',
+                                lineHeight: '1.5'
+                              }}>
+                                {notes || 'No notes'}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {evaluation.casingNotes && typeof evaluation.casingNotes === 'string' && evaluation.casingNotes.trim() && (
+                      <div style={{ marginBottom: '12px' }}>
+                        <div style={{ fontWeight: '600', color: '#374151', marginBottom: '4px', fontSize: '0.875rem' }}>
+                          Casing Notes:
+                        </div>
+                        <div style={{
+                          backgroundColor: '#f3f4f6',
+                          padding: '8px',
+                          borderRadius: '4px',
+                          whiteSpace: 'pre-wrap',
+                          fontSize: '0.875rem',
+                          color: '#374151'
+                        }}>
+                          {evaluation.casingNotes}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Candidate Details for Final Round */}
+                    {evaluation.candidateDetails && typeof evaluation.candidateDetails === 'object' && Object.keys(evaluation.candidateDetails).length > 0 && (
+                      <div style={{ marginBottom: '12px' }}>
+                        <div style={{ fontWeight: '600', color: '#374151', marginBottom: '8px', fontSize: '0.875rem' }}>
+                          Candidate Details:
+                        </div>
+                        <div style={{
+                          backgroundColor: '#f3f4f6',
+                          padding: '12px',
+                          borderRadius: '4px',
+                          borderLeft: '3px solid #f59e0b'
+                        }}>
+                          <div style={{
+                            whiteSpace: 'pre-wrap',
+                            fontSize: '0.875rem',
+                            color: '#374151',
+                            lineHeight: '1.5'
+                          }}>
+                            {JSON.stringify(evaluation.candidateDetails, null, 2)}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* Regular Notes (for non-first-round interviews that aren't final round) */}
+                {evaluation.interview.interviewType !== 'ROUND_ONE' && 
+                 evaluation.interview.interviewType !== 'FINAL_ROUND' && 
+                 evaluation.interview.interviewType !== 'ROUND_TWO' && 
+                 evaluation.notes && (
                   <div style={{ marginBottom: '12px' }}>
                     <div style={{ fontWeight: '600', color: '#374151', marginBottom: '4px', fontSize: '0.875rem' }}>
                       Notes:
