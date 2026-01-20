@@ -773,7 +773,7 @@ export default function FinalRoundInterviewInterface() {
                             checked={evaluation.candidateDetails?.decisionCallTonight || false}
                             onChange={(e) => updateCandidateDetails(application.id, 'decisionCallTonight', e.target.checked)}
                           />
-                          We will call with a decision tonight
+                          We will communicate a decision tonight.
                         </label>
                       </div>
                       
@@ -795,7 +795,7 @@ export default function FinalRoundInterviewInterface() {
                             checked={evaluation.candidateDetails?.accelerator || false}
                             onChange={(e) => updateCandidateDetails(application.id, 'accelerator', e.target.checked)}
                           />
-                          Weekly Accelerator Mondays 6:00 - 7:00 during the rest of Fall Quarter
+                          Weekly Accelerator Mondays 6:00 - 7:00 during the rest of Winter Quarter
                         </label>
                       </div>
                       
@@ -817,7 +817,7 @@ export default function FinalRoundInterviewInterface() {
                             checked={evaluation.candidateDetails?.dues || false}
                             onChange={(e) => updateCandidateDetails(application.id, 'dues', e.target.checked)}
                           />
-                          $30 dues per quarter
+                          One time membership fee of $230
                         </label>
                       </div>
                     </div>
